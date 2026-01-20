@@ -1,0 +1,762 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  // url      = env("DATABASE_URL") // Removed as per Prisma 7.2.0 update
+}
+
+// ====================================================================================
+// Enums
+// ====================================================================================
+
+enum OurEntityType {
+  company
+  branch
+  studio
+  other
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum ScopeType {
+  global
+  our_entity
+  all_entities
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum ApprovalStepStatus {
+  pending
+  approved
+  rejected
+  skipped
+}
+
+enum ObjectType {
+  contract
+  invoice_request
+  reimbursement
+  custom
+}
+
+enum TodoSourceType {
+  project_task
+  approval_step
+  contract_reminder
+  finance_action
+  custom
+}
+
+enum TodoActionType {
+  do
+  approve
+  review
+  ack
+}
+
+enum TodoPriority {
+  p0
+  p1
+  p2
+  p3
+}
+
+enum TodoStatus {
+  open
+  in_progress
+  blocked
+  done
+  dismissed
+}
+
+enum ContractType {
+  sales
+  purchase
+  third_party
+}
+
+enum ContractStatus {
+  draft
+  in_approval
+  approved
+  signed
+  in_delivery
+  accepted
+  archived
+  cancelled
+}
+
+enum CounterpartyType {
+  customer
+  supplier
+  partner
+  other
+}
+
+enum PaymentPlanDirection {
+  receivable
+  payable
+}
+
+enum PaymentPlanStatus {
+  pending
+  due
+  overdue
+  completed
+}
+
+enum ProjectType {
+  b2b
+  b2c
+}
+
+enum ProjectStatus {
+  draft
+  active
+  paused
+  closed
+  cancelled
+}
+
+enum ProjectStageStatus {
+  not_started
+  in_progress
+  blocked
+  done
+  skipped
+}
+
+enum FinanceAccountCategory {
+  public
+  private
+}
+
+enum FinanceAccountStatus {
+  active
+  inactive
+}
+
+enum FinanceTransactionDirection {
+  in
+  out
+}
+
+enum FinanceReconcileStatus {
+  unreconciled
+  reconciled
+}
+
+enum FinanceInvoiceKind {
+  output
+  input
+}
+
+enum FinanceInvoiceMedium {
+  paper
+  electronic
+}
+
+enum FinanceOcrStatus {
+  pending
+  processing
+  succeeded
+  failed
+  needs_review
+}
+
+enum InvoiceRequestStatus {
+  draft
+  in_approval
+  approved
+  issued
+  rejected
+  cancelled
+}
+
+enum ReimbursementStatus {
+  draft
+  in_approval
+  approved
+  paid
+  rejected
+  cancelled
+}
+
+// ====================================================================================
+// IAM Module
+// ====================================================================================
+
+model OurEntity {
+  our_entity_id          String       @id @default(uuid()) @map("our_entity_id")
+  name                   String
+  type                   OurEntityType?
+  legal_name             String?
+  uscc                   String?      @map("uscc") // Unified Social Credit Code
+  address                String?
+  default_currency       String       @default("CNY")
+  status                 UserStatus   @default(active)
+  default_finance_user_id String?
+  default_cashier_user_id String?
+  default_seal_admin_user_id String?
+  default_legal_user_id  String?
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  users                  User[] // Now correctly linked via User.ourEntity
+  userRoles              UserRole[]
+  contracts              Contract[]
+  projects               Project[]
+  financeAccounts        FinanceAccount[]
+  financeTransactions    FinanceTransaction[] // Added missing opposite relation
+  financeInvoices        FinanceInvoice[]
+  invoiceRequests        InvoiceRequest[]
+  reimbursements         Reimbursement[]
+  todoItems              TodoItem[]
+
+  @@map("our_entity")
+}
+
+model User {
+  user_id           String     @id @default(uuid()) @map("user_id")
+  display_name      String     @map("display_name")
+  email             String?    @unique
+  phone             String?    @unique
+  username          String?    @unique
+  status            UserStatus @default(active)
+  is_shareholder    Boolean    @default(false) @map("is_shareholder")
+  our_entity_id     String     @map("our_entity_id") // Added this to link to OurEntity
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity         OurEntity  @relation(fields: [our_entity_id], references: [our_entity_id]) // Added this relation
+  orgMemberships    OrgMembership[]
+  userRoles         UserRole[]
+  ownedContracts    Contract[]       @relation("OwnerContracts")
+  managedContracts  Contract[]       @relation("PMContracts")
+  ownedProjects     Project[]        @relation("OwnerProjects")
+  managedProjects   Project[]        @relation("PMProjects")
+  createdTransactions FinanceTransaction[] @relation("CreatorTransactions")
+  invoiceRequests   InvoiceRequest[] @relation("RequesterInvoiceRequests")
+  reimbursements    Reimbursement[]  @relation("RequesterReimbursements")
+  todoItemsAssigned TodoItem[]       @relation("AssignedTodoItems")
+  todoItemsCreated  TodoItem[]       @relation("CreatorTodoItems")
+  approvalInstances ApprovalInstance[] @relation("ApprovalInstanceCreator")
+  approvalSteps     ApprovalStep[]   @relation("ApprovalStepApprover")
+  projectMembers    ProjectMember[]
+
+  @@map("user")
+}
+
+model OrgUnit {
+  org_unit_id      String        @id @default(uuid()) @map("org_unit_id")
+  name             String
+  parent_org_unit_id String?
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  parent           OrgUnit?      @relation("ParentChildOrgUnits", fields: [parent_org_unit_id], references: [org_unit_id], onDelete: NoAction, onUpdate: NoAction)
+  children         OrgUnit[]     @relation("ParentChildOrgUnits")
+  memberships      OrgMembership[]
+
+  @@map("org_unit")
+}
+
+model OrgMembership {
+  org_membership_id String   @id @default(uuid()) @map("org_membership_id")
+  user_id           String   @map("user_id")
+  org_unit_id       String   @map("org_unit_id")
+  title             String?
+  is_manager        Boolean  @default(false) @map("is_manager")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user              User     @relation(fields: [user_id], references: [user_id])
+  orgUnit           OrgUnit  @relation(fields: [org_unit_id], references: [org_unit_id])
+
+  @@unique([user_id, org_unit_id])
+  @@map("org_membership")
+}
+
+model Permission {
+  permission_id   String @id @default(uuid()) @map("permission_id")
+  code            String @unique
+  name            String
+  module          String // e.g., iam, todo, contract, project, finance
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rolePermissions RolePermission[]
+
+  @@map("permission")
+}
+
+model Role {
+  role_id         String @id @default(uuid()) @map("role_id")
+  code            String @unique
+  name            String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("role")
+}
+
+model RolePermission {
+  role_permission_id String     @id @default(uuid()) @map("role_permission_id")
+  role_id            String     @map("role_id")
+  permission_id      String     @map("permission_id")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  role               Role       @relation(fields: [role_id], references: [role_id])
+  permission         Permission @relation(fields: [permission_id], references: [permission_id])
+
+  @@unique([role_id, permission_id])
+  @@map("role_permission")
+}
+
+model UserRole {
+  user_role_id    String    @id @default(uuid()) @map("user_role_id")
+  user_id         String    @map("user_id")
+  role_id         String    @map("role_id")
+  scope_type      ScopeType @map("scope_type")
+  our_entity_id   String?   @map("our_entity_id") // Required if scope_type is our_entity
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user            User      @relation(fields: [user_id], references: [user_id])
+  role            Role      @relation(fields: [role_id], references: [role_id])
+  ourEntity       OurEntity? @relation(fields: [our_entity_id], references: [our_entity_id])
+
+  @@unique([user_id, role_id, our_entity_id]) // A user can have a role for a specific entity or globally
+  @@map("user_role")
+}
+
+// Approval Engine Models (defined in IAM PRD)
+model ApprovalFlow {
+  flow_id     String @id @default(uuid()) @map("flow_id")
+  flow_code   String @unique
+  name        String
+  object_type ObjectType
+  steps       Json // Array of JSON objects for steps
+  is_active   Boolean @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  approvalInstances ApprovalInstance[]
+
+  @@map("approval_flow")
+}
+
+model ApprovalInstance {
+  approval_id        String         @id @default(uuid()) @map("approval_id")
+  object_type        ObjectType     @map("object_type")
+  object_id          String         @map("object_id")
+  flow_code          String         @map("flow_code")
+  status             ApprovalStatus @default(pending)
+  current_step_no    Int            @map("current_step_no")
+  created_by_user_id String         @map("created_by_user_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy          User           @relation("ApprovalInstanceCreator", fields: [created_by_user_id], references: [user_id])
+  flow               ApprovalFlow   @relation(fields: [flow_code], references: [flow_code])
+  steps              ApprovalStep[]
+
+  @@map("approval_instance")
+}
+
+model ApprovalStep {
+  step_id         String           @id @default(uuid()) @map("step_id")
+  approval_id     String           @map("approval_id")
+  step_no         Int              @map("step_no")
+  step_name       String           @map("step_name")
+  approver_user_id String           @map("approver_user_id")
+  status          ApprovalStepStatus @default(pending)
+  acted_at        DateTime?        @map("acted_at")
+  comment         String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  approvalInstance ApprovalInstance @relation(fields: [approval_id], references: [approval_id])
+  approver         User             @relation("ApprovalStepApprover", fields: [approver_user_id], references: [user_id])
+  todoItem         TodoItem?        @relation("ApprovalStepTodoItem") // Removed fields and references from this side
+
+  @@unique([approval_id, step_no])
+  @@map("approval_step")
+}
+
+
+// ====================================================================================
+// Todo Module
+// ====================================================================================
+
+model TodoItem {
+  todo_id         String         @id @default(uuid()) @map("todo_id")
+  our_entity_id   String         @map("our_entity_id")
+  assignee_user_id String         @map("assignee_user_id")
+  creator_user_id String         @map("creator_user_id")
+  title           String
+  description     String?
+  source_type     TodoSourceType @map("source_type")
+  source_id       String         @unique @map("source_id") // R-TODO-002: Unique constraint to avoid duplicate todos from the same source
+  action_type     TodoActionType @map("action_type")
+  priority        TodoPriority   @default(p2)
+  status          TodoStatus     @default(open)
+  due_at          DateTime?      @map("due_at")
+  start_at        DateTime?      @map("start_at")
+  tags            Json? // array of strings
+  link            Json? // { object_type, object_id, url }
+  blocked_reason  String?        @map("blocked_reason")
+  done_at         DateTime?      @map("done_at")
+  done_by_user_id String?        @map("done_by_user_id")
+  dismiss_reason  String?        @map("dismiss_reason")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity       OurEntity      @relation(fields: [our_entity_id], references: [our_entity_id])
+  assignee        User           @relation("AssignedTodoItems", fields: [assignee_user_id], references: [user_id])
+  creator         User           @relation("CreatorTodoItems", fields: [creator_user_id], references: [user_id])
+  approvalStep    ApprovalStep?  @relation("ApprovalStepTodoItem", fields: [source_id], references: [step_id]) // Moved fields and references here
+
+  @@unique([source_type, source_id])
+  @@map("todo_item")
+}
+
+// ====================================================================================
+// Contract Module
+// ====================================================================================
+
+model Counterparty {
+  counterparty_id String     @id @default(uuid()) @map("counterparty_id")
+  name            String
+  type            CounterpartyType
+  identifier      String?
+  address         String?
+  contacts        Json? // Array of contact persons {name, email, phone}
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  contracts       Contract[]
+  projects        Project[]  @relation("CustomerProjects")
+  financeTransactions FinanceTransaction[]
+
+  @@map("counterparty")
+}
+
+model Contract {
+  contract_id      String       @id @default(uuid()) @map("contract_id")
+  our_entity_id    String       @map("our_entity_id")
+  contract_no      String       @unique @map("contract_no")
+  name             String
+  contract_type    ContractType @map("contract_type")
+  status           ContractStatus
+  owner_user_id    String       @map("owner_user_id") // Sales/Business Owner
+  pm_user_id       String?      @map("pm_user_id") // Project Manager (optional)
+  counterparty_id  String       @map("counterparty_id")
+  amount_total     Decimal      @db.Decimal(18, 2) @map("amount_total")
+  currency         String
+  sign_date        DateTime?    @db.Date @map("sign_date")
+  effective_date   DateTime?    @db.Date @map("effective_date")
+  expire_date      DateTime?    @db.Date @map("expire_date")
+  summary          String?      @db.Text
+  content_doc      String?      @db.Text // Markdown content
+  attachments      Json? // array<json> for file service
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity        OurEntity    @relation(fields: [our_entity_id], references: [our_entity_id])
+  owner            User         @relation("OwnerContracts", fields: [owner_user_id], references: [user_id])
+  projectManager   User?        @relation("PMContracts", fields: [pm_user_id], references: [user_id])
+  counterparty     Counterparty @relation(fields: [counterparty_id], references: [counterparty_id])
+  paymentPlans     ContractPaymentPlan[]
+  projectLinks     ProjectContractLink[]
+  financeInvoices  FinanceInvoice[] @relation("ContractInvoices")
+  invoiceRequests  InvoiceRequest[]
+  projects         Project[] // Opposite relation for Project.contract
+  reimbursements   Reimbursement[] @relation("ContractReimbursements") // Added missing opposite relation with explicit name
+
+  @@map("contract")
+}
+
+model ContractPaymentPlan {
+  plan_id        String            @id @default(uuid()) @map("plan_id")
+  contract_id    String            @map("contract_id")
+  sequence_no    Int               @map("sequence_no")
+  direction      PaymentPlanDirection
+  name           String
+  amount         Decimal           @db.Decimal(18, 2)
+  due_at         DateTime?         @map("due_at") @db.Date
+  is_final       Boolean           @default(false) @map("is_final")
+  paid_amount    Decimal           @db.Decimal(18, 2) @default(0) @map("paid_amount")
+  paid_at        DateTime?         @map("paid_at")
+  status         PaymentPlanStatus @default(pending)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  contract       Contract          @relation(fields: [contract_id], references: [contract_id])
+  financeTransactions FinanceTransaction[] @relation("PaymentPlanTransactions") // Explicit opposite relation for FinanceTransaction
+  financeInvoices FinanceInvoice[] @relation("PaymentPlanInvoices")
+  invoiceRequests InvoiceRequest[]
+
+  @@map("contract_payment_plan")
+}
+
+// ====================================================================================
+// Project Module
+// ====================================================================================
+
+model Project {
+  project_id         String           @id @default(uuid()) @map("project_id")
+  our_entity_id      String           @map("our_entity_id")
+  project_no         String           @unique @map("project_no")
+  name               String
+  project_type       ProjectType      @map("project_type")
+  status             ProjectStatus    @default(draft)
+  owner_user_id      String           @map("owner_user_id")
+  pm_user_id         String           @map("pm_user_id")
+  customer_id        String?          @map("customer_id") // counterparty_id
+  contract_id        String?          @map("contract_id") // For B2B projects
+  start_at           DateTime?        @db.Date @map("start_at")
+  due_at             DateTime?        @db.Date @map("due_at")
+  current_stage_code String           @map("current_stage_code")
+  progress           Decimal          @db.Decimal(5, 2) @default(0) // 0 to 1, e.g., 0.75
+  description        String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity          OurEntity        @relation(fields: [our_entity_id], references: [our_entity_id])
+  owner              User             @relation("OwnerProjects", fields: [owner_user_id], references: [user_id])
+  projectManager     User             @relation("PMProjects", fields: [pm_user_id], references: [user_id])
+  customer           Counterparty?    @relation("CustomerProjects", fields: [customer_id], references: [counterparty_id])
+  contract           Contract?        @relation(fields: [contract_id], references: [contract_id]) // Explicit relation name to avoid clash
+  projectStages      ProjectStage[]
+  projectMembers     ProjectMember[]
+  projectContractLinks ProjectContractLink[]
+  reimbursements     Reimbursement[] @relation("ProjectReimbursements") // Added missing opposite relation with explicit name
+
+  @@map("project")
+}
+
+model ProjectStage {
+  stage_id     String           @id @default(uuid()) @map("stage_id")
+  project_id   String           @map("project_id")
+  stage_code   String           @map("stage_code")
+  stage_name   String           @map("stage_name")
+  sequence_no  Int              @map("sequence_no")
+  status       ProjectStageStatus @default(not_started)
+  planned_start DateTime?       @db.Date @map("planned_start")
+  planned_end  DateTime?        @db.Date @map("planned_end")
+  actual_start DateTime?        @db.Date @map("actual_start")
+  actual_end   DateTime?        @db.Date @map("actual_end")
+  blocked_reason String?        @map("blocked_reason")
+  skipped_reason String?        @map("skipped_reason")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  project      Project          @relation(fields: [project_id], references: [project_id])
+
+  @@unique([project_id, stage_code])
+  @@map("project_stage")
+}
+
+model ProjectMember {
+  member_id   String   @id @default(uuid()) @map("member_id")
+  project_id  String   @map("project_id")
+  user_id     String   @map("user_id")
+  role_in_project String? @map("role_in_project")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project  @relation(fields: [project_id], references: [project_id])
+  user        User     @relation(fields: [user_id], references: [user_id])
+
+  @@unique([project_id, user_id])
+  @@map("project_member")
+}
+
+model ProjectContractLink { // For B2B projects, linking a project to a contract
+  link_id      String   @id @default(uuid()) @map("link_id")
+  project_id   String   @map("project_id")
+  contract_id  String   @map("contract_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  project      Project  @relation(fields: [project_id], references: [project_id])
+  contract     Contract @relation(fields: [contract_id], references: [contract_id])
+
+  @@unique([project_id, contract_id])
+  @@map("project_contract_link")
+}
+
+// ====================================================================================
+// Finance Module
+// ====================================================================================
+
+model FinanceAccount {
+  account_id          String                @id @default(uuid()) @map("account_id")
+  our_entity_id       String                @map("our_entity_id")
+  account_category    FinanceAccountCategory @map("account_category")
+  account_name        String                @map("account_name")
+  bank_name           String?               @map("bank_name")
+  bank_branch         String?               @map("bank_branch")
+  account_no_encrypted String?              @map("account_no_encrypted")
+  account_no_masked   String?               @map("account_no_masked")
+  currency            String
+  status              FinanceAccountStatus  @default(active)
+  is_default          Boolean               @default(false) @map("is_default")
+  shareholder_user_id String?               @map("shareholder_user_id")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity           OurEntity             @relation(fields: [our_entity_id], references: [our_entity_id])
+  // shareholderUser     User?                 @relation("ShareholderAccount", fields: [shareholder_user_id], references: [user_id]) // Self-referencing not allowed like this, handled via code
+  transactions        FinanceTransaction[]
+
+  @@map("finance_account")
+}
+
+model FinanceTransaction {
+  txn_id                  String                  @id @default(uuid()) @map("txn_id")
+  our_entity_id           String                  @map("our_entity_id")
+  account_id              String                  @map("account_id")
+  txn_direction           FinanceTransactionDirection @map("txn_direction")
+  amount                  Decimal                 @db.Decimal(18, 2)
+  currency                String
+  txn_date                DateTime                @db.Date @map("txn_date")
+  counterparty_id         String?                 @map("counterparty_id")
+  purpose                 String?
+  channel                 String?
+  reference_no            String?                 @map("reference_no")
+  attachments             Json? // Array of file service JSON
+  reconcile_status        FinanceReconcileStatus  @default(unreconciled) @map("reconcile_status")
+  // Keep these for application logic, but use explicit FKs for Prisma relations
+  related_object_type     String?                 @map("related_object_type")
+  related_object_id       String?                 @map("related_object_id")
+
+  // Explicit foreign keys for relations
+  contract_payment_plan_id String?                @map("contract_payment_plan_id")
+  reimbursement_id        String?                @map("reimbursement_id") @unique // One-to-one with Reimbursement.paidTransaction
+
+  created_by_user_id      String                  @map("created_by_user_id")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity               OurEntity               @relation(fields: [our_entity_id], references: [our_entity_id])
+  account                 FinanceAccount          @relation(fields: [account_id], references: [account_id])
+  counterparty            Counterparty?           @relation(fields: [counterparty_id], references: [counterparty_id])
+  createdBy               User                    @relation("CreatorTransactions", fields: [created_by_user_id], references: [user_id])
+  paymentPlan             ContractPaymentPlan?    @relation("PaymentPlanTransactions", fields: [contract_payment_plan_id], references: [plan_id])
+  reimbursement           Reimbursement?          @relation("ReimbursementPayment") // Removed fields and references from this side
+
+  @@map("finance_transaction")
+}
+
+model FinanceInvoice {
+  invoice_id          String                @id @default(uuid()) @map("invoice_id")
+  our_entity_id       String                @map("our_entity_id")
+  invoice_kind        FinanceInvoiceKind    @map("invoice_kind")
+  invoice_medium      FinanceInvoiceMedium  @map("invoice_medium")
+  invoice_no          String?               @unique @map("invoice_no")
+  issue_date          DateTime?             @db.Date @map("issue_date")
+  amount_with_tax     Decimal?              @db.Decimal(18, 2) @map("amount_with_tax")
+  // ... other fields from PRD like tax_amount, tax_rate, buyer_name, seller_name etc.
+  files               Json // Array of file service JSON for the invoice documents
+  ocr_status          FinanceOcrStatus      @default(pending) @map("ocr_status")
+  ocr_confidence      Decimal?              @db.Decimal(5, 4) @map("ocr_confidence")
+  ocr_raw_result      Json?                 @map("ocr_raw_result")
+  ocr_extracted_fields Json?                @map("ocr_extracted_fields")
+  related_contract_id String?               @map("related_contract_id")
+  related_payment_plan_id String?           @map("related_payment_plan_id")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity           OurEntity             @relation(fields: [our_entity_id], references: [our_entity_id])
+  relatedContract     Contract?             @relation("ContractInvoices", fields: [related_contract_id], references: [contract_id])
+  relatedPaymentPlan  ContractPaymentPlan?  @relation("PaymentPlanInvoices", fields: [related_payment_plan_id], references: [plan_id])
+  invoiceRequest      InvoiceRequest?       @relation("InvoiceRequestIssuedInvoice") // Opposite relation for InvoiceRequest.issuedInvoice
+
+  @@map("finance_invoice")
+}
+
+model InvoiceRequest {
+  request_id          String            @id @default(uuid()) @map("request_id")
+  our_entity_id       String            @map("our_entity_id")
+  contract_id         String?           @map("contract_id")
+  payment_plan_id     String?           @map("payment_plan_id")
+  requester_user_id   String            @map("requester_user_id")
+  amount_with_tax     Decimal           @db.Decimal(18, 2) @map("amount_with_tax")
+  status              InvoiceRequestStatus @default(draft)
+  issued_invoice_id   String?           @unique @map("issued_invoice_id") // Links to FinanceInvoice
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity           OurEntity         @relation(fields: [our_entity_id], references: [our_entity_id])
+  contract            Contract?         @relation(fields: [contract_id], references: [contract_id])
+  paymentPlan         ContractPaymentPlan? @relation(fields: [payment_plan_id], references: [plan_id])
+  requester           User              @relation("RequesterInvoiceRequests", fields: [requester_user_id], references: [user_id])
+  issuedInvoice       FinanceInvoice?   @relation("InvoiceRequestIssuedInvoice", fields: [issued_invoice_id], references: [invoice_id])
+
+  @@map("invoice_request")
+}
+
+model Reimbursement {
+  reim_id             String            @id @default(uuid()) @map("reim_id")
+  our_entity_id       String            @map("our_entity_id")
+  requester_user_id   String            @map("requester_user_id")
+  project_id          String?           @map("project_id")
+  contract_id         String?           @map("contract_id")
+  total_amount        Decimal           @db.Decimal(18, 2) @map("total_amount")
+  expense_lines       Json              // Array of expense line items {description, amount, attachments}
+  status              ReimbursementStatus @default(draft)
+  paid_txn_id         String?           @unique @map("paid_txn_id") // Links to FinanceTransaction
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  ourEntity           OurEntity         @relation(fields: [our_entity_id], references: [our_entity_id])
+  requester           User              @relation("RequesterReimbursements", fields: [requester_user_id], references: [user_id])
+  project             Project?          @relation("ProjectReimbursements", fields: [project_id], references: [project_id])
+  contract            Contract?         @relation("ContractReimbursements", fields: [contract_id], references: [contract_id])
+  paidTransaction     FinanceTransaction? @relation("ReimbursementPayment", fields: [paid_txn_id], references: [txn_id])
+
+  @@map("reimbursement")
+}
