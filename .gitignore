@@ -60,4 +60,5 @@ backend/punkrecord.db-shm
 
 # 日志
 logs/
-*.logpunkrecord/
+*.log
+punkrecord/
