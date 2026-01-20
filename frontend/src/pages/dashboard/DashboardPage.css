@@ -1,0 +1,93 @@
+/* DashboardPage.css */
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #cdd6f4;
+    margin-bottom: 4px;
+}
+
+.page-header p {
+    color: #a6adc8;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .card {
+        background-color: #1e1e2e;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+}
+
+.stat-card h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: #a6adc8;
+    margin-bottom: 12px;
+}
+
+.stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: #89b4fa;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #bac2de;
+}
+
+.recent-activity {
+    grid-column: 1 / -1;
+}
+
+.recent-activity h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #cdd6f4;
+    margin-bottom: 20px;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.activity-item {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #313244;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.activity-item .time {
+    color: #7f849c;
+    font-size: 14px;
+    min-width: 80px;
+}
+
+.activity-item .desc {
+    color: #cdd6f4;
+}

@@ -1,1 +1,63 @@
+# 系统文件
 .DS_Store
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 构建产物
+dist/
+build/
+*.min.js
+*.min.css
+
+# 上传文件
+uploads/
+*.pdf
+*.docx
+*.xlsx
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+backend/punkrecord.db
+backend/punkrecord.db-journal
+backend/punkrecord.db-wal
+backend/punkrecord.db-shm
+
+# 日志
+logs/
+*.logpunkrecord/
