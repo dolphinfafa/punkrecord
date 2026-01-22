@@ -5,6 +5,15 @@ import Layout from '@/components/layout/Layout';
 import LoginPage from '@/pages/auth/LoginPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import TodoPage from '@/pages/todo/TodoPage';
+import FinanceLayout from '@/pages/finance/FinanceLayout';
+import AccountListPage from '@/pages/finance/AccountListPage';
+import TransactionListPage from '@/pages/finance/TransactionListPage';
+import IAMLayout from '@/pages/iam/IAMLayout';
+import UserListPage from '@/pages/iam/UserListPage';
+import EntityListPage from '@/pages/iam/EntityListPage';
+import ContractLayout from '@/pages/contract/ContractLayout';
+import ContractListPage from '@/pages/contract/ContractListPage';
+import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -35,10 +44,20 @@ function App() {
           }>
             <Route index element={<DashboardPage />} />
             <Route path="todo" element={<TodoPage />} />
-            <Route path="iam" element={<div>IAM Module (Coming Soon)</div>} />
-            <Route path="contract" element={<div>Contract Module (Coming Soon)</div>} />
+            <Route path="iam" element={<IAMLayout />}>
+              <Route path="users" element={<UserListPage />} />
+              <Route path="entities" element={<EntityListPage />} />
+            </Route>
+            <Route path="contract" element={<ContractLayout />}>
+              <Route path="list" element={<ContractListPage />} />
+              <Route path="counterparties" element={<CounterpartyListPage />} />
+            </Route>
             <Route path="project" element={<div>Project Module (Coming Soon)</div>} />
-            <Route path="finance" element={<div>Finance Module (Coming Soon)</div>} />
+
+            <Route path="finance" element={<FinanceLayout />}>
+              <Route path="accounts" element={<AccountListPage />} />
+              <Route path="transactions" element={<TransactionListPage />} />
+            </Route>
           </Route>
         </Routes>
       </AuthProvider>

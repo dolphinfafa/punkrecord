@@ -1,0 +1,49 @@
+.finance-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.finance-header {
+    padding: 1.5rem 2rem;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.finance-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.finance-nav {
+    display: flex;
+    gap: 2rem;
+}
+
+.finance-nav a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.finance-nav a:hover {
+    color: var(--text-primary);
+}
+
+.finance-nav a.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.finance-content {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+}
