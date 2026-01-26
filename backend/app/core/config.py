@@ -3,6 +3,7 @@ Application configuration
 """
 from pydantic_settings import BaseSettings
 from typing import Optional
+from urllib.parse import quote_plus
 
 
 class Settings(BaseSettings):
@@ -14,7 +15,11 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # Database
-    DATABASE_URL: str = "sqlite:///./atlas.db"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 3306
+    DB_NAME: str = "punkrecord"
+    DB_USER: str = "admin"
+    DB_PASSWORD: str = ""
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -31,6 +36,13 @@ class Settings(BaseSettings):
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+    
+    @property
+    def DATABASE_URL(self) -> str:
+        """Construct database URL from components"""
+        # URL-encode the password to handle special characters like @
+        encoded_password = quote_plus(self.DB_PASSWORD)
+        return f"mysql+pymysql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     
     class Config:
         env_file = ".env"

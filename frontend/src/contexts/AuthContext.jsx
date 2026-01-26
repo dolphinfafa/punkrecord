@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     const login = async (username, password) => {
         try {
             const response = await client.post('/auth/login', { username, password });
-            const { access_token, user_id, display_name } = response.data;
+            const { access_token, user_id, display_name } = response;
 
             const userData = { id: user_id, name: display_name };
 

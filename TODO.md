@@ -1,32 +1,378 @@
 # Project TODO List (Atlas Enterprise Management System)
 
-Here are the remaining tasks to be completed for the "Atlas" enterprise management system:
+## 📊 项目概况
 
-## Current Task: Configure Database and Run Migrations
+**项目名称**：Atlas 企业管理系统  
+**当前版本**：v1.0.0  
+**整体进度**：约 50%  
+**最后更新**：2026-01-26
 
-Before proceeding, please ensure your MySQL server is running and the `DATABASE_URL` in `apps/api/.env` file is correctly configured with your MySQL credentials.
+---
 
-The format should be:
-`mysql://USER:PASSWORD@HOST:PORT/DATABASE_NAME`
+## ✅ 已完成的重要里程碑
 
-For example:
-`mysql://root:mysecretpassword@localhost:3306/atlas_db`
+### 2026-01-26
+- ✅ MySQL数据库配置完成
+- ✅ 从SQLite迁移到MySQL 9.6.0
+- ✅ 创建28个数据表
+- ✅ 环境变量配置（.env文件）
+- ✅ 数据库连接测试工具
+- ✅ 数据库初始化脚本
 
-Once you have updated the `.env` file with your actual database credentials, I will proceed with running the Prisma migration to create the database schema.
+### 2026-01-22
+- ✅ 前后端完全打通
+- ✅ 所有API模块开发完成
+- ✅ 前端页面与后端API集成
+- ✅ 认证授权流程实现
 
-To run the migration manually (after configuring `.env`):
+### 早期工作
+- ✅ 后端FastAPI框架搭建
+- ✅ 前端React + Vite项目初始化
+- ✅ 基础模型设计（IAM、合同、项目、财务等）
+- ✅ API路由和控制器开发
+
+---
+
+## 🔥 当前优先任务（本周）
+
+### 1. 数据初始化 🗄️
+**优先级**：⭐⭐⭐⭐⭐
+
+- [ ] 创建默认管理员账户（admin用户）
+- [ ] 初始化系统角色（管理员、普通用户等）
+- [ ] 初始化基础权限配置
+- [ ] 创建测试数据（用于开发和演示）
+  - [ ] 测试用户（5-10个）
+  - [ ] 测试主体实体（2-3个公司）
+  - [ ] 测试合同数据（10-20条）
+  - [ ] 测试项目数据（5-10个）
+  - [ ] 测试财务数据（账户、交易）
+
+**预计工时**：4小时
+
+---
+
+### 2. 项目管理模块前端开发 📊
+**优先级**：⭐⭐⭐⭐
+
+- [ ] 创建项目列表页面（ProjectListPage.jsx）
+  - [ ] 项目卡片展示
+  - [ ] 筛选和搜索功能
+  - [ ] 分页支持
+- [ ] 实现项目详情页面（ProjectDetailPage.jsx）
+  - [ ] 项目基本信息展示
+  - [ ] 项目阶段时间线
+  - [ ] 项目成员列表
+- [ ] 开发项目创建/编辑表单
+  - [ ] 表单验证
+  - [ ] 项目类型选择
+  - [ ] 主体实体关联
+- [ ] 实现项目阶段可视化
+  - [ ] 时间线视图
+  - [ ] 阶段状态更新
+  - [ ] 进度百分比显示
+- [ ] 添加项目成员管理
+  - [ ] 成员添加/移除
+  - [ ] 角色分配
+
+**预计工时**：12小时
+
+---
+
+### 3. 财务模块增强 💰
+**优先级**：⭐⭐⭐⭐
+
+- [ ] 完善账户管理页面
+  - [ ] 账户创建表单
+  - [ ] 账户余额显示
+  - [ ] 账户状态管理
+- [ ] 实现交易记录创建表单
+  - [ ] 收入/支出类型选择
+  - [ ] 交易对手方关联
+  - [ ] 附件上传
+- [ ] 开发发票管理界面
+  - [ ] 发票列表展示
+  - [ ] 发票创建表单
+  - [ ] OCR识别集成（后续）
+- [ ] 实现报销申请流程
+  - [ ] 报销单创建
+  - [ ] 费用明细录入
+  - [ ] 关联项目/合同
+- [ ] 添加财务数据导出
+  - [ ] Excel导出
+  - [ ] CSV导出
+  - [ ] 日期范围筛选
+
+**预计工时**：10小时
+
+---
+
+### 4. 合同管理完善 📄
+**优先级**：⭐⭐⭐
+
+- [ ] 实现合同创建表单
+  - [ ] 基本信息录入
+  - [ ] 交易对手方选择
+  - [ ] 合同金额和日期
+- [ ] 开发付款计划管理
+  - [ ] 付款计划列表
+  - [ ] 付款计划创建/编辑
+  - [ ] 付款状态跟踪
+- [ ] 添加合同状态流转
+  - [ ] 草稿 → 审批中 → 生效
+  - [ ] 状态变更日志
+- [ ] 实现交易对手方管理
+  - [ ] 对手方列表
+  - [ ] 对手方创建/编辑
+  - [ ] 对手方分类
+
+**预计工时**：8小时
+
+---
+
+## 🎯 中期计划（本月）
+
+### 1. 审批流程开发 ✓
+**优先级**：⭐⭐⭐
+
+- [ ] 设计审批流程配置界面
+- [ ] 实现审批流程引擎
+- [ ] 开发审批任务列表页面
+- [ ] 实现审批操作（同意/拒绝/转交）
+- [ ] 添加审批历史记录查看
+- [ ] 集成到合同、报销等模块
+
+**预计工时**：16小时
+
+---
+
+### 2. 文件管理系统 📁
+**优先级**：⭐⭐⭐
+
+- [ ] 实现文件上传功能
+  - [ ] 支持多文件上传
+  - [ ] 文件大小限制
+  - [ ] 文件类型验证
+- [ ] 开发文件列表和预览
+  - [ ] 文件列表展示
+  - [ ] 图片预览
+  - [ ] PDF预览
+- [ ] 添加文件分类和标签
+- [ ] 实现文件权限控制
+- [ ] 集成发票OCR识别
+  - [ ] 调研OCR服务（百度、腾讯、阿里）
+  - [ ] 实现OCR接口集成
+  - [ ] 发票信息自动填充
+
+**预计工时**：12小时
+
+---
+
+### 3. Dashboard开发 📈
+**优先级**：⭐⭐⭐
+
+- [ ] 设计首页Dashboard布局
+- [ ] 实现待办事项统计卡片
+- [ ] 添加财务数据概览
+  - [ ] 收支统计图表
+  - [ ] 账户余额汇总
+- [ ] 开发项目进度展示
+  - [ ] 进行中的项目
+  - [ ] 项目完成率
+- [ ] 实现合同到期提醒
+- [ ] 添加快捷操作入口
+
+**预计工时**：10小时
+
+---
+
+### 4. 用户体验优化 ✨
+**优先级**：⭐⭐
+
+- [ ] 添加全局加载指示器
+- [ ] 优化错误提示信息
+- [ ] 实现表单验证（React Hook Form + Yup）
+- [ ] 添加操作成功的Toast提示
+- [ ] 优化移动端响应式布局
+- [ ] 添加快捷键支持
+- [ ] 实现主题切换（浅色/深色）
+
+**预计工时**：8小时
+
+---
+
+## 📅 长期计划（季度）
+
+### 1. 微信小程序开发 📱
+**优先级**：⭐⭐
+
+- [ ] 技术选型（Taro vs uni-app）
+- [ ] 搭建小程序项目框架
+- [ ] 实现微信登录和用户绑定
+- [ ] 开发移动端待办事项功能
+- [ ] 实现消息推送和提醒
+- [ ] 开发审批功能（移动审批）
+- [ ] 实现合同查看
+- [ ] 开发报销申请
+
+**预计工时**：40小时
+
+---
+
+### 2. 高级功能 🚀
+**优先级**：⭐
+
+- [ ] 实现智能合同分析（AI辅助）
+- [ ] 添加财务预测和分析
+- [ ] 开发自动化工作流
+- [ ] 集成第三方服务
+  - [ ] 支付接口（微信、支付宝）
+  - [ ] 电子签章
+  - [ ] 发票查验
+- [ ] 实现数据可视化报表
+
+**预计工时**：60小时
+
+---
+
+### 3. 系统功能 ⚙️
+**优先级**：⭐⭐
+
+- [ ] 实现操作日志记录和审计
+- [ ] 添加系统配置管理界面
+- [ ] 实现数据备份和恢复
+- [ ] 添加系统监控和告警
+- [ ] 实现多租户支持
+- [ ] 开发权限管理界面
+
+**预计工时**：24小时
+
+---
+
+### 4. 性能优化与部署 🔧
+**优先级**：⭐⭐⭐
+
+- [ ] 实现前端代码分割和懒加载
+- [ ] 优化数据库查询和索引
+- [ ] 添加Redis缓存层
+- [ ] 配置CDN加速
+- [ ] 编写Docker部署文件
+  - [ ] Dockerfile（前端、后端）
+  - [ ] docker-compose.yml
+  - [ ] 环境变量配置
+- [ ] 配置CI/CD流程
+  - [ ] GitHub Actions
+  - [ ] 自动化测试
+  - [ ] 自动化部署
+- [ ] 配置Nginx反向代理
+- [ ] SSL证书配置
+
+**预计工时**：20小时
+
+---
+
+### 5. 测试与文档 📚
+**优先级**：⭐⭐
+
+- [ ] 编写后端单元测试
+  - [ ] 模型测试
+  - [ ] API测试
+  - [ ] 业务逻辑测试
+- [ ] 编写前端组件测试
+  - [ ] 组件单元测试
+  - [ ] 集成测试
+- [ ] 编写端到端测试（E2E）
+- [ ] 完善API文档（Swagger/OpenAPI）
+- [ ] 编写用户操作手册
+- [ ] 录制功能演示视频
+- [ ] 编写开发者文档
+
+**预计工时**：30小时
+
+---
+
+## 💡 技术债务
+
+### 高优先级
+1. **表单验证统一**：需要引入 React Hook Form + Yup
+2. **错误处理完善**：需要更完善的错误边界和错误上报机制
+3. **数据迁移工具**：需要开发从SQLite迁移到MySQL的数据迁移脚本
+
+### 中优先级
+1. **前端状态管理**：考虑引入 Redux 或 Zustand
+2. **测试覆盖**：目前缺少自动化测试
+3. **代码规范**：需要配置 ESLint 和 Prettier
+4. **数据库备份**：需要配置MySQL自动备份策略
+
+### 低优先级
+1. **性能监控**：添加前端性能监控（如Sentry）
+2. **日志系统**：完善后端日志系统
+3. **国际化**：支持多语言（i18n）
+
+---
+
+## 📊 模块完成度
+
+| 模块 | 后端 API | 前端页面 | 数据库 | 功能完整度 | 状态 |
+|------|---------|---------|--------|-----------|------|
+| 认证授权 | ✅ 90% | ✅ 80% | ✅ 100% | 🟡 85% | 进行中 |
+| IAM | ✅ 100% | ✅ 90% | ✅ 100% | 🟢 95% | 基本完成 |
+| 待办事项 | ✅ 100% | ✅ 100% | ✅ 100% | 🟢 100% | ✅ 完成 |
+| 合同管理 | ✅ 100% | ✅ 70% | ✅ 100% | 🟡 85% | 进行中 |
+| 项目管理 | ✅ 100% | 🔴 20% | ✅ 100% | 🟡 70% | 待开发 |
+| 财务管理 | ✅ 100% | ✅ 60% | ✅ 100% | 🟡 80% | 进行中 |
+| 审批流程 | 🔴 30% | 🔴 0% | ✅ 100% | 🔴 40% | 待开发 |
+| 文件管理 | 🔴 40% | 🔴 0% | ✅ 100% | 🔴 45% | 待开发 |
+
+图例：
+- 🟢 90%+ 基本完成
+- 🟡 60-89% 进行中
+- 🔴 <60% 待开发
+
+---
+
+## 🔧 环境配置
+
+### 开发环境
+- **后端**：Python 3.10 + FastAPI + SQLModel
+- **前端**：React 18 + Vite + React Router
+- **数据库**：MySQL 9.6.0
+- **虚拟环境**：pyenv (punkrecord)
+
+### 启动命令
+
+**后端服务**：
 ```bash
-cd apps/api
-npx prisma migrate dev --name init
+cd backend
+source ~/.pyenv/versions/punkrecord/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Pending Tasks:
+**前端服务**：
+```bash
+cd frontend
+npm run dev
+```
 
-### 1. Frontend Setup
-*   Set up the web admin frontend project using React/Vite in `apps/web-admin`.
-*   Set up the WeChat Mini-program project using Taro/uni-app in `apps/miniprogram`.
+### 环境变量
+配置文件：`backend/.env`（参考 `backend/.env.example`）
 
-### 2. Documentation
-*   Create a root `README.md` file explaining the project structure and how to run each part.
+---
 
-Let me know when you're ready to proceed with the database migration, or if you'd like me to start on the frontend setups while you handle the database.
+## 📝 备注
+
+### 重要提醒
+1. 所有Python命令需在pyenv的punkrecord虚拟环境下运行
+2. 生产环境需要修改 `SECRET_KEY` 和数据库密码
+3. 定期备份数据库
+4. 代码提交前需通过lint检查
+
+### 相关文档
+- [2026-01-26 开发日志](file:///Users/yangzhe/workspace/punkrecord/milestone/2026-01-26.md)
+- [2026-01-22 开发日志](file:///Users/yangzhe/workspace/punkrecord/milestone/2026-01-22.md)
+- [数据库配置文档](file:///Users/yangzhe/workspace/punkrecord/backend/DATABASE_SETUP.md)
+
+---
+
+**最后更新**：2026-01-26 18:17  
+**维护者**：yangzhe + AI Assistant

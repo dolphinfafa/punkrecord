@@ -3,15 +3,7 @@ import client from './client';
 export const authApi = {
     // Login
     login: async (username, password) => {
-        const formData = new URLSearchParams();
-        formData.append('username', username);
-        formData.append('password', password);
-
-        return client.post('/auth/login', formData, {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        });
+        return client.post('/auth/login', { username, password });
     },
 
     // Register

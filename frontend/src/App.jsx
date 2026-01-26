@@ -14,6 +14,9 @@ import EntityListPage from '@/pages/iam/EntityListPage';
 import ContractLayout from '@/pages/contract/ContractLayout';
 import ContractListPage from '@/pages/contract/ContractListPage';
 import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
+import ProjectLayout from '@/pages/project/ProjectLayout';
+import ProjectListPage from '@/pages/project/ProjectListPage';
+import ProjectDetailPage from '@/pages/project/ProjectDetailPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -52,7 +55,10 @@ function App() {
               <Route path="list" element={<ContractListPage />} />
               <Route path="counterparties" element={<CounterpartyListPage />} />
             </Route>
-            <Route path="project" element={<div>Project Module (Coming Soon)</div>} />
+            <Route path="project" element={<ProjectLayout />}>
+              <Route index element={<ProjectListPage />} />
+              <Route path=":id" element={<ProjectDetailPage />} />
+            </Route>
 
             <Route path="finance" element={<FinanceLayout />}>
               <Route path="accounts" element={<AccountListPage />} />
