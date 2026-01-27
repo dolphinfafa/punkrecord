@@ -17,12 +17,12 @@ import clsx from 'clsx';
 import './Sidebar.css';
 
 const MENU_ITEMS = [
-    { path: '/', label: 'Workbench', icon: LayoutDashboard },
-    { path: '/todo', label: 'Todo', icon: CheckSquare },
-    { path: '/iam', label: 'IAM / Users', icon: Users },
-    { path: '/contract', label: 'Contracts', icon: FileText },
-    { path: '/project', label: 'Projects', icon: Briefcase },
-    { path: '/finance', label: 'Finance', icon: CreditCard },
+    { path: '/', label: '工作台', icon: LayoutDashboard },
+    { path: '/todo', label: '待办事项', icon: CheckSquare },
+    { path: '/iam', label: '用户管理', icon: Users },
+    { path: '/contract', label: '合同管理', icon: FileText },
+    { path: '/project', label: '项目管理', icon: Briefcase },
+    { path: '/finance', label: '财务管理', icon: CreditCard },
 ];
 
 export default function Sidebar() {
@@ -76,7 +76,7 @@ export default function Sidebar() {
                             <div className="user-details">
                                 <span className="user-name">{user?.name}</span>
                                 <button onClick={logout} className="logout-btn">
-                                    <LogOut size={14} /> <span>Sign out</span>
+                                    <LogOut size={14} /> <span>退出登录</span>
                                 </button>
                             </div>
                         )}

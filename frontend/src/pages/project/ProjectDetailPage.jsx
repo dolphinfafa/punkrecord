@@ -28,22 +28,22 @@ export default function ProjectDetailPage() {
             setStages(stagesRes.data?.items || stagesRes.data || []);
             setError(null);
         } catch (err) {
-            setError(err.message || 'Failed to load project details');
+            setError(err.message || '加载项目详情失败');
             console.error('Error loading project details:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) return <div className="page-content"><div className="loading">Loading details...</div></div>;
-    if (error) return <div className="page-content"><div className="error">Error: {error}</div></div>;
-    if (!project) return <div className="page-content"><div className="error">Project not found</div></div>;
+    if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
+    if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
+    if (!project) return <div className="page-content"><div className="error">未找到项目</div></div>;
 
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-secondary" onClick={() => navigate('/project')}>Back to List</button>
-                <button className="btn btn-primary">Edit Project</button>
+                <button className="btn btn-secondary" onClick={() => navigate('/project')}>返回列表</button>
+                <button className="btn btn-primary">编辑项目</button>
             </div>
 
             <div className="detail-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
@@ -52,52 +52,52 @@ export default function ProjectDetailPage() {
                         <h2>{project.name}</h2>
                         <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginTop: '1rem' }}>
                             <div className="info-item">
-                                <label>Project Number</label>
+                                <label>项目编号</label>
                                 <div>{project.project_no}</div>
                             </div>
                             <div className="info-item">
-                                <label>Status</label>
+                                <label>状态</label>
                                 <div><span className={`status-badge ${project.status}`}>{project.status}</span></div>
                             </div>
                             <div className="info-item">
-                                <label>Type</label>
+                                <label>类型</label>
                                 <div>{project.project_type}</div>
                             </div>
                             <div className="info-item">
-                                <label>Progress</label>
+                                <label>进度</label>
                                 <div>{project.progress ? `${(project.progress * 100).toFixed(0)}%` : '0%'}</div>
                             </div>
                             <div className="info-item">
-                                <label>Start Date</label>
+                                <label>开始日期</label>
                                 <div>{project.start_at || '-'}</div>
                             </div>
                             <div className="info-item">
-                                <label>Due Date</label>
+                                <label>截止日期</label>
                                 <div>{project.due_at || '-'}</div>
                             </div>
                         </div>
 
                         {project.description && (
                             <div className="description" style={{ marginTop: '2rem' }}>
-                                <label>Description</label>
+                                <label>描述</label>
                                 <p>{project.description}</p>
                             </div>
                         )}
                     </div>
 
                     <div className="card" style={{ marginTop: '2rem' }}>
-                        <h3>Stages</h3>
+                        <h3>阶段</h3>
                         <div className="stages-list" style={{ marginTop: '1rem' }}>
                             {stages.length === 0 ? (
-                                <p>No stages defined.</p>
+                                <p>暂无阶段。</p>
                             ) : (
                                 <table className="data-table">
                                     <thead>
                                         <tr>
                                             <th>#</th>
-                                            <th>Stage</th>
-                                            <th>Status</th>
-                                            <th>Planned End</th>
+                                            <th>阶段</th>
+                                            <th>状态</th>
+                                            <th>计划结束日期</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -119,10 +119,10 @@ export default function ProjectDetailPage() {
                 <div className="side-info">
                     {/* Placeholder for future sidebar info like Team Members or recent activity */}
                     <div className="card">
-                        <h3>Team</h3>
+                        <h3>团队</h3>
                         <div className="info-item" style={{ marginTop: '1rem' }}>
-                            <label>PM</label>
-                            <div>{project.pm_name || 'Unassigned'}</div>
+                            <label>项目经理</label>
+                            <div>{project.pm_name || '未分配'}</div>
                         </div>
                     </div>
                 </div>

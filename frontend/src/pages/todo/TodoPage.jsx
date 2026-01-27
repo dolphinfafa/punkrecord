@@ -48,9 +48,9 @@ export default function TodoPage() {
     return (
         <div className="todo-container">
             <div className="todo-header">
-                <h1>My Tasks</h1>
+                <h1>我的任务</h1>
                 <button className="create-todo-btn">
-                    <Plus size={18} /> New Task
+                    <Plus size={18} /> 新建任务
                 </button>
             </div>
 
@@ -59,28 +59,28 @@ export default function TodoPage() {
                     className={clsx("filter-btn", { active: filter === 'open' })}
                     onClick={() => setFilter('open')}
                 >
-                    Open
+                    未完成
                 </button>
                 <button
                     className={clsx("filter-btn", { active: filter === 'done' })}
                     onClick={() => setFilter('done')}
                 >
-                    Completed
+                    已完成
                 </button>
                 <button
                     className={clsx("filter-btn", { active: filter === 'all' })}
                     onClick={() => setFilter('all')}
                 >
-                    All
+                    全部
                 </button>
             </div>
 
             {loading ? (
-                <div className="loading-state">Loading tasks...</div>
+                <div className="loading-state">加载中...</div>
             ) : (
                 <div className="todo-list">
                     {todos.length === 0 ? (
-                        <div className="empty-state">No tasks found</div>
+                        <div className="empty-state">暂无任务</div>
                     ) : (
                         todos.map(todo => (
                             <div key={todo.id} className={clsx("todo-item", { done: todo.status === 'done' })}>

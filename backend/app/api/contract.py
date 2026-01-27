@@ -161,7 +161,7 @@ async def get_contract(
     """Get contract by ID"""
     contract = session.get(Contract, contract_id)
     if not contract:
-        raise NotFoundException("Contract not found")
+        raise NotFoundException("未找到合同")
     
     return success_response(ContractResponse.model_validate(contract))
 
@@ -176,7 +176,7 @@ async def update_contract(
     """Update contract"""
     contract = session.get(Contract, contract_id)
     if not contract:
-        raise NotFoundException("Contract not found")
+        raise NotFoundException("未找到合同")
     
     if data.name is not None:
         contract.name = data.name
@@ -208,7 +208,7 @@ async def get_contract_payment_plans(
     """Get contract payment plans"""
     contract = session.get(Contract, contract_id)
     if not contract:
-        raise NotFoundException("Contract not found")
+        raise NotFoundException("未找到合同")
     
     plans = session.exec(
         select(ContractPaymentPlan)
@@ -228,11 +228,11 @@ async def submit_contract_for_approval(
     """Submit contract for approval"""
     contract = session.get(Contract, contract_id)
     if not contract:
-        raise NotFoundException("Contract not found")
+        raise NotFoundException("未找到合同")
     
     if contract.status != ContractStatus.DRAFT:
         from app.core.exceptions import ValidationException
-        raise ValidationException("Only draft contracts can be submitted")
+        raise ValidationException("只有草稿状态的合同才能提交")
     
     contract.status = ContractStatus.IN_APPROVAL
     contract.updated_at = datetime.utcnow()

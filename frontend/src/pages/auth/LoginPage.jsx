@@ -21,7 +21,7 @@ export default function LoginPage() {
             await login(username, password);
             navigate('/');
         } catch (err) {
-            setError('Invalid username or password');
+            setError('用户名或密码错误');
         } finally {
             setLoading(false);
         }
@@ -32,12 +32,12 @@ export default function LoginPage() {
             <div className="login-card">
                 <div className="login-header">
                     <h1>Atlas</h1>
-                    <p>Enterprise Management System</p>
+                    <p>企业管理系统</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="login-form">
                     <div className="form-group">
-                        <label htmlFor="username">Username</label>
+                        <label htmlFor="username">用户名</label>
                         <div className="input-with-icon">
                             <User size={18} className="input-icon" />
                             <input
@@ -45,14 +45,14 @@ export default function LoginPage() {
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                placeholder="Enter your username"
+                                placeholder="请输入用户名"
                                 required
                             />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="password">Password</label>
+                        <label htmlFor="password">密码</label>
                         <div className="input-with-icon">
                             <Lock size={18} className="input-icon" />
                             <input
@@ -60,7 +60,7 @@ export default function LoginPage() {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter your password"
+                                placeholder="请输入密码"
                                 required
                             />
                         </div>
@@ -69,12 +69,12 @@ export default function LoginPage() {
                     {error && <div className="error-message">{error}</div>}
 
                     <button type="submit" disabled={loading} className="submit-btn">
-                        {loading ? <Loader2 className="spinner" size={20} /> : 'Sign In'}
+                        {loading ? <Loader2 className="spinner" size={20} /> : '登录'}
                     </button>
                 </form>
 
                 <div className="login-footer">
-                    <p>Default: admin / admin123</p>
+                    <p>默认账号: admin / admin123</p>
                 </div>
             </div>
         </div>

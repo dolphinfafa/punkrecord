@@ -20,7 +20,7 @@ export default function ProjectListPage() {
             setProjects(response.data?.items || []);
             setError(null);
         } catch (err) {
-            setError(err.message || 'Failed to load projects');
+            setError(err.message || '加载项目失败');
             console.error('Error loading projects:', err);
         } finally {
             setLoading(false);
@@ -31,33 +31,33 @@ export default function ProjectListPage() {
         navigate(`/project/${projectId}`);
     };
 
-    if (loading) return <div className="page-content"><div className="loading">Loading projects...</div></div>;
-    if (error) return <div className="page-content"><div className="error">Error: {error}</div></div>;
+    if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
+    if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
 
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-primary">Create Project</button>
+                <button className="btn btn-primary">创建项目</button>
             </div>
 
             <div className="data-table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Project No.</th>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>PM</th>
-                            <th>Start Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>项目编号</th>
+                            <th>名称</th>
+                            <th>类型</th>
+                            <th>项目经理</th>
+                            <th>开始日期</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
                         {projects.length === 0 ? (
                             <tr>
                                 <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    No projects found. Click "Create Project" to create one.
+                                    暂无项目。点击“创建项目”来创建一个。
                                 </td>
                             </tr>
                         ) : (
@@ -77,7 +77,7 @@ export default function ProjectListPage() {
                                                 handleProjectClick(project.id);
                                             }}
                                         >
-                                            View
+                                            查看
                                         </button>
                                     </td>
                                 </tr>

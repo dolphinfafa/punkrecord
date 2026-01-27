@@ -17,41 +17,41 @@ export default function ContractListPage() {
             setContracts(response.data?.items || []);
             setError(null);
         } catch (err) {
-            setError(err.message || 'Failed to load contracts');
+            setError(err.message || '加载合同失败');
             console.error('Error loading contracts:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) return <div className="page-content"><div className="loading">Loading contracts...</div></div>;
-    if (error) return <div className="page-content"><div className="error">Error: {error}</div></div>;
+    if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
+    if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
 
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-primary">Create Contract</button>
+                <button className="btn btn-primary">创建合同</button>
             </div>
 
             <div className="data-table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Contract No.</th>
-                            <th>Name</th>
-                            <th>Counterparty</th>
-                            <th>Type</th>
-                            <th className="text-right">Total Amount</th>
-                            <th>Sign Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>合同编号</th>
+                            <th>名称</th>
+                            <th>交易对方</th>
+                            <th>类型</th>
+                            <th className="text-right">总金额</th>
+                            <th>签约日期</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
                                 <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    No contracts found. Click "Create Contract" to create one.
+                                    暂无合同。点击“创建合同”来创建一个。
                                 </td>
                             </tr>
                         ) : (
@@ -65,7 +65,7 @@ export default function ContractListPage() {
                                     <td>{contract.sign_date || '-'}</td>
                                     <td><span className={`status-badge ${contract.status}`}>{contract.status}</span></td>
                                     <td>
-                                        <button className="btn-link">View</button>
+                                        <button className="btn-link">查看</button>
                                     </td>
                                 </tr>
                             ))

@@ -17,20 +17,20 @@ export default function TransactionListPage() {
             setTransactions(response.data?.items || []);
             setError(null);
         } catch (err) {
-            setError(err.message || 'Failed to load transactions');
+            setError(err.message || '加载交易失败');
             console.error('Error loading transactions:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) return <div className="page-content"><div className="loading">Loading transactions...</div></div>;
-    if (error) return <div className="page-content"><div className="error">Error: {error}</div></div>;
+    if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
+    if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
 
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-primary">Record Transaction</button>
+                <button className="btn btn-primary">记录交易</button>
                 {/* Filters could go here */}
             </div>
 
@@ -38,18 +38,18 @@ export default function TransactionListPage() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Account</th>
-                            <th className="text-right">Amount</th>
-                            <th>Status</th>
+                            <th>日期</th>
+                            <th>描述</th>
+                            <th>账户</th>
+                            <th className="text-right">金额</th>
+                            <th>状态</th>
                         </tr>
                     </thead>
                     <tbody>
                         {transactions.length === 0 ? (
                             <tr>
                                 <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    No transactions found. Click "Record Transaction" to create one.
+                                    暂无交易。点击“记录交易”来创建一个。
                                 </td>
                             </tr>
                         ) : (

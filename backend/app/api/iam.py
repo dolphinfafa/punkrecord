@@ -76,7 +76,7 @@ async def get_user(
     """Get user by ID"""
     user = session.get(User, user_id)
     if not user:
-        raise NotFoundException("User not found")
+        raise NotFoundException("未找到用户")
     
     return success_response(UserResponse.model_validate(user))
 
@@ -91,7 +91,7 @@ async def update_user(
     """Update user"""
     user = session.get(User, user_id)
     if not user:
-        raise NotFoundException("User not found")
+        raise NotFoundException("未找到用户")
     
     if user_data.display_name is not None:
         user.display_name = user_data.display_name

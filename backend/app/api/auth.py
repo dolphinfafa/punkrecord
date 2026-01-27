@@ -22,17 +22,17 @@ async def login(
     user = session.exec(select(User).where(User.username == login_data.username)).first()
     
     if not user:
-        raise UnauthorizedException("Incorrect username or password")
+        raise UnauthorizedException("用户名或密码错误")
     
     if user.status != UserStatus.ACTIVE:
-        raise UnauthorizedException("User is inactive")
+        raise UnauthorizedException("用户已停用")
     
     if not user.hashed_password:
-        raise UnauthorizedException("Password not set for this user")
+        raise UnauthorizedException("该用户未设置密码")
     
     # Verify password
     if not verify_password(login_data.password, user.hashed_password):
-        raise UnauthorizedException("Incorrect username or password")
+        raise UnauthorizedException("用户名或密码错误")
     
     # Create access token
     access_token = create_access_token(data={"sub": str(user.id)})

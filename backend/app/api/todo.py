@@ -99,11 +99,11 @@ async def get_todo(
     """Get todo by ID"""
     todo = session.get(TodoItem, todo_id)
     if not todo:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     # Check if user has access
     if todo.assignee_user_id != current_user.id and todo.creator_user_id != current_user.id:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     return success_response(TodoResponse.model_validate(todo))
 
@@ -118,11 +118,11 @@ async def update_todo(
     """Update todo"""
     todo = session.get(TodoItem, todo_id)
     if not todo:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     # Only assignee or creator can update
     if todo.assignee_user_id != current_user.id and todo.creator_user_id != current_user.id:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     if todo_data.title is not None:
         todo.title = todo_data.title
@@ -154,15 +154,15 @@ async def mark_todo_done(
     """Mark todo as done"""
     todo = session.get(TodoItem, todo_id)
     if not todo:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     if todo.assignee_user_id != current_user.id:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     # Cannot mark approval type todos as done directly
     if todo.action_type == TodoActionType.APPROVE:
         from app.core.exceptions import ValidationException
-        raise ValidationException("Approval todos must be completed through approval API")
+        raise ValidationException("审批类型的待办事项必须通过审批API完成")
     
     todo.status = TodoStatus.DONE
     todo.done_at = datetime.utcnow()
@@ -186,10 +186,10 @@ async def block_todo(
     """Block todo with reason"""
     todo = session.get(TodoItem, todo_id)
     if not todo:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     if todo.assignee_user_id != current_user.id:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     todo.status = TodoStatus.BLOCKED
     todo.blocked_reason = blocked_reason
@@ -212,10 +212,10 @@ async def dismiss_todo(
     """Dismiss todo"""
     todo = session.get(TodoItem, todo_id)
     if not todo:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     if todo.assignee_user_id != current_user.id:
-        raise NotFoundException("Todo not found")
+        raise NotFoundException("未找到待办事项")
     
     todo.status = TodoStatus.DISMISSED
     todo.dismiss_reason = dismiss_reason

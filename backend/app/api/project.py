@@ -143,7 +143,7 @@ async def get_project(
     """Get project by ID"""
     project = session.get(Project, project_id)
     if not project:
-        raise NotFoundException("Project not found")
+        raise NotFoundException("未找到项目")
     
     return success_response(ProjectResponse.model_validate(project))
 
@@ -158,7 +158,7 @@ async def update_project(
     """Update project"""
     project = session.get(Project, project_id)
     if not project:
-        raise NotFoundException("Project not found")
+        raise NotFoundException("未找到项目")
     
     if data.name is not None:
         project.name = data.name
@@ -188,7 +188,7 @@ async def get_project_stages(
     """Get project stages"""
     project = session.get(Project, project_id)
     if not project:
-        raise NotFoundException("Project not found")
+        raise NotFoundException("未找到项目")
     
     stages = session.exec(
         select(ProjectStage)
@@ -209,7 +209,7 @@ async def update_stage_status(
     """Update project stage status"""
     stage = session.get(ProjectStage, stage_id)
     if not stage:
-        raise NotFoundException("Stage not found")
+        raise NotFoundException("未找到阶段")
     
     stage.status = StageStatus(data.status)
     if data.blocked_reason:

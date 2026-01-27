@@ -142,7 +142,7 @@ async def get_transaction(
     """Get transaction"""
     transaction = session.get(FinanceTransaction, txn_id)
     if not transaction:
-        raise NotFoundException("Transaction not found")
+        raise NotFoundException("未找到交易")
     
     return success_response(TransactionResponse.model_validate(transaction))
 
