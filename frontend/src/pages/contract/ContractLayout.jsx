@@ -12,19 +12,19 @@ export default function ContractLayout() {
     return (
         <div className="finance-layout">
             <div className="finance-header">
-                <h1>Contract Management</h1>
+                <h1>合同管理</h1>
                 <nav className="finance-nav">
                     <NavLink
                         to="/contract/list"
                         className={({ isActive }) => isActive ? 'active' : ''}
                     >
-                        Contracts
+                        合同列表
                     </NavLink>
                     <NavLink
                         to="/contract/counterparties"
                         className={({ isActive }) => isActive ? 'active' : ''}
                     >
-                        Counterparties
+                        交易方管理
                     </NavLink>
                 </nav>
             </div>

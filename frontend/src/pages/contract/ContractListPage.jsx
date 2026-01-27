@@ -1,10 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, FileText, ExternalLink, Calendar, Users, DollarSign, Tag } from 'lucide-react';
 import contractApi from '@/api/contract';
+import CreateContractModal from './components/CreateContractModal';
+
+// Status mapping
+const STATUS_MAP = {
+    'draft': { label: '草稿', color: 'bg-gray-500' },
+    'active': { label: '执行中', color: 'bg-green-500' },
+    'completed': { label: '已完成', color: 'bg-blue-500' },
+    'terminated': { label: '已终止', color: 'bg-red-500' },
+    'pending': { label: '待审批', color: 'bg-yellow-500' }
+};
+
+const TYPE_MAP = {
+    'service': '服务合同',
+    'purchase': '采购合同',
+    'sales': '销售合同',
+    'lease': '租赁合同',
+    'other': '其他'
+};
 
 export default function ContractListPage() {
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     useEffect(() => {
         loadContracts();
@@ -29,8 +49,18 @@ export default function ContractListPage() {
 
     return (
         <div className="page-content">
-            <div className="toolbar">
-                <button className="btn btn-primary">创建合同</button>
+            <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div className="toolbar-left">
+                    {/* Filter controls could go here */}
+                </div>
+                <button
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={() => setIsCreateModalOpen(true)}
+                >
+                    <Plus size={18} />
+                    创建合同
+                </button>
             </div>
 
             <div className="data-table-container">
@@ -50,29 +80,76 @@ export default function ContractListPage() {
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
-                                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    暂无合同。点击“创建合同”来创建一个。
+                                <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                        <FileText size={48} opacity={0.5} />
+                                        <p>暂无合同数据</p>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => setIsCreateModalOpen(true)}
+                                        >
+                                            创建第一个合同
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ) : (
-                            contracts.map(contract => (
-                                <tr key={contract.id}>
-                                    <td>{contract.contract_no}</td>
-                                    <td>{contract.name}</td>
-                                    <td>{contract.counterparty}</td>
-                                    <td><span className="badge">{contract.contract_type || contract.type}</span></td>
-                                    <td className="text-right">{(contract.amount_total || contract.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                                    <td>{contract.sign_date || '-'}</td>
-                                    <td><span className={`status-badge ${contract.status}`}>{contract.status}</span></td>
-                                    <td>
-                                        <button className="btn-link">查看</button>
-                                    </td>
-                                </tr>
-                            ))
+                            contracts.map(contract => {
+                                const statusInfo = STATUS_MAP[contract.status] || { label: contract.status, color: '' };
+                                return (
+                                    <tr key={contract.id}>
+                                        <td style={{ fontFamily: 'monospace' }}>{contract.contract_no}</td>
+                                        <td style={{ fontWeight: 500 }}>{contract.name}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <Users size={14} className="text-secondary" />
+                                                {contract.counterparty}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className="badge">
+                                                {TYPE_MAP[contract.contract_type || contract.type] || contract.type}
+                                            </span>
+                                        </td>
+                                        <td className="text-right" style={{ fontFamily: 'monospace' }}>
+                                            {(contract.amount_total || contract.amount || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <Calendar size={14} className="text-secondary" />
+                                                {contract.sign_date || '-'}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className={`status-badge ${contract.status}`} style={{
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontSize: '0.8rem',
+                                                backgroundColor: 'rgba(255,255,255,0.1)', // simplified
+                                                border: '1px solid currentColor'
+                                            }}>
+                                                {statusInfo.label}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button className="btn-link" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                <ExternalLink size={14} />
+                                                查看
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
             </div>
+
+            <CreateContractModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={loadContracts}
+            />
         </div>
     );
 }

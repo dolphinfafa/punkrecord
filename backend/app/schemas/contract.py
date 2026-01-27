@@ -14,6 +14,9 @@ class CounterpartyCreate(BaseModel):
     type: str
     identifier: Optional[str] = None
     address: Optional[str] = None
+    phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
     contacts: Optional[dict] = None
 
 
@@ -24,6 +27,9 @@ class CounterpartyResponse(BaseModel):
     type: str
     identifier: Optional[str] = None
     address: Optional[str] = None
+    phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
     created_at: datetime
     
     class Config:

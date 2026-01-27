@@ -11,6 +11,25 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Catppuccin Macchiato Theme Variables */
+  --bg-base: #24273a;
+  --bg-mantle: #1e2030;
+  --bg-crust: #181926;
+  
+  --text-primary: #cad3f5;
+  --text-secondary: #a5adcb;
+  
+  --primary-color: #8aadf4;
+  --secondary-color: #f5bde6;
+  --success-color: #a6da95;
+  --warning-color: #eed49f;
+  --error-color: #ed8796;
+  
+  --border-color: #494d64;
+  --card-bg: #363a4f;
+  
+  --hover-bg: #494d64;
 }
 
 * {

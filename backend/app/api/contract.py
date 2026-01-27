@@ -36,9 +36,12 @@ async def create_counterparty(
     """Create counterparty"""
     counterparty = Counterparty(
         name=data.name,
-        type=CounterpartyType(data.type),
+        type=data.type,  # Use string directly
         identifier=data.identifier,
         address=data.address,
+        phone=data.phone,
+        bank_name=data.bank_name,
+        bank_account=data.bank_account,
         contacts=data.contacts
     )
     

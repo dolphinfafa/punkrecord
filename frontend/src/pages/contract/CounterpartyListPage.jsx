@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Users, User, Building2, MapPin, FileBadge, Edit } from 'lucide-react';
 import contractApi from '@/api/contract';
+import CreateCounterpartyModal from './components/CreateCounterpartyModal';
+
+const TYPE_MAP = {
+    'individual': '个人',
+    'organization': '企业/组织'
+};
 
 export default function CounterpartyListPage() {
     const [counterparties, setCounterparties] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     useEffect(() => {
         loadCounterparties();
@@ -29,8 +37,18 @@ export default function CounterpartyListPage() {
 
     return (
         <div className="page-content">
-            <div className="toolbar">
-                <button className="btn btn-primary">添加交易方</button>
+            <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div className="toolbar-left">
+                    {/* Search/Filter could go here */}
+                </div>
+                <button
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={() => setIsCreateModalOpen(true)}
+                >
+                    <Plus size={18} />
+                    添加交易方
+                </button>
             </div>
 
             <div className="data-table-container">
@@ -39,7 +57,7 @@ export default function CounterpartyListPage() {
                         <tr>
                             <th>名称</th>
                             <th>类型</th>
-                            <th>税号</th>
+                            <th>税号/识别号</th>
                             <th>地址</th>
                             <th>操作</th>
                         </tr>
@@ -47,19 +65,46 @@ export default function CounterpartyListPage() {
                     <tbody>
                         {counterparties.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    暂无交易方。点击“添加交易方”来创建一个。
+                                <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                        <Users size={48} opacity={0.5} />
+                                        <p>暂无交易方信息</p>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => setIsCreateModalOpen(true)}
+                                        >
+                                            添加第一个交易方
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ) : (
                             counterparties.map(cp => (
                                 <tr key={cp.id}>
-                                    <td>{cp.name}</td>
-                                    <td><span className="badge">{cp.type}</span></td>
-                                    <td>{cp.identifier}</td>
-                                    <td>{cp.address}</td>
+                                    <td style={{ fontWeight: 500 }}>{cp.name}</td>
                                     <td>
-                                        <button className="btn-link">编辑</button>
+                                        <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            {cp.type === 'organization' ? <Building2 size={12} /> : <User size={12} />}
+                                            {TYPE_MAP[cp.type] || cp.type}
+                                        </span>
+                                    </td>
+                                    <td style={{ fontFamily: 'monospace' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <FileBadge size={14} className="text-secondary" />
+                                            {cp.identifier || '-'}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <MapPin size={14} className="text-secondary" />
+                                            {cp.address || '-'}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <button className="btn-link" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Edit size={14} />
+                                            编辑
+                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -67,6 +112,12 @@ export default function CounterpartyListPage() {
                     </tbody>
                 </table>
             </div>
+
+            <CreateCounterpartyModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={loadCounterparties}
+            />
         </div>
     );
 }

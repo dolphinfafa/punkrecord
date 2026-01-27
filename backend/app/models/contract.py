@@ -35,6 +35,8 @@ class CounterpartyType(str, Enum):
     CUSTOMER = "customer"
     SUPPLIER = "supplier"
     PARTNER = "partner"
+    INDIVIDUAL = "individual"
+    ORGANIZATION = "organization"
     OTHER = "other"
 
 
@@ -57,9 +59,12 @@ class Counterparty(BaseDBModel, table=True):
     __tablename__ = "counterparty"
     
     name: str = Field(nullable=False)
-    type: CounterpartyType = Field(nullable=False)
+    type: str = Field(nullable=False)
     identifier: Optional[str] = None  # Tax ID / USCC
     address: Optional[str] = None
+    phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
     contacts: Optional[dict] = Field(default=None, sa_column=Column(JSON))
 
 
