@@ -17,7 +17,6 @@ class CounterpartyCreate(BaseModel):
     phone: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account: Optional[str] = None
-    contacts: Optional[dict] = None
 
 
 class CounterpartyResponse(BaseModel):

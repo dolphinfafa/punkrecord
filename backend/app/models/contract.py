@@ -65,7 +65,6 @@ class Counterparty(BaseDBModel, table=True):
     phone: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account: Optional[str] = None
-    contacts: Optional[dict] = Field(default=None, sa_column=Column(JSON))
 
 
 class Contract(BaseDBModel, table=True):

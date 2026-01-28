@@ -41,8 +41,7 @@ async def create_counterparty(
         address=data.address,
         phone=data.phone,
         bank_name=data.bank_name,
-        bank_account=data.bank_account,
-        contacts=data.contacts
+        bank_account=data.bank_account
     )
     
     session.add(counterparty)
