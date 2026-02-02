@@ -15,11 +15,13 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # Database
+    DB_TYPE: str = "sqlite"  # sqlite or mysql
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_NAME: str = "punkrecord"
     DB_USER: str = "admin"
     DB_PASSWORD: str = ""
+    SQLITE_DB_PATH: str = "./atlas.db"  # SQLite database file path
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -40,9 +42,14 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """Construct database URL from components"""
-        # URL-encode the password to handle special characters like @
-        encoded_password = quote_plus(self.DB_PASSWORD)
-        return f"mysql+pymysql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        if self.DB_TYPE.lower() == "sqlite":
+            # SQLite database URL
+            return f"sqlite:///{self.SQLITE_DB_PATH}"
+        else:
+            # MySQL database URL
+            # URL-encode the password to handle special characters like @
+            encoded_password = quote_plus(self.DB_PASSWORD)
+            return f"mysql+pymysql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     
     class Config:
         env_file = ".env"
