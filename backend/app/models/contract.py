@@ -71,16 +71,18 @@ class Contract(BaseDBModel, table=True):
     """Contract model"""
     __tablename__ = "contract"
     
-    our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)
     contract_no: str = Field(nullable=False, unique=True, index=True)
     name: str = Field(nullable=False)
     contract_type: ContractType = Field(nullable=False)
     status: ContractStatus = Field(default=ContractStatus.DRAFT, nullable=False, index=True)
     
+    # Contract parties
+    party_a_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)  # 甲方 (Our Entity)
+    party_b_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)  # 乙方 (Counterparty)
+    party_c_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id", index=True)  # 丙方 (Optional third party)
+    
     owner_user_id: UUID = Field(foreign_key="user.id", nullable=False)
     pm_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
-    
-    counterparty_id: UUID = Field(foreign_key="counterparty.id", nullable=False)
     
     amount_total: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
     currency: str = Field(default="CNY", nullable=False)

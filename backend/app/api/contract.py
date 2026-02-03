@@ -76,14 +76,15 @@ async def create_contract(
 ):
     """Create contract"""
     contract = Contract(
-        our_entity_id=data.our_entity_id,
         contract_no=data.contract_no,
         name=data.name,
         contract_type=ContractType(data.contract_type),
         status=ContractStatus.DRAFT,
+        party_a_id=data.party_a_id,
+        party_b_id=data.party_b_id,
+        party_c_id=data.party_c_id,
         owner_user_id=current_user.id,
         pm_user_id=data.pm_user_id,
-        counterparty_id=data.counterparty_id,
         amount_total=data.amount_total,
         currency=data.currency,
         sign_date=data.sign_date,
@@ -126,32 +127,47 @@ async def list_contracts(
     current_user: User = Depends(get_current_user)
 ):
     """List contracts"""
-    query = select(Contract)
-    
-    if status:
-        query = query.where(Contract.status == status)
-    if contract_type:
-        query = query.where(Contract.contract_type == contract_type)
-    
-    query = query.order_by(Contract.created_at.desc())
-    
-    offset = (page - 1) * page_size
-    contracts = session.exec(query.offset(offset).limit(page_size)).all()
-    
-    count_query = select(Contract)
-    if status:
-        count_query = count_query.where(Contract.status == status)
-    if contract_type:
-        count_query = count_query.where(Contract.contract_type == contract_type)
-    total = len(session.exec(count_query).all())
-    
-    return success_response({
-        "items": [ContractResponse.model_validate(c) for c in contracts],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size
-    })
+    try:
+        print(f"🔍 list_contracts called by user: {current_user.username}")
+        print(f"   Parameters: status={status}, contract_type={contract_type}, page={page}, page_size={page_size}")
+        
+        query = select(Contract)
+        
+        if status:
+            query = query.where(Contract.status == status)
+        if contract_type:
+            query = query.where(Contract.contract_type == contract_type)
+        
+        query = query.order_by(Contract.created_at.desc())
+        
+        offset = (page - 1) * page_size
+        contracts = session.exec(query.offset(offset).limit(page_size)).all()
+        print(f"   Found {len(contracts)} contracts")
+        
+        count_query = select(Contract)
+        if status:
+            count_query = count_query.where(Contract.status == status)
+        if contract_type:
+            count_query = count_query.where(Contract.contract_type == contract_type)
+        total = len(session.exec(count_query).all())
+        print(f"   Total count: {total}")
+        
+        print(f"   Converting contracts to response schema...")
+        response_items = [ContractResponse.model_validate(c) for c in contracts]
+        print(f"   ✅ Conversion successful")
+        
+        return success_response({
+            "items": response_items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size
+        })
+    except Exception as e:
+        print(f"   ❌ Error in list_contracts: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @router.get("/contracts/{contract_id}", response_model=dict)

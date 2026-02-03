@@ -34,6 +34,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"📥 Incoming request: {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        print(f"📤 Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"❌ Request failed: {type(e).__name__}: {str(e)}")
+        raise
+
 
 # Exception handlers
 @app.exception_handler(AtlasException)

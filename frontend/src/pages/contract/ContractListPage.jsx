@@ -13,11 +13,9 @@ const STATUS_MAP = {
 };
 
 const TYPE_MAP = {
-    'service': '服务合同',
-    'purchase': '采购合同',
     'sales': '销售合同',
-    'lease': '租赁合同',
-    'other': '其他'
+    'purchase': '采购合同',
+    'third_party': '第三方合同'
 };
 
 export default function ContractListPage() {
@@ -32,13 +30,22 @@ export default function ContractListPage() {
 
     const loadContracts = async () => {
         try {
+            console.log('🔍 Starting to load contracts...');
             setLoading(true);
             const response = await contractApi.listContracts();
+            console.log('✅ API Response:', response);
             setContracts(response.data?.items || []);
+            console.log('✅ Contracts set:', response.data?.items || []);
             setError(null);
         } catch (err) {
+            console.error('❌ Error loading contracts:', err);
+            console.error('❌ Error details:', {
+                message: err.message,
+                response: err.response,
+                status: err.response?.status,
+                data: err.response?.data
+            });
             setError(err.message || '加载合同失败');
-            console.error('Error loading contracts:', err);
         } finally {
             setLoading(false);
         }
@@ -69,7 +76,6 @@ export default function ContractListPage() {
                         <tr>
                             <th>合同编号</th>
                             <th>名称</th>
-                            <th>交易对方</th>
                             <th>类型</th>
                             <th className="text-right">总金额</th>
                             <th>签约日期</th>
@@ -80,7 +86,7 @@ export default function ContractListPage() {
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
-                                <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                         <FileText size={48} opacity={0.5} />
                                         <p>暂无合同数据</p>
@@ -101,18 +107,12 @@ export default function ContractListPage() {
                                         <td style={{ fontFamily: 'monospace' }}>{contract.contract_no}</td>
                                         <td style={{ fontWeight: 500 }}>{contract.name}</td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <Users size={14} className="text-secondary" />
-                                                {contract.counterparty}
-                                            </div>
-                                        </td>
-                                        <td>
                                             <span className="badge">
-                                                {TYPE_MAP[contract.contract_type || contract.type] || contract.type}
+                                                {TYPE_MAP[contract.contract_type] || contract.contract_type}
                                             </span>
                                         </td>
                                         <td className="text-right" style={{ fontFamily: 'monospace' }}>
-                                            {(contract.amount_total || contract.amount || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
+                                            {(contract.amount_total || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

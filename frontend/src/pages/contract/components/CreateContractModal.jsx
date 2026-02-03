@@ -1,31 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '@/components/common/Modal';
 import contractApi from '@/api/contract';
+import axios from 'axios';
 
 export default function CreateContractModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
         contract_no: '',
         name: '',
-        counterparty: '',
-        contract_type: 'service',
+        party_a_id: '',  // 甲方 (Our Entity)
+        party_b_id: '',  // 乙方 (Counterparty)
+        party_c_id: '',  // 丙方 (Optional third party)
+        contract_type: 'sales',
         amount_total: '',
         sign_date: '',
-        status: 'draft'
+        currency: 'CNY'
     });
     const [loading, setLoading] = useState(false);
     const [counterparties, setCounterparties] = useState([]);
+    const [ourEntities, setOurEntities] = useState([]);
 
     useEffect(() => {
         if (isOpen) {
             loadCounterparties();
+            loadOurEntities();
             setFormData({
-                contract_no: `CNT-${Date.now()}`, // Auto-generate dummy ID
+                contract_no: `CNT-${Date.now()}`,
                 name: '',
-                counterparty: '',
-                contract_type: 'service',
+                party_a_id: '',
+                party_b_id: '',
+                party_c_id: '',
+                contract_type: 'sales',
                 amount_total: '',
                 sign_date: new Date().toISOString().split('T')[0],
-                status: 'draft'
+                currency: 'CNY'
             });
         }
     }, [isOpen]);
@@ -39,6 +46,18 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
+    const loadOurEntities = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('http://localhost:8000/iam/our-entities', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setOurEntities(res.data.data || []);
+        } catch (error) {
+            console.error('Failed to load our entities', error);
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -48,16 +67,27 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess }) {
         e.preventDefault();
         try {
             setLoading(true);
-            await contractApi.createContract({
-                ...formData,
+
+            // Prepare data for API
+            const submitData = {
+                contract_no: formData.contract_no,
+                name: formData.name,
+                contract_type: formData.contract_type,
+                party_a_id: formData.party_a_id,
+                party_b_id: formData.party_b_id,
+                party_c_id: formData.party_c_id || null,
                 amount_total: parseFloat(formData.amount_total),
-                amount_paid: 0
-            });
+                currency: formData.currency,
+                sign_date: formData.sign_date,
+                payment_plans: []
+            };
+
+            await contractApi.createContract(submitData);
             onSuccess();
             onClose();
         } catch (error) {
             console.error('Failed to create contract', error);
-            alert('创建合同失败: ' + (error.message || '未知错误'));
+            alert('创建合同失败: ' + (error.response?.data?.message || error.message || '未知错误'));
         } finally {
             setLoading(false);
         }
@@ -103,17 +133,46 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess }) {
                     />
                 </div>
                 <div className="form-group">
-                    <label>交易均方</label>
+                    <label>甲方（我方）</label>
                     <select
-                        name="counterparty"
+                        name="party_a_id"
                         className="form-select"
-                        value={formData.counterparty}
+                        value={formData.party_a_id}
                         onChange={handleChange}
                         required
                     >
-                        <option value="">请选择交易方</option>
+                        <option value="">请选择甲方</option>
+                        {ourEntities.map(entity => (
+                            <option key={entity.id} value={entity.id}>{entity.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label>乙方（交易对手方）</label>
+                    <select
+                        name="party_b_id"
+                        className="form-select"
+                        value={formData.party_b_id}
+                        onChange={handleChange}
+                        required
+                    >
+                        <option value="">请选择乙方</option>
                         {counterparties.map(cp => (
-                            <option key={cp.id} value={cp.name}>{cp.name}</option>
+                            <option key={cp.id} value={cp.id}>{cp.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label>丙方（第三方，可选）</label>
+                    <select
+                        name="party_c_id"
+                        className="form-select"
+                        value={formData.party_c_id}
+                        onChange={handleChange}
+                    >
+                        <option value="">无</option>
+                        {counterparties.map(cp => (
+                            <option key={cp.id} value={cp.id}>{cp.name}</option>
                         ))}
                     </select>
                 </div>
@@ -125,11 +184,9 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess }) {
                         value={formData.contract_type}
                         onChange={handleChange}
                     >
-                        <option value="service">服务合同</option>
-                        <option value="purchase">采购合同</option>
                         <option value="sales">销售合同</option>
-                        <option value="lease">租赁合同</option>
-                        <option value="other">其他</option>
+                        <option value="purchase">采购合同</option>
+                        <option value="third_party">第三方合同</option>
                     </select>
                 </div>
                 <div className="form-group">

@@ -20,24 +20,31 @@ async def get_current_user(
     session: Session = Depends(get_session)
 ) -> User:
     """Get current authenticated user"""
+    print(f"🔐 Authentication attempt...")
     token = credentials.credentials
     
     try:
         payload = decode_access_token(token)
         user_id: str = payload.get("sub")
         if user_id is None:
+            print(f"   ❌ No user_id in token payload")
             raise UnauthorizedException("Invalid authentication credentials")
-    except Exception:
+        print(f"   User ID from token: {user_id}")
+    except Exception as e:
+        print(f"   ❌ Token decode failed: {type(e).__name__}: {str(e)}")
         raise UnauthorizedException("Invalid authentication credentials")
     
     # Get user from database
     user = session.get(User, UUID(user_id))
     if user is None:
+        print(f"   ❌ User not found in database")
         raise UnauthorizedException("User not found")
     
     if user.status != UserStatus.ACTIVE:
+        print(f"   ❌ User is not active: {user.status}")
         raise UnauthorizedException("User is inactive")
     
+    print(f"   ✅ Authentication successful: {user.username}")
     return user
 
 

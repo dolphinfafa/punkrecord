@@ -66,11 +66,12 @@ class PaymentPlanResponse(BaseModel):
 
 class ContractCreate(BaseModel):
     """Contract creation schema"""
-    our_entity_id: UUID
     contract_no: str
     name: str
     contract_type: str
-    counterparty_id: UUID
+    party_a_id: UUID  # 甲方 (Our Entity)
+    party_b_id: UUID  # 乙方 (Counterparty)
+    party_c_id: Optional[UUID] = None  # 丙方 (Optional third party)
     amount_total: Decimal
     currency: str = "CNY"
     pm_user_id: Optional[UUID] = None
@@ -95,14 +96,15 @@ class ContractUpdate(BaseModel):
 class ContractResponse(BaseModel):
     """Contract response schema"""
     id: UUID
-    our_entity_id: UUID
     contract_no: str
     name: str
     contract_type: str
     status: str
+    party_a_id: UUID  # 甲方
+    party_b_id: UUID  # 乙方
+    party_c_id: Optional[UUID] = None  # 丙方
     owner_user_id: UUID
     pm_user_id: Optional[UUID] = None
-    counterparty_id: UUID
     amount_total: Decimal
     currency: str
     sign_date: Optional[date] = None
