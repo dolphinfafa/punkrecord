@@ -10,23 +10,39 @@ from pydantic import BaseModel
 
 class FinanceAccountCreate(BaseModel):
     """Finance account creation schema"""
-    our_entity_id: UUID
+    entity_id: UUID
     account_category: str  # public or private
     account_name: str
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
     currency: str = "CNY"
+    initial_balance: Decimal = 0
     shareholder_user_id: Optional[UUID] = None  # Required for private accounts
 
 
+class FinanceAccountUpdate(BaseModel):
+    """Finance account update schema"""
+    entity_id: Optional[UUID] = None
+    account_category: Optional[str] = None
+    account_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    currency: Optional[str] = None
+    initial_balance: Optional[Decimal] = None
+    shareholder_user_id: Optional[UUID] = None
+    is_default: Optional[bool] = None
+    status: Optional[str] = None
+    account_no_masked: Optional[str] = None
 class FinanceAccountResponse(BaseModel):
     """Finance account response schema"""
     id: UUID
-    our_entity_id: UUID
+    entity_id: UUID
     account_category: str
     account_name: str
     bank_name: Optional[str] = None
     currency: str
+    initial_balance: Decimal
+    balance: Decimal = 0 # Computed field
     status: str
     is_default: bool
     shareholder_user_id: Optional[UUID] = None

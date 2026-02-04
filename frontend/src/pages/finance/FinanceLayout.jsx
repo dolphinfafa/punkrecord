@@ -13,19 +13,19 @@ export default function FinanceLayout() {
     return (
         <div className="finance-layout">
             <div className="finance-header">
-                <h1>Finance Module</h1>
+                <h1>财务管理</h1>
                 <nav className="finance-nav">
                     <NavLink
                         to="/finance/accounts"
                         className={({ isActive }) => isActive ? 'active' : ''}
                     >
-                        Accounts
+                        账户列表
                     </NavLink>
                     <NavLink
                         to="/finance/transactions"
                         className={({ isActive }) => isActive ? 'active' : ''}
                     >
-                        Transactions
+                        交易明细
                     </NavLink>
                 </nav>
             </div>

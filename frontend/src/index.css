@@ -16,19 +16,19 @@
   --bg-base: #24273a;
   --bg-mantle: #1e2030;
   --bg-crust: #181926;
-  
+
   --text-primary: #cad3f5;
   --text-secondary: #a5adcb;
-  
+
   --primary-color: #8aadf4;
   --secondary-color: #f5bde6;
   --success-color: #a6da95;
   --warning-color: #eed49f;
   --error-color: #ed8796;
-  
+
   --border-color: #494d64;
   --card-bg: #363a4f;
-  
+
   --hover-bg: #494d64;
 }
 
@@ -65,4 +65,90 @@ button {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #585b70;
+}
+
+/* Data Table Styles */
+.data-table-container {
+  background: var(--card-bg, #363a4f);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  color: var(--text-primary, #cad3f5);
+}
+
+.data-table th {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary, #a5adcb);
+  border-bottom: 1px solid var(--border-color, #494d64);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #494d64);
+  vertical-align: middle;
+}
+
+.data-table tr:hover {
+  background-color: var(--hover-bg, #494d64);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: rgba(138, 173, 244, 0.1);
+  color: var(--primary-color, #8aadf4);
+  border: 1px solid rgba(138, 173, 244, 0.2);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary-color, #8aadf4);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Page content wrapper */
+.page-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid currentColor;
+  background-color: rgba(255, 255, 255, 0.1);
+  display: inline-block;
+  font-weight: 500;
 }

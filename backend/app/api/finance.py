@@ -18,7 +18,7 @@ from app.models.finance import (
     ReimbursementStatus
 )
 from app.schemas.finance import (
-    FinanceAccountCreate, FinanceAccountResponse,
+    FinanceAccountCreate, FinanceAccountUpdate, FinanceAccountResponse,
     TransactionCreate, TransactionResponse,
     InvoiceCreate, InvoiceResponse,
     ReimbursementCreate, ReimbursementResponse
@@ -37,12 +37,13 @@ async def create_account(
 ):
     """Create finance account"""
     account = FinanceAccount(
-        our_entity_id=data.our_entity_id,
+        entity_id=data.entity_id,
         account_category=AccountCategory(data.account_category),
         account_name=data.account_name,
         bank_name=data.bank_name,
         bank_branch=data.bank_branch,
         currency=data.currency,
+        initial_balance=data.initial_balance,
         status=AccountStatus.ACTIVE,
         shareholder_user_id=data.shareholder_user_id
     )
@@ -61,7 +62,71 @@ async def list_accounts(
 ):
     """List finance accounts"""
     accounts = session.exec(select(FinanceAccount).where(FinanceAccount.status == AccountStatus.ACTIVE)).all()
-    return success_response([FinanceAccountResponse.model_validate(a) for a in accounts])
+    
+    results = []
+    for account in accounts:
+        # Calculate balance: initial_balance + sum(transactions)
+        # In: +amount, Out: -amount
+        
+        # This is N+1, optimize later if needed
+        txns = session.exec(select(FinanceTransaction).where(FinanceTransaction.account_id == account.id)).all()
+        
+        current_balance = account.initial_balance
+        for txn in txns:
+            if txn.txn_direction == TransactionDirection.IN:
+                current_balance += txn.amount
+            else:
+                current_balance -= txn.amount
+                
+        # Create response object and set computed balance
+        acc_resp = FinanceAccountResponse.model_validate(account)
+        acc_resp.balance = current_balance
+        results.append(acc_resp)
+        
+    return success_response(results)
+
+
+@router.patch("/accounts/{account_id}", response_model=dict)
+async def update_account(
+    account_id: UUID,
+    data: FinanceAccountUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Update finance account"""
+    account = session.get(FinanceAccount, account_id)
+    if not account:
+        raise NotFoundException("未找到账户")
+    
+    if data.entity_id is not None:
+        account.entity_id = data.entity_id
+    if data.account_category is not None:
+        account.account_category = AccountCategory(data.account_category)
+    if data.account_name is not None:
+        account.account_name = data.account_name
+    if data.bank_name is not None:
+        account.bank_name = data.bank_name
+    if data.bank_branch is not None:
+        account.bank_branch = data.bank_branch
+    if data.currency is not None:
+        account.currency = data.currency
+    if data.initial_balance is not None:
+        account.initial_balance = data.initial_balance
+    if data.shareholder_user_id is not None:
+        account.shareholder_user_id = data.shareholder_user_id
+    if data.is_default is not None:
+        account.is_default = data.is_default
+    if data.status is not None:
+        account.status = AccountStatus(data.status)
+    if data.account_no_masked is not None:
+        account.account_no_masked = data.account_no_masked
+
+    account.updated_at = datetime.utcnow()
+    session.add(account)
+    session.commit()
+    session.refresh(account)
+    
+    return success_response(FinanceAccountResponse.model_validate(account))
 
 
 # Transaction endpoints

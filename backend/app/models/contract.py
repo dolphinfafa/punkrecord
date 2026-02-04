@@ -77,9 +77,9 @@ class Contract(BaseDBModel, table=True):
     status: ContractStatus = Field(default=ContractStatus.DRAFT, nullable=False, index=True)
     
     # Contract parties
-    party_a_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)  # 甲方 (Our Entity)
-    party_b_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)  # 乙方 (Counterparty)
-    party_c_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id", index=True)  # 丙方 (Optional third party)
+    party_a_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)  # 甲方 (Party A)
+    party_b_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)  # 乙方 (Party B)
+    party_c_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id", index=True)  # 丙方 (Optional Party C)
     
     owner_user_id: UUID = Field(foreign_key="user.id", nullable=False)
     pm_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")

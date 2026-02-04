@@ -23,6 +23,7 @@ export default function ContractListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingContract, setEditingContract] = useState(null);
 
     useEffect(() => {
         loadContracts();
@@ -39,16 +40,20 @@ export default function ContractListPage() {
             setError(null);
         } catch (err) {
             console.error('❌ Error loading contracts:', err);
-            console.error('❌ Error details:', {
-                message: err.message,
-                response: err.response,
-                status: err.response?.status,
-                data: err.response?.data
-            });
             setError(err.message || '加载合同失败');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEdit = (contract) => {
+        setEditingContract(contract);
+        setIsCreateModalOpen(true);
+    };
+
+    const handleCreate = () => {
+        setEditingContract(null);
+        setIsCreateModalOpen(true);
     };
 
     if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
@@ -63,7 +68,7 @@ export default function ContractListPage() {
                 <button
                     className="btn btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={handleCreate}
                 >
                     <Plus size={18} />
                     创建合同
@@ -92,7 +97,7 @@ export default function ContractListPage() {
                                         <p>暂无合同数据</p>
                                         <button
                                             className="btn btn-primary"
-                                            onClick={() => setIsCreateModalOpen(true)}
+                                            onClick={handleCreate}
                                         >
                                             创建第一个合同
                                         </button>
@@ -121,20 +126,18 @@ export default function ContractListPage() {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`status-badge ${contract.status}`} style={{
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '4px',
-                                                fontSize: '0.8rem',
-                                                backgroundColor: 'rgba(255,255,255,0.1)', // simplified
-                                                border: '1px solid currentColor'
-                                            }}>
+                                            <span className={`status-badge ${contract.status} ${STATUS_MAP[contract.status]?.color}`}>
                                                 {statusInfo.label}
                                             </span>
                                         </td>
                                         <td>
-                                            <button className="btn-link" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                <ExternalLink size={14} />
-                                                查看
+                                            <button
+                                                className="btn-link"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                                onClick={() => handleEdit(contract)}
+                                            >
+                                                <i className="lucide-edit-2" />
+                                                编辑
                                             </button>
                                         </td>
                                     </tr>
@@ -149,6 +152,7 @@ export default function ContractListPage() {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={loadContracts}
+                initialData={editingContract}
             />
         </div>
     );

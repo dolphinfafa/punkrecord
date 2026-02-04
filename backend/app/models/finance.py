@@ -80,7 +80,7 @@ class FinanceAccount(BaseDBModel, table=True):
     """Finance account"""
     __tablename__ = "finance_account"
     
-    our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)
+    entity_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)
     account_category: AccountCategory = Field(nullable=False)
     account_name: str = Field(nullable=False)
     
@@ -90,6 +90,7 @@ class FinanceAccount(BaseDBModel, table=True):
     account_no_masked: Optional[str] = None     # Masked for display
     
     currency: str = Field(default="CNY", nullable=False)
+    initial_balance: Decimal = Field(default=0, sa_column=Column(DECIMAL(18, 2), nullable=False, default=0))
     status: AccountStatus = Field(default=AccountStatus.ACTIVE, nullable=False)
     is_default: bool = Field(default=False, nullable=False)
     

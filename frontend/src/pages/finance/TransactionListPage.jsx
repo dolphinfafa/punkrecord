@@ -1,24 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import financeApi from '@/api/finance';
 
+import CreateTransactionModal from './components/CreateTransactionModal';
+
+const STATUS_MAP = {
+    'unreconciled': { label: '未对账', color: 'bg-yellow-500' },
+    'reconciled': { label: '已对账', color: 'bg-green-500' }
+};
+
 export default function TransactionListPage() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    const [accountsMap, setAccountsMap] = useState({});
 
     useEffect(() => {
-        loadTransactions();
+        loadData();
     }, []);
 
-    const loadTransactions = async () => {
+    const loadData = async () => {
         try {
             setLoading(true);
-            const response = await financeApi.listTransactions();
-            setTransactions(response.data?.items || []);
+            const [txnRes, accRes] = await Promise.all([
+                financeApi.listTransactions(),
+                financeApi.listAccounts()
+            ]);
+
+            setTransactions(txnRes.data?.items || []);
+
+            const accMap = {};
+            (accRes.data || []).forEach(acc => {
+                accMap[acc.id] = acc.account_name;
+            });
+            setAccountsMap(accMap);
+
             setError(null);
         } catch (err) {
             setError(err.message || '加载交易失败');
-            console.error('Error loading transactions:', err);
+            console.error('Error loading data:', err);
         } finally {
             setLoading(false);
         }
@@ -30,7 +51,12 @@ export default function TransactionListPage() {
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-primary">记录交易</button>
+                <button
+                    className="btn btn-primary"
+                    onClick={() => setIsCreateModalOpen(true)}
+                >
+                    记录交易
+                </button>
                 {/* Filters could go here */}
             </div>
 
@@ -56,13 +82,15 @@ export default function TransactionListPage() {
                             transactions.map(txn => (
                                 <tr key={txn.id}>
                                     <td>{txn.txn_date || txn.date}</td>
-                                    <td>{txn.purpose || txn.description}</td>
-                                    <td>{txn.account}</td>
-                                    <td className={`text-right ${txn.txn_direction === 'in' || txn.direction === 'in' ? 'text-success' : 'text-danger'}`}>
-                                        {(txn.txn_direction === 'in' || txn.direction === 'in') ? '+' : ''}{(txn.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    <td>{txn.purpose || txn.description || '-'}</td>
+                                    <td>{accountsMap[txn.account_id] || txn.account_id}</td>
+                                    <td className={`text-right ${['in', 'income'].includes(txn.txn_direction) ? 'text-success' : 'text-danger'}`}>
+                                        {['in', 'income'].includes(txn.txn_direction) ? '+' : '-'}{(txn.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                                     </td>
                                     <td>
-                                        <span className={`status-badge ${txn.reconcile_status || txn.status}`}>{txn.reconcile_status || txn.status}</span>
+                                        <span className={`status-badge ${txn.reconcile_status || 'unreconciled'} ${STATUS_MAP[txn.reconcile_status]?.color || 'bg-yellow-500'}`}>
+                                            {STATUS_MAP[txn.reconcile_status]?.label || '未对账'}
+                                        </span>
                                     </td>
                                 </tr>
                             ))
@@ -70,6 +98,12 @@ export default function TransactionListPage() {
                     </tbody>
                 </table>
             </div>
+
+            <CreateTransactionModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={loadData}
+            />
         </div>
     );
 }

@@ -11,7 +11,9 @@ This is the monorepo for the Atlas Enterprise Management System, comprising a ba
 -   `/packages`
     -   `/shared-types`: Shared TypeScript types across the applications.
 -   `/prd`: Product Requirement Documents.
+-   `/prd`: Product Requirement Documents.
 -   `TODO.md`: A list of remaining tasks and instructions for setting up the project.
+-   `MILESTONE.md`: Project progress and daily updates.
 
 ## 环境要求
 
