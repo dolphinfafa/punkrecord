@@ -106,6 +106,7 @@ class ContractResponse(BaseModel):
     owner_user_id: UUID
     pm_user_id: Optional[UUID] = None
     amount_total: Decimal
+    pending_amount: Decimal
     currency: str
     sign_date: Optional[date] = None
     effective_date: Optional[date] = None

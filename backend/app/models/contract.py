@@ -85,6 +85,7 @@ class Contract(BaseDBModel, table=True):
     pm_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     
     amount_total: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
+    pending_amount: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
     currency: str = Field(default="CNY", nullable=False)
     
     sign_date: Optional[date] = None

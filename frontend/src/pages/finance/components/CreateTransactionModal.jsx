@@ -12,10 +12,12 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
         txn_date: new Date().toISOString().split('T')[0],
         purpose: '',
         counterparty_id: '',
+        contract_id: '',
         our_entity_id: '' // Will be auto-filled based on account
     });
     const [accounts, setAccounts] = useState([]);
     const [counterparties, setCounterparties] = useState([]);
+    const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -29,6 +31,7 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
                 txn_date: new Date().toISOString().split('T')[0],
                 purpose: '',
                 counterparty_id: '',
+                contract_id: '',
                 our_entity_id: ''
             });
         }
@@ -36,12 +39,14 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
 
     const loadDependencies = async () => {
         try {
-            const [accRes, cpRes] = await Promise.all([
+            const [accRes, cpRes, contractRes] = await Promise.all([
                 financeApi.listAccounts(),
-                contractApi.listCounterparties()
+                contractApi.listCounterparties(),
+                contractApi.listContracts()
             ]);
             setAccounts(accRes.data || []);
             setCounterparties(cpRes.data || []);
+            setContracts(contractRes.data?.items || []);
         } catch (error) {
             console.error('Failed to load dependencies', error);
         }
@@ -81,7 +86,8 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
             const payload = {
                 ...formData,
                 amount: Number(formData.amount),
-                counterparty_id: formData.counterparty_id || null
+                counterparty_id: formData.counterparty_id || null,
+                contract_id: formData.contract_id || null
             };
 
             await financeApi.createTransaction(payload);
@@ -193,6 +199,23 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
                         <option value="">无</option>
                         {counterparties.map(cp => (
                             <option key={cp.id} value={cp.id}>{cp.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="form-group">
+                    <label>关联合同 (可选)</label>
+                    <select
+                        name="contract_id"
+                        className="form-select"
+                        value={formData.contract_id}
+                        onChange={handleChange}
+                    >
+                        <option value="">无</option>
+                        {contracts.map(contract => (
+                            <option key={contract.id} value={contract.id}>
+                                {contract.contract_no} - {contract.name}
+                            </option>
                         ))}
                     </select>
                 </div>

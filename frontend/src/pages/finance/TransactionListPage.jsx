@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import financeApi from '@/api/finance';
+import { contractApi } from '@/api/contract';
 
 import CreateTransactionModal from './components/CreateTransactionModal';
 
@@ -15,6 +16,7 @@ export default function TransactionListPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const [accountsMap, setAccountsMap] = useState({});
+    const [contractsMap, setContractsMap] = useState({});
 
     useEffect(() => {
         loadData();
@@ -23,9 +25,10 @@ export default function TransactionListPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [txnRes, accRes] = await Promise.all([
+            const [txnRes, accRes, contractRes] = await Promise.all([
                 financeApi.listTransactions(),
-                financeApi.listAccounts()
+                financeApi.listAccounts(),
+                contractApi.listContracts()
             ]);
 
             setTransactions(txnRes.data?.items || []);
@@ -35,6 +38,12 @@ export default function TransactionListPage() {
                 accMap[acc.id] = acc.account_name;
             });
             setAccountsMap(accMap);
+
+            const contractMap = {};
+            (contractRes.data?.items || []).forEach(contract => {
+                contractMap[contract.id] = contract.contract_no + ' - ' + contract.name;
+            });
+            setContractsMap(contractMap);
 
             setError(null);
         } catch (err) {
@@ -67,6 +76,7 @@ export default function TransactionListPage() {
                             <th>日期</th>
                             <th>描述</th>
                             <th>账户</th>
+                            <th>关联合同</th>
                             <th className="text-right">金额</th>
                             <th>状态</th>
                         </tr>
@@ -74,8 +84,8 @@ export default function TransactionListPage() {
                     <tbody>
                         {transactions.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    暂无交易。点击“记录交易”来创建一个。
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>
+                                    暂无交易。点击"记录交易"来创建一个。
                                 </td>
                             </tr>
                         ) : (
@@ -84,6 +94,7 @@ export default function TransactionListPage() {
                                     <td>{txn.txn_date || txn.date}</td>
                                     <td>{txn.purpose || txn.description || '-'}</td>
                                     <td>{accountsMap[txn.account_id] || txn.account_id}</td>
+                                    <td>{txn.contract_id ? (contractsMap[txn.contract_id] || txn.contract_id) : '-'}</td>
                                     <td className={`text-right ${['in', 'income'].includes(txn.txn_direction) ? 'text-success' : 'text-danger'}`}>
                                         {['in', 'income'].includes(txn.txn_direction) ? '+' : '-'}{(txn.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                                     </td>

@@ -61,6 +61,7 @@ class TransactionCreate(BaseModel):
     currency: str = "CNY"
     txn_date: date
     counterparty_id: Optional[UUID] = None
+    contract_id: Optional[UUID] = None
     purpose: Optional[str] = None
     channel: Optional[str] = None
     reference_no: Optional[str] = None
@@ -76,6 +77,7 @@ class TransactionResponse(BaseModel):
     currency: str
     txn_date: date
     counterparty_id: Optional[UUID] = None
+    contract_id: Optional[UUID] = None
     purpose: Optional[str] = None
     reconcile_status: str
     related_object_type: Optional[str] = None

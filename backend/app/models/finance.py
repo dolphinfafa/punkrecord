@@ -110,6 +110,7 @@ class FinanceTransaction(BaseDBModel, table=True):
     txn_date: date = Field(nullable=False, index=True)
     
     counterparty_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id")
+    contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id", index=True)
     purpose: Optional[str] = None
     channel: Optional[str] = None
     reference_no: Optional[str] = None

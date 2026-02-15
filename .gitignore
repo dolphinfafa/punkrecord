@@ -50,7 +50,7 @@ uploads/
 *.xlsx
 
 # 数据库
-*.db
+# *.db
 *.sqlite
 *.sqlite3
 backend/punkrecord.db

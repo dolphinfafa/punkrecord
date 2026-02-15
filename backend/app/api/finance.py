@@ -146,6 +146,7 @@ async def create_transaction(
         currency=data.currency,
         txn_date=data.txn_date,
         counterparty_id=data.counterparty_id,
+        contract_id=data.contract_id,
         purpose=data.purpose,
         channel=data.channel,
         reference_no=data.reference_no,
@@ -156,6 +157,34 @@ async def create_transaction(
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    
+    # Update contract pending_amount if transaction is linked to a contract
+    if data.contract_id:
+        from app.models.contract import Contract, ContractType
+        contract = session.get(Contract, data.contract_id)
+        if contract:
+            # Calculate pending amount change based on contract type and transaction direction
+            # Sales contract: income decreases pending (customer payment), expense increases pending (refund)
+            # Purchase contract: expense decreases pending (our payment), income increases pending (supplier refund)
+            
+            if contract.contract_type == ContractType.SALES:
+                if data.txn_direction == 'in':
+                    # Customer payment - decrease pending amount
+                    contract.pending_amount -= data.amount
+                else:  # 'out'
+                    # Refund to customer - increase pending amount
+                    contract.pending_amount += data.amount
+            elif contract.contract_type == ContractType.PURCHASE:
+                if data.txn_direction == 'out':
+                    # Our payment - decrease pending amount
+                    contract.pending_amount -= data.amount
+                else:  # 'in'
+                    # Supplier refund - increase pending amount
+                    contract.pending_amount += data.amount
+            # For THIRD_PARTY contracts, we don't update pending_amount for now
+            
+            session.add(contract)
+            session.commit()
     
     return success_response(TransactionResponse.model_validate(transaction))
 

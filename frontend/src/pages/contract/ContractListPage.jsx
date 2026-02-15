@@ -83,6 +83,7 @@ export default function ContractListPage() {
                             <th>名称</th>
                             <th>类型</th>
                             <th className="text-right">总金额</th>
+                            <th className="text-right">待付款金额</th>
                             <th>签约日期</th>
                             <th>状态</th>
                             <th>操作</th>
@@ -91,7 +92,7 @@ export default function ContractListPage() {
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
-                                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                         <FileText size={48} opacity={0.5} />
                                         <p>暂无合同数据</p>
@@ -118,6 +119,9 @@ export default function ContractListPage() {
                                         </td>
                                         <td className="text-right" style={{ fontFamily: 'monospace' }}>
                                             {(contract.amount_total || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
+                                        </td>
+                                        <td className="text-right" style={{ fontFamily: 'monospace', fontWeight: 600, color: contract.pending_amount > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                                            {(contract.pending_amount || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

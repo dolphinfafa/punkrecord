@@ -86,6 +86,7 @@ async def create_contract(
         owner_user_id=current_user.id,
         pm_user_id=data.pm_user_id,
         amount_total=data.amount_total,
+        pending_amount=data.amount_total,  # Initialize pending_amount to total amount
         currency=data.currency,
         sign_date=data.sign_date,
         effective_date=data.effective_date,
