@@ -8,14 +8,29 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check if user is logged in
-        const token = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
+        // Validate token on app initialization
+        const initAuth = async () => {
+            const token = localStorage.getItem('token');
+            const savedUser = localStorage.getItem('user');
 
-        if (token && savedUser) {
-            setUser(JSON.parse(savedUser));
-        }
-        setLoading(false);
+            if (token && savedUser) {
+                try {
+                    // Validate token by calling /auth/me
+                    await client.get('/auth/me');
+                    // Token is valid, set user
+                    setUser(JSON.parse(savedUser));
+                } catch (error) {
+                    // Token is invalid (e.g., server restarted), clear storage
+                    console.log('Token validation failed, clearing auth state');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    setUser(null);
+                }
+            }
+            setLoading(false);
+        };
+
+        initAuth();
     }, []);
 
     const login = async (username, password) => {
