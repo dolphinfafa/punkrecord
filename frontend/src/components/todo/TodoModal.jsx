@@ -1,23 +1,30 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
+import client from '@/api/client';
 import './TodoModal.css';
 
-export default function TodoModal({ isOpen, onClose, onSubmit, initialData = null, mode = 'create' }) {
+export default function TodoModal({ isOpen, onClose, onSubmit, initialData = null, mode = 'create', currentUserId }) {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         priority: 'p2',
         due_at: '',
         start_at: '',
-        source_type: 'custom',
-        source_id: '',
-        action_type: 'do',
-        our_entity_id: '',
-        assignee_user_id: ''
+        assignee_user_id: currentUserId || '',
     });
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
+
+    // Load user list for assignee selector
+    useEffect(() => {
+        if (isOpen && mode === 'create') {
+            client.get('/iam/users', { params: { page_size: 100 } })
+                .then(res => setUsers(res.data?.items || []))
+                .catch(() => { });
+        }
+    }, [isOpen, mode]);
 
     useEffect(() => {
         if (initialData) {
@@ -27,35 +34,25 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 priority: initialData.priority || 'p2',
                 due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 16) : '',
                 start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 16) : '',
-                source_type: initialData.source_type || 'custom',
-                source_id: initialData.source_id || '',
-                action_type: initialData.action_type || 'do',
-                our_entity_id: initialData.our_entity_id || '',
-                assignee_user_id: initialData.assignee_user_id || ''
+                assignee_user_id: initialData.assignee_user_id || currentUserId || '',
             });
         } else {
-            // Reset form for create mode
             setFormData({
                 title: '',
                 description: '',
                 priority: 'p2',
                 due_at: '',
                 start_at: '',
-                source_type: 'custom',
-                source_id: Date.now().toString(),
-                action_type: 'do',
-                our_entity_id: '',
-                assignee_user_id: ''
+                assignee_user_id: currentUserId || '',
             });
         }
         setErrors({});
-    }, [initialData, isOpen]);
+    }, [initialData, isOpen, currentUserId]);
 
     const validate = () => {
         const newErrors = {};
-        if (!formData.title.trim()) {
-            newErrors.title = '标题不能为空';
-        }
+        if (!formData.title.trim()) newErrors.title = '标题不能为空';
+        if (!formData.assignee_user_id) newErrors.assignee_user_id = '请选择被分配人';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -63,18 +60,19 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validate()) return;
-
         setLoading(true);
         try {
             const submitData = {
                 ...formData,
                 due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
-                start_at: formData.start_at ? new Date(formData.start_at).toISOString() : null
+                start_at: formData.start_at ? new Date(formData.start_at).toISOString() : null,
+                source_type: 'custom',
+                source_id: '',
+                action_type: 'do',
             };
             await onSubmit(submitData);
             onClose();
         } catch (error) {
-            console.error('Failed to submit todo:', error);
             setErrors({ submit: error.message || '提交失败，请重试' });
         } finally {
             setLoading(false);
@@ -83,9 +81,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
 
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }));
-        }
+        if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
     };
 
     if (!isOpen) return null;
@@ -95,9 +91,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>{mode === 'create' ? '新建任务' : '编辑任务'}</h2>
-                    <button className="modal-close-btn" onClick={onClose}>
-                        <X size={20} />
-                    </button>
+                    <button className="modal-close-btn" onClick={onClose}><X size={20} /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
@@ -121,9 +115,29 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                             value={formData.description}
                             onChange={(e) => handleChange('description', e.target.value)}
                             placeholder="输入任务描述"
-                            rows={4}
+                            rows={3}
                         />
                     </div>
+
+                    {mode === 'create' && (
+                        <div className="form-group">
+                            <label htmlFor="assignee">分配给 *</label>
+                            <select
+                                id="assignee"
+                                value={formData.assignee_user_id}
+                                onChange={(e) => handleChange('assignee_user_id', e.target.value)}
+                                className={clsx({ error: errors.assignee_user_id })}
+                            >
+                                <option value="">请选择被分配人</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.display_name}{u.id === currentUserId ? '（我）' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
+                        </div>
+                    )}
 
                     <div className="form-row">
                         <div className="form-group">
@@ -138,33 +152,6 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                                 <option value="p2">P2 - 中</option>
                                 <option value="p3">P3 - 低</option>
                             </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="action_type">操作类型</label>
-                            <select
-                                id="action_type"
-                                value={formData.action_type}
-                                onChange={(e) => handleChange('action_type', e.target.value)}
-                                disabled={mode === 'edit'}
-                            >
-                                <option value="do">执行</option>
-                                <option value="approve">审批</option>
-                                <option value="review">审阅</option>
-                                <option value="ack">确认</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="start_at">开始时间</label>
-                            <input
-                                id="start_at"
-                                type="datetime-local"
-                                value={formData.start_at}
-                                onChange={(e) => handleChange('start_at', e.target.value)}
-                            />
                         </div>
 
                         <div className="form-group">
@@ -183,9 +170,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                     )}
 
                     <div className="modal-footer">
-                        <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>
-                            取消
-                        </button>
+                        <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
                         <button type="submit" className="btn-primary" disabled={loading}>
                             {loading ? '提交中...' : mode === 'create' ? '创建' : '保存'}
                         </button>

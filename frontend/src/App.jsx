@@ -11,6 +11,9 @@ import TransactionListPage from '@/pages/finance/TransactionListPage';
 import IAMLayout from '@/pages/iam/IAMLayout';
 import UserListPage from '@/pages/iam/UserListPage';
 import EntityListPage from '@/pages/iam/EntityListPage';
+import DepartmentPage from '@/pages/iam/DepartmentPage';
+import JobTitlePage from '@/pages/iam/JobTitlePage';
+import OrgChartPage from '@/pages/iam/OrgChartPage';
 import ContractLayout from '@/pages/contract/ContractLayout';
 import ContractListPage from '@/pages/contract/ContractListPage';
 import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
@@ -50,6 +53,9 @@ function App() {
             <Route path="iam" element={<IAMLayout />}>
               <Route path="users" element={<UserListPage />} />
               <Route path="entities" element={<EntityListPage />} />
+              <Route path="departments" element={<DepartmentPage />} />
+              <Route path="job-titles" element={<JobTitlePage />} />
+              <Route path="org-chart" element={<OrgChartPage />} />
             </Route>
             <Route path="contract" element={<ContractLayout />}>
               <Route path="list" element={<ContractListPage />} />

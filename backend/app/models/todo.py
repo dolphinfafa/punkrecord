@@ -39,6 +39,7 @@ class TodoStatus(str, Enum):
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     BLOCKED = "blocked"
+    PENDING_REVIEW = "pending_review"  # Employee submitted, waiting for manager approval
     DONE = "done"
     DISMISSED = "dismissed"
 
@@ -71,6 +72,8 @@ class TodoItem(BaseDBModel, table=True):
     done_at: Optional[datetime] = None
     done_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     dismiss_reason: Optional[str] = None
+    review_comment: Optional[str] = None  # Manager's feedback when rejecting
+    reviewed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
 
 
 class NotificationChannel(str, Enum):

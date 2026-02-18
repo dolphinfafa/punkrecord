@@ -248,3 +248,91 @@
     background-color: #f38ba8;
     color: #1e1e2e;
 }
+
+/* View mode tabs */
+.todo-view-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.view-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #45475a;
+    background: #313244;
+    color: #a6adc8;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.view-tab.active {
+    background: #89b4fa;
+    color: #1e1e2e;
+    border-color: #89b4fa;
+}
+
+.view-tab:hover:not(.active) {
+    border-color: #89b4fa;
+    color: #cdd6f4;
+}
+
+/* Pending review todo item */
+.todo-item.pending-review {
+    border-left: 3px solid #f9e2af;
+}
+
+.todo-checkbox.checked {
+    background-color: #f9e2af;
+    border-color: #f9e2af;
+    color: #1e1e2e;
+}
+
+/* Override for done state */
+.todo-item.done .todo-checkbox.checked {
+    background-color: #a6e3a1;
+    border-color: #a6e3a1;
+}
+
+/* Status mini badge in list */
+.status-mini {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.status-mini.status-open {
+    background: #313244;
+    color: #a6adc8;
+}
+
+.status-mini.status-in_progress {
+    background: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+}
+
+.status-mini.status-blocked {
+    background: rgba(243, 139, 168, 0.15);
+    color: #f38ba8;
+}
+
+.status-mini.status-pending_review {
+    background: rgba(249, 226, 175, 0.2);
+    color: #f9e2af;
+}
+
+.status-mini.status-done {
+    background: rgba(166, 227, 161, 0.15);
+    color: #a6e3a1;
+}
+
+.status-mini.status-dismissed {
+    background: #313244;
+    color: #6c7086;
+}

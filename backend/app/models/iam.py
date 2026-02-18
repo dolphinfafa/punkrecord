@@ -58,6 +58,23 @@ class OurEntity(BaseDBModel, table=True):
     default_legal_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
 
 
+class JobTitle(BaseDBModel, table=True):
+    """Job title / position model"""
+    __tablename__ = "job_title"
+
+    name: str = Field(nullable=False)
+    description: Optional[str] = None
+
+
+class OrgUnit(BaseDBModel, table=True):
+    """Organization unit (department) model"""
+    __tablename__ = "org_unit"
+
+    name: str = Field(nullable=False)
+    description: Optional[str] = None
+    parent_org_unit_id: Optional[UUID] = Field(default=None, foreign_key="org_unit.id")
+
+
 class User(BaseDBModel, table=True):
     """User model"""
     __tablename__ = "user"
@@ -69,7 +86,12 @@ class User(BaseDBModel, table=True):
     hashed_password: Optional[str] = None
     status: UserStatus = Field(default=UserStatus.ACTIVE, nullable=False)
     is_shareholder: bool = Field(default=False, nullable=False)
-    
+
+    # Organization fields
+    manager_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    job_title_id: Optional[UUID] = Field(default=None, foreign_key="job_title.id")
+    department_id: Optional[UUID] = Field(default=None, foreign_key="org_unit.id")
+
     # Relationships
     user_roles: List["UserRole"] = Relationship(back_populates="user")
 
@@ -124,14 +146,6 @@ class UserRole(BaseDBModel, table=True):
     # Relationships
     user: User = Relationship(back_populates="user_roles")
     role: Role = Relationship(back_populates="user_roles")
-
-
-class OrgUnit(BaseDBModel, table=True):
-    """Organization unit model"""
-    __tablename__ = "org_unit"
-    
-    name: str = Field(nullable=False)
-    parent_org_unit_id: Optional[UUID] = Field(default=None, foreign_key="org_unit.id")
 
 
 class OrgMembership(BaseDBModel, table=True):

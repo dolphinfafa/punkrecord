@@ -86,6 +86,71 @@
     color: #6b7280;
 }
 
+.status-badge.status-pending_review {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Review comment (rejection feedback) */
+.review-comment-section {
+    border-left: 3px solid #f59e0b;
+    padding-left: 12px;
+}
+
+.review-comment {
+    background: #fffbeb !important;
+    border-left: 3px solid #f59e0b !important;
+    color: #92400e !important;
+}
+
+/* Pending review notice */
+.pending-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(249, 226, 175, 0.15);
+    border: 1px solid rgba(249, 226, 175, 0.3);
+    border-radius: 8px;
+    color: #f9e2af;
+    font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .detail-modal-content {
+        background: #1e1e2e;
+    }
+
+    .detail-section h4 {
+        color: #a6adc8;
+    }
+
+    .detail-title {
+        color: #cdd6f4;
+    }
+
+    .detail-description {
+        color: #cdd6f4;
+    }
+
+    .info-item {
+        background: #313244;
+    }
+
+    .info-label {
+        color: #a6adc8;
+    }
+
+    .info-value {
+        color: #cdd6f4;
+    }
+
+    .detail-modal-footer {
+        background: #181825;
+        border-color: #313244;
+    }
+}
+
 .priority-badge.priority-p0 {
     background: #fee2e2;
     color: #991b1b;
