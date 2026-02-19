@@ -40,7 +40,7 @@ export default function Sidebar() {
             <div className="sidebar-header">
                 <div className="logo-container">
                     <Terminal className="logo-icon" />
-                    {!collapsed && <span className="logo-text">Atlas</span>}
+                    {!collapsed && <span className="logo-text">PunkRecord</span>}
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Calendar, Clock, Tag, User, CheckCircle, RotateCcw, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Clock, Tag, User, CheckCircle, RotateCcw, AlertTriangle, Play } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import './TodoDetailModal.css';
@@ -16,7 +16,7 @@ const STATUS_LABELS = {
 const ACTION_LABELS = { do: '执行', approve: '审批', review: '审阅', ack: '确认' };
 
 export default function TodoDetailModal({
-    isOpen, onClose, todo, onEdit, onSubmit, onApprove, onReject, onBlock, onDismiss,
+    isOpen, onClose, todo, onEdit, onStart, onSubmit, onApprove, onReject, onBlock, onDismiss,
     currentUserId, isManager
 }) {
     const [rejectComment, setRejectComment] = useState('');
@@ -25,6 +25,7 @@ export default function TodoDetailModal({
     if (!isOpen || !todo) return null;
 
     const isAssignee = todo.assignee_user_id === currentUserId;
+    const canStart = isAssignee && todo.status === 'open';
     const canSubmit = isAssignee && ['open', 'in_progress', 'blocked'].includes(todo.status);
     const canApproveReject = isManager && todo.status === 'pending_review';
     const isFinished = ['done', 'dismissed'].includes(todo.status);
@@ -186,6 +187,11 @@ export default function TodoDetailModal({
                     {canSubmit && (
                         <>
                             <button onClick={() => onEdit(todo)} className="btn-secondary">编辑</button>
+                            {canStart && (
+                                <button onClick={() => onStart(todo.id)} className="btn-primary">
+                                    <Play size={14} /> 开始任务
+                                </button>
+                            )}
                             <button onClick={() => onSubmit(todo.id)} className="btn-success">
                                 <CheckCircle size={14} /> 提交完成
                             </button>

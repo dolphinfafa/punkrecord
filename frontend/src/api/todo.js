@@ -16,6 +16,9 @@ export const todoApi = {
     // Update todo
     update: (id, data) => client.patch(`/todo/${id}`, data),
 
+    // Start todo (Open -> In Progress)
+    start: (id) => client.post(`/todo/${id}/start`),
+
     // Employee submits task as complete → pending_review
     submit: (id) => client.post(`/todo/${id}/submit`),
 
@@ -33,4 +36,6 @@ export const todoApi = {
 
     // Legacy mark done (now goes to pending_review)
     markDone: (id) => client.post(`/todo/${id}/done`),
+    // Generic status update for DnD (Backward transitions)
+    updateStatus: (id, status, comment) => client.post(`/todo/${id}/status`, { status, comment }),
 };

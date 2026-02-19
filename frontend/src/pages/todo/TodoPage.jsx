@@ -3,7 +3,7 @@ import { todoApi } from '@/api/todo';
 import { useAuth } from '@/contexts/AuthContext';
 import client from '@/api/client';
 import {
-    Plus, Check, Clock, AlertCircle, Calendar, Users, User
+    Plus, Check, Clock, AlertCircle, Calendar, Users, User, LayoutGrid, List
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -22,7 +22,7 @@ export default function TodoPage() {
     const [todos, setTodos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('my');   // 'my' | 'team'
-    const [filter, setFilter] = useState('open');
+    const [filter, setFilter] = useState('board'); // 'board' (kanban) or 'all' (list)
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -31,6 +31,7 @@ export default function TodoPage() {
     const [entityId, setEntityId] = useState(null);
     const [hasSubordinates, setHasSubordinates] = useState(false);
     const [subordinates, setSubordinates] = useState([]);
+    const [draggedTodo, setDraggedTodo] = useState(null);
 
     // Fetch entity and check if user has subordinates
     useEffect(() => {
@@ -56,12 +57,17 @@ export default function TodoPage() {
             setLoading(true);
             let response;
             if (viewMode === 'team') {
-                const statusParam = filter === 'all' ? undefined : filter;
+                // If filter is 'board', fetch all active tasks (or rely on backend logic for 'open')
+                // Backend 'open' usually returns OPEN, IN_PROGRESS, BLOCKED. 
+                // We need DONE and PENDING_REVIEW too for the board.
+                // Let's use 'all' for board fetching and filter/group in client.
+                const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
                 response = await todoApi.listTeam({ status: statusParam });
             } else {
-                const statusParam = filter === 'all' ? undefined : filter;
+                const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
                 response = await todoApi.list({ status: statusParam });
             }
+            // For board view, we might want to filter out dismissed or very old done tasks if not done by backend
             setTodos(response.data?.items || []);
         } catch (error) {
             showNotification('获取任务列表失败', 'error');
@@ -99,10 +105,22 @@ export default function TodoPage() {
         }
     };
 
+    const handleStart = async (id) => {
+        try {
+            await todoApi.start(id);
+            showNotification('任务已开始');
+            setDetailModalOpen(false);
+            setSelectedTodo(null);
+            fetchTodos();
+        } catch (err) {
+            showNotification(err.response?.data?.detail || '操作失败', 'error');
+        }
+    };
+
     const handleSubmit = async (id) => {
         try {
             await todoApi.submit(id);
-            showNotification('已提交完成，等待上级审核');
+            showNotification('已提交完成');
             setDetailModalOpen(false);
             setSelectedTodo(null);
             fetchTodos();
@@ -183,8 +201,83 @@ export default function TodoPage() {
         return null;
     };
 
+    // Drag and Drop Handlers
+    const handleDragStart = (e, todo) => {
+        setDraggedTodo(todo);
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a slight transparency to the drag image ghost if possible, primarily handled by CSS on the source
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = async (e, targetStatus) => {
+        e.preventDefault();
+        if (!draggedTodo) return;
+        if (draggedTodo.status === targetStatus) {
+            setDraggedTodo(null);
+            return;
+        }
+
+        const todo = draggedTodo;
+        setDraggedTodo(null); // Reset immediately
+
+        try {
+            // Forward Transitions
+            if (todo.status === 'open' && targetStatus === 'in_progress') {
+                await todoApi.start(todo.id);
+                showNotification('任务已开始');
+            } else if (todo.status === 'in_progress' && targetStatus === 'pending_review') {
+                await todoApi.submit(todo.id);
+                showNotification('已提交完成');
+            } else if (targetStatus === 'done') {
+                if (todo.status === 'pending_review') {
+                    // Manager Approve
+                    if (isManagerOfTodo(todo) || todo.assignee_user_id === user?.id || todo.creator_user_id === user?.id) {
+                        await todoApi.approve(todo.id);
+                        showNotification('已审核通过');
+                    } else {
+                        showNotification('您没有权限审核此任务', 'error');
+                        return;
+                    }
+                } else if (todo.status === 'in_progress' && todo.assignee_user_id === user?.id) {
+                    // Self-assigned direct completion handled by submit
+                    await todoApi.submit(todo.id);
+                    showNotification('已提交');
+                } else {
+                    showNotification('无法直接完成任务', 'error');
+                    return;
+                }
+            }
+            // Backward Transitions / Special Cases
+            else if (todo.status === 'in_progress' && targetStatus === 'open') {
+                await todoApi.updateStatus(todo.id, 'open');
+                showNotification('任务已重置为未开始');
+            } else if (todo.status === 'pending_review' && targetStatus === 'in_progress') {
+                await todoApi.updateStatus(todo.id, 'in_progress', 'Recall via Drag');
+                showNotification('任务已撤回至进行中');
+            } else if (todo.status === 'done' && targetStatus === 'in_progress') {
+                await todoApi.updateStatus(todo.id, 'in_progress', 'Reopen via Drag');
+                showNotification('任务已重新打开');
+            } else if (todo.status === 'pending_review' && targetStatus === 'open') {
+                // Reject
+                await todoApi.updateStatus(todo.id, 'open', 'Rejected via Board');
+                showNotification('任务已退回');
+            }
+            else {
+                showNotification(`不支持从 ${STATUS_LABELS[todo.status]} 拖拽到 ${STATUS_LABELS[targetStatus]}`, 'error');
+                return;
+            }
+            fetchTodos();
+        } catch (err) {
+            showNotification(err.response?.data?.detail || '操作失败', 'error');
+        }
+    };
+
     return (
-        <div className="todo-container">
+        <div className="todo-container" style={{ animation: 'fadeIn 0.5s ease-out' }}>
             {notification && (
                 <div className={clsx('notification', `notification-${notification.type}`)}>
                     {notification.message}
@@ -202,88 +295,143 @@ export default function TodoPage() {
             <div className="todo-view-tabs">
                 <button
                     className={clsx('view-tab', { active: viewMode === 'my' })}
-                    onClick={() => { setViewMode('my'); setFilter('open'); }}
+                    onClick={() => { setViewMode('my'); setFilter('board'); }}
                 >
                     <User size={15} /> 我的任务
                 </button>
                 {hasSubordinates && (
                     <button
                         className={clsx('view-tab', { active: viewMode === 'team' })}
-                        onClick={() => { setViewMode('team'); setFilter('all'); }}
+                        onClick={() => { setViewMode('team'); setFilter('board'); }}
                     >
                         <Users size={15} /> 团队任务
                     </button>
                 )}
             </div>
 
-            {/* Status filters */}
+            {/* View Toggle (Board vs List) */}
             <div className="todo-filters">
-                {viewMode === 'my' ? (
-                    <>
-                        <button className={clsx('filter-btn', { active: filter === 'open' })} onClick={() => setFilter('open')}>未完成</button>
-                        <button className={clsx('filter-btn', { active: filter === 'pending_review' })} onClick={() => setFilter('pending_review')}>上报完成</button>
-                        <button className={clsx('filter-btn', { active: filter === 'done' })} onClick={() => setFilter('done')}>已完成</button>
-                        <button className={clsx('filter-btn', { active: filter === 'all' })} onClick={() => setFilter('all')}>全部</button>
-                    </>
-                ) : (
-                    <>
-                        <button className={clsx('filter-btn', { active: filter === 'all' })} onClick={() => setFilter('all')}>全部</button>
-                        <button className={clsx('filter-btn', { active: filter === 'pending_review' })} onClick={() => setFilter('pending_review')}>待审核</button>
-                        <button className={clsx('filter-btn', { active: filter === 'open' })} onClick={() => setFilter('open')}>进行中</button>
-                        <button className={clsx('filter-btn', { active: filter === 'done' })} onClick={() => setFilter('done')}>已完成</button>
-                    </>
-                )}
+                <button
+                    className={clsx('filter-btn', { active: filter === 'board' })}
+                    onClick={() => setFilter('board')}
+                >
+                    <LayoutGrid size={13} /> 看板视图
+                </button>
+                <button
+                    className={clsx('filter-btn', { active: filter === 'all' })}
+                    onClick={() => setFilter('all')}
+                >
+                    <List size={13} /> 全部列表
+                </button>
             </div>
 
             {loading ? (
                 <div className="loading-state">加载中...</div>
             ) : (
-                <div className="todo-list">
-                    {todos.length === 0 ? (
-                        <div className="empty-state">暂无任务</div>
-                    ) : (
-                        todos.map(todo => (
-                            <div
-                                key={todo.id}
-                                className={clsx('todo-item', {
-                                    done: todo.status === 'done',
-                                    'pending-review': todo.status === 'pending_review'
-                                })}
-                                onClick={() => handleTodoClick(todo)}
-                            >
-                                <div className={clsx('todo-checkbox', { checked: todo.status === 'done' || todo.status === 'pending_review' })}>
-                                    {getStatusIcon(todo.status)}
-                                </div>
-
-                                <div className="todo-content">
-                                    <div className="todo-title">{todo.title}</div>
-                                    <div className="todo-meta">
-                                        <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
-                                            {PRIORITY_LABELS[todo.priority] || todo.priority}
-                                        </span>
-                                        <span className={clsx('status-mini', `status-${todo.status}`)}>
-                                            {STATUS_LABELS[todo.status]}
-                                        </span>
-                                        {viewMode === 'team' && todo.assignee_name && (
-                                            <span className="meta-tag">
-                                                <User size={11} /> {todo.assignee_name}
-                                            </span>
-                                        )}
-                                        {viewMode === 'my' && todo.creator_name && todo.creator_user_id !== user?.id && (
-                                            <span className="meta-tag">由 {todo.creator_name} 分配</span>
-                                        )}
-                                        {todo.due_at && (
-                                            <span className="meta-tag">
-                                                <Calendar size={11} />
-                                                {format(new Date(todo.due_at), 'MM-dd HH:mm')}
-                                            </span>
-                                        )}
+                <>
+                    {filter === 'board' ? (
+                        <div className="todo-board">
+                            {['open', 'in_progress', 'pending_review', 'done'].map(status => {
+                                const columnTodos = todos.filter(t => t.status === status);
+                                return (
+                                    <div
+                                        key={status}
+                                        className="board-column"
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, status)}
+                                    >
+                                        <div className="column-header">
+                                            <span className={clsx('status-dot', `status-${status}`)}></span>
+                                            <h3>{STATUS_LABELS[status]}</h3>
+                                            <span className="count-badge">{columnTodos.length}</span>
+                                        </div>
+                                        <div className="column-body">
+                                            {columnTodos.map(todo => (
+                                                <div
+                                                    key={todo.id}
+                                                    className={clsx('todo-card', {
+                                                        done: todo.status === 'done',
+                                                        dragging: draggedTodo?.id === todo.id
+                                                    })}
+                                                    draggable={todo.status !== 'blocked'} // Allow dragging except blocked
+                                                    onDragStart={(e) => handleDragStart(e, todo)}
+                                                    onClick={() => handleTodoClick(todo)}
+                                                >
+                                                    <div className="card-header">
+                                                        <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
+                                                            {PRIORITY_LABELS[todo.priority]}
+                                                        </span>
+                                                        {todo.due_at && (
+                                                            <span className="due-date">
+                                                                {format(new Date(todo.due_at), 'MM/dd')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="card-title">{todo.title}</div>
+                                                    <div className="card-footer">
+                                                        {viewMode === 'team' && todo.assignee_name && (
+                                                            <div className="avatar-circle" title={todo.assignee_name}>
+                                                                {todo.assignee_name[0]}
+                                                            </div>
+                                                        )}
+                                                        {/* Actions could go here */}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        ))
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="todo-list">
+                            {todos.length === 0 ? (
+                                <div className="empty-state">暂无任务</div>
+                            ) : (
+                                todos.map(todo => (
+                                    <div
+                                        key={todo.id}
+                                        className={clsx('todo-item', {
+                                            done: todo.status === 'done',
+                                            'pending-review': todo.status === 'pending_review'
+                                        })}
+                                        onClick={() => handleTodoClick(todo)}
+                                    >
+                                        <div className={clsx('todo-checkbox', { checked: todo.status === 'done' || todo.status === 'pending_review' })}>
+                                            {getStatusIcon(todo.status)}
+                                        </div>
+
+                                        <div className="todo-content">
+                                            <div className="todo-title">{todo.title}</div>
+                                            <div className="todo-meta">
+                                                <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
+                                                    {PRIORITY_LABELS[todo.priority] || todo.priority}
+                                                </span>
+                                                <span className={clsx('status-mini', `status-${todo.status}`)}>
+                                                    {STATUS_LABELS[todo.status]}
+                                                </span>
+                                                {viewMode === 'team' && todo.assignee_name && (
+                                                    <span className="meta-tag">
+                                                        <User size={11} /> {todo.assignee_name}
+                                                    </span>
+                                                )}
+                                                {viewMode === 'my' && todo.creator_name && todo.creator_user_id !== user?.id && (
+                                                    <span className="meta-tag">由 {todo.creator_name} 分配</span>
+                                                )}
+                                                {todo.due_at && (
+                                                    <span className="meta-tag">
+                                                        <Calendar size={11} />
+                                                        {format(new Date(todo.due_at), 'MM-dd HH:mm')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     )}
-                </div>
+                </>
             )}
 
             <TodoModal
@@ -308,6 +456,7 @@ export default function TodoPage() {
                 onClose={() => { setDetailModalOpen(false); setSelectedTodo(null); }}
                 todo={selectedTodo}
                 onEdit={handleEditClick}
+                onStart={handleStart}
                 onSubmit={handleSubmit}
                 onApprove={handleApprove}
                 onReject={handleReject}

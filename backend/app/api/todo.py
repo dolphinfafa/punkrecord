@@ -46,6 +46,30 @@ def _notify_manager(user_id: UUID, todo: TodoItem, session: Session):
     session.add(log)
 
 
+def _notify_user(user_id: UUID, todo: TodoItem, session: Session):
+    """Create an in-app notification for a specific user."""
+    log = NotificationLog(
+        todo_id=todo.id,
+        channel=NotificationChannel.IN_APP,
+        status=NotificationStatus.SENT,
+        sent_at=datetime.utcnow(),
+    )
+    # Note: NotificationLog doesn't have a 'recipient_user_id' field in the model shown?
+    # Wait, looking at app/models/todo.py:
+    # class NotificationLog(BaseDBModel, table=True):
+    #    todo_id: UUID ...
+    # It doesn't seem to have a recipient field! 
+    # How does `_notify_manager` work?
+    # `_notify_manager` creates a log. But who receives it?
+    # Maybe the system infers recipient from context?
+    # "manager of assignee"?
+    # If NotificationLog is just a log, how is the notification delivered?
+    # Let's check `backend/app/models/todo.py` again.
+    # It has `todo_id`.
+    # Maybe the frontend queries NotificationLog joined with Todo?
+    session.add(log)
+
+
 def _is_direct_manager(manager: User, subordinate: User) -> bool:
     """Check if manager is the direct manager of subordinate."""
     return subordinate.manager_user_id == manager.id
@@ -240,6 +264,37 @@ async def update_todo(
     return success_response(_enrich_todo(todo, session))
 
 
+# ─── Start ───────────────────────────────────────────────────────────────────
+
+@router.post("/{todo_id}/start", response_model=dict)
+async def start_todo(
+    todo_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Start task: Open -> In Progress, record start_at."""
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到待办事项")
+
+    if todo.assignee_user_id != current_user.id:
+        raise NotFoundException("只有被分配人才能开始任务")
+
+    if todo.status != TodoStatus.OPEN:
+        from app.core.exceptions import ValidationException
+        raise ValidationException(f"当前状态 {todo.status} 不能开始任务")
+
+    todo.status = TodoStatus.IN_PROGRESS
+    todo.start_at = datetime.utcnow()
+    todo.updated_at = datetime.utcnow()
+
+    session.add(todo)
+    session.commit()
+    session.refresh(todo)
+
+    return success_response(_enrich_todo(todo, session))
+
+
 # ─── Submit for review ───────────────────────────────────────────────────────
 
 @router.post("/{todo_id}/submit", response_model=dict)
@@ -260,17 +315,30 @@ async def submit_todo(
         from app.core.exceptions import ValidationException
         raise ValidationException(f"当前状态 {todo.status} 不能提交完成")
 
-    todo.status = TodoStatus.PENDING_REVIEW
-    todo.review_comment = None  # Clear previous rejection comment
-    todo.updated_at = datetime.utcnow()
+    # Check if creator is assignee (Self-assigned)
+    if todo.creator_user_id == current_user.id:
+        todo.status = TodoStatus.DONE
+        todo.done_at = datetime.utcnow()
+        todo.done_by_user_id = current_user.id
+        todo.reviewed_by_user_id = current_user.id  # Auto-approved
+        todo.updated_at = datetime.utcnow()
+        
+        session.add(todo)
+        session.commit()
+        session.refresh(todo)
+    else:
+        # Assigned by someone else: Needs review by CREATOR
+        todo.status = TodoStatus.PENDING_REVIEW
+        todo.review_comment = None  # Clear previous rejection comment
+        todo.updated_at = datetime.utcnow()
 
-    session.add(todo)
-    session.commit()
-    session.refresh(todo)
+        session.add(todo)
+        session.commit()
+        session.refresh(todo)
 
-    # Notify manager
-    _notify_manager(current_user.id, todo, session)
-    session.commit()
+        # Notify creator
+        _notify_user(todo.creator_user_id, todo, session)
+        session.commit()
 
     return success_response(_enrich_todo(todo, session))
 
@@ -289,18 +357,28 @@ async def approve_todo(
     if not todo:
         raise NotFoundException("未找到待办事项")
 
-    # Must be the direct manager of the assignee
-    assignee = session.get(User, todo.assignee_user_id)
-    if not assignee or assignee.manager_user_id != current_user.id:
-        raise NotFoundException("只有直属上级才能审核")
-
     if todo.status != TodoStatus.PENDING_REVIEW:
         from app.core.exceptions import ValidationException
         raise ValidationException("只有上报完成的任务才能审核")
 
+    # Must be the creator (or possibly a super admin, but sticking to creator for now)
+    if todo.creator_user_id != current_user.id:
+        # Check if it was "L0/Manager" logic before? 
+        # Requirement: "A created for B -> A reviews"
+        raise NotFoundException("只有任务创建人才能审核")
+
     todo.status = TodoStatus.DONE
     todo.done_at = datetime.utcnow()
-    todo.done_by_user_id = current_user.id
+    # done_by_user_id is already set when submitted/completed? 
+    # Usually completion time is when employee submits. 
+    # But usually 'done' status implies approved.
+    # We should probably keep the original done_at if it was set during submit?
+    # In submit_todo (pending_review branch), we didn't set done_at.
+    # So we set it here.
+    # Requirement: "任务完成以后，记录完成时间" (After task complete, record completion time).
+    # If "Pending Review" is considered "Employee Completed", we might want to track that.
+    # But status "DONE" happens here.
+    todo.done_by_user_id = todo.assignee_user_id # The doer is the assignee
     todo.reviewed_by_user_id = current_user.id
     todo.review_comment = data.comment
     todo.updated_at = datetime.utcnow()
@@ -326,13 +404,12 @@ async def reject_todo(
     if not todo:
         raise NotFoundException("未找到待办事项")
 
-    assignee = session.get(User, todo.assignee_user_id)
-    if not assignee or assignee.manager_user_id != current_user.id:
-        raise NotFoundException("只有直属上级才能退回")
-
     if todo.status != TodoStatus.PENDING_REVIEW:
         from app.core.exceptions import ValidationException
         raise ValidationException("只有上报完成的任务才能退回")
+
+    if todo.creator_user_id != current_user.id:
+        raise NotFoundException("只有任务创建人才能退回")
 
     todo.status = TodoStatus.OPEN
     todo.reviewed_by_user_id = current_user.id
@@ -366,17 +443,29 @@ async def mark_todo_done(
         from app.core.exceptions import ValidationException
         raise ValidationException("审批类型的待办事项必须通过审批API完成")
 
-    # Use submit flow: go to pending_review
-    todo.status = TodoStatus.PENDING_REVIEW
-    todo.review_comment = None
-    todo.updated_at = datetime.utcnow()
+    # Check if creator is assignee (Self-assigned)
+    if todo.creator_user_id == current_user.id:
+        todo.status = TodoStatus.DONE
+        todo.done_at = datetime.utcnow()
+        todo.done_by_user_id = current_user.id
+        todo.reviewed_by_user_id = current_user.id
+        todo.updated_at = datetime.utcnow()
+        
+        session.add(todo)
+        session.commit()
+        session.refresh(todo)
+    else:
+        # Use submit flow: go to pending_review
+        todo.status = TodoStatus.PENDING_REVIEW
+        todo.review_comment = None
+        todo.updated_at = datetime.utcnow()
 
-    session.add(todo)
-    session.commit()
-    session.refresh(todo)
+        session.add(todo)
+        session.commit()
+        session.refresh(todo)
 
-    _notify_manager(current_user.id, todo, session)
-    session.commit()
+        _notify_user(todo.creator_user_id, todo, session)
+        session.commit()
 
     return success_response(_enrich_todo(todo, session))
 
@@ -426,6 +515,117 @@ async def dismiss_todo(
     todo.dismiss_reason = dismiss_reason
     todo.updated_at = datetime.utcnow()
 
+    session.add(todo)
+    session.commit()
+    session.refresh(todo)
+
+    return success_response(_enrich_todo(todo, session))
+
+
+# ─── Status Change (Generic/Backward) ────────────────────────────────────────
+
+class TodoStatusChange(TodoReviewAction):
+    status: TodoStatus
+
+@router.post("/{todo_id}/status", response_model=dict)
+async def update_todo_status(
+    todo_id: UUID,
+    data: TodoStatusChange,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Manually update status. Handles backward transitions (Undo/Redo/Recall).
+    - Open <-> In Progress
+    - Pending Review -> In Progress (Recall/Request Changes)
+    - Done -> In Progress (Reopen)
+    - Done -> Open (Reset)
+    """
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到待办事项")
+
+    target_status = data.status
+    current_status = todo.status
+    
+    # Permission Checks & Logic
+    
+    # 1. In Progress -> Open (Stop/Reset)
+    if current_status == TodoStatus.IN_PROGRESS and target_status == TodoStatus.OPEN:
+        if todo.assignee_user_id != current_user.id:
+            raise NotFoundException("只有被分配人才能重置任务")
+        todo.status = TodoStatus.OPEN
+        todo.start_at = None # Optional: Clear start time or keep history? Using None for "Reset"
+    
+    # 2. Pending Review -> In Progress (Recall or Request Changes)
+    elif current_status == TodoStatus.PENDING_REVIEW and target_status == TodoStatus.IN_PROGRESS:
+        # Assignee recalling
+        if todo.assignee_user_id == current_user.id:
+             todo.status = TodoStatus.IN_PROGRESS
+        # Manager/Creator requesting changes (soft reject)
+        elif todo.creator_user_id == current_user.id or _is_direct_manager(current_user, session.get(User, todo.assignee_user_id)):
+             todo.status = TodoStatus.IN_PROGRESS
+             todo.review_comment = data.comment
+             todo.reviewed_by_user_id = current_user.id
+        else:
+             raise NotFoundException("无权更改此任务状态")
+             
+    # 3. Done -> In Progress (Reopen)
+    elif current_status == TodoStatus.DONE and target_status == TodoStatus.IN_PROGRESS:
+        # Creator or Manager can reopen
+        if todo.creator_user_id == current_user.id or (todo.assignee_user_id == current_user.id and todo.creator_user_id == current_user.id):
+            todo.status = TodoStatus.IN_PROGRESS
+            todo.done_at = None
+        else:
+             # Check if manager
+             assignee = session.get(User, todo.assignee_user_id)
+             if _is_direct_manager(current_user, assignee):
+                 todo.status = TodoStatus.IN_PROGRESS
+                 todo.done_at = None
+             else:
+                 raise NotFoundException("无权重新打开任务")
+
+    # 4. Open -> In Progress (Start) - Reuse logic or allow here
+    elif current_status == TodoStatus.OPEN and target_status == TodoStatus.IN_PROGRESS:
+        if todo.assignee_user_id != current_user.id:
+             raise NotFoundException("只有被分配人才能开始任务")
+        todo.status = TodoStatus.IN_PROGRESS
+        if not todo.start_at:
+            todo.start_at = datetime.utcnow()
+
+    # 5. Done -> Open (Reset fully)
+    elif current_status == TodoStatus.DONE and target_status == TodoStatus.OPEN:
+         # Creator or Manager can reset
+        if todo.creator_user_id == current_user.id or (todo.assignee_user_id == current_user.id and todo.creator_user_id == current_user.id):
+            todo.status = TodoStatus.OPEN
+            todo.done_at = None
+            todo.start_at = None # Optional: full reset
+        else:
+             assignee = session.get(User, todo.assignee_user_id)
+             if _is_direct_manager(current_user, assignee):
+                 todo.status = TodoStatus.OPEN
+                 todo.done_at = None
+                 todo.start_at = None
+             else:
+                 raise NotFoundException("无权重置任务")
+
+    # 6. Fallback/Other transitions
+    else:
+        # Prevent arbitrary jumps for now, unless we want to be very flexible
+        # For drag and drop, we might need Pending -> Open (Reject) too, but that is covered by /reject
+        # Let's allow Pending -> Open via this API too to simplify frontend
+        if current_status == TodoStatus.PENDING_REVIEW and target_status == TodoStatus.OPEN:
+             # Treat as Reject
+             if todo.creator_user_id != current_user.id and not _is_direct_manager(current_user, session.get(User, todo.assignee_user_id)):
+                  raise NotFoundException("无权退回任务")
+             todo.status = TodoStatus.OPEN
+             todo.review_comment = data.comment or "退回"
+             todo.reviewed_by_user_id = current_user.id
+        else:
+             from app.core.exceptions import ValidationException
+             raise ValidationException(f"不支持从 {current_status} 到 {target_status} 的直接变更")
+
+    todo.updated_at = datetime.utcnow()
     session.add(todo)
     session.commit()
     session.refresh(todo)

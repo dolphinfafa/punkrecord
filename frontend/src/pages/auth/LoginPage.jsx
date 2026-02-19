@@ -31,7 +31,7 @@ export default function LoginPage() {
         <div className="login-container">
             <div className="login-card">
                 <div className="login-header">
-                    <h1>Atlas</h1>
+                    <h1>PunkRecord</h1>
                     <p>企业管理系统</p>
                 </div>
 
