@@ -29,6 +29,28 @@ export const projectApi = {
     updateStageStatus: async (stageId, data) => {
         return client.patch(`/project/stages/${stageId}`, data);
     },
+
+    deleteProject: async (projectId) => {
+        return client.delete(`/project/projects/${projectId}`);
+    },
+
+    // Project Members
+    getProjectMembers: async (projectId) => {
+        return client.get(`/project/projects/${projectId}/members`);
+    },
+
+    addProjectMember: async (projectId, data) => {
+        return client.post(`/project/projects/${projectId}/members`, data);
+    },
+
+    removeProjectMember: async (projectId, userId) => {
+        return client.delete(`/project/projects/${projectId}/members/${userId}`);
+    },
+
+    // Project Tasks
+    getProjectTodos: async (projectId) => {
+        return client.get(`/project/projects/${projectId}/todos`);
+    },
 };
 
 export default projectApi;

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import projectApi from '@/api/project';
+import ProjectEditModal from './components/ProjectEditModal';
+import ProjectTeam from './components/ProjectTeam';
+import ProjectTasks from './components/ProjectTasks';
 
 export default function ProjectDetailPage() {
     const { id } = useParams();
@@ -9,6 +12,7 @@ export default function ProjectDetailPage() {
     const [stages, setStages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -35,6 +39,16 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!window.confirm('确定要删除该项目吗？此操作不可恢复。')) return;
+        try {
+            await projectApi.deleteProject(id);
+            navigate('/project');
+        } catch (err) {
+            alert(err.message || '删除失败');
+        }
+    };
+
     if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
     if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
     if (!project) return <div className="page-content"><div className="error">未找到项目</div></div>;
@@ -43,8 +57,22 @@ export default function ProjectDetailPage() {
         <div className="page-content">
             <div className="toolbar">
                 <button className="btn btn-secondary" onClick={() => navigate('/project')}>返回列表</button>
-                <button className="btn btn-primary">编辑项目</button>
+                <div>
+                    <button className="btn btn-primary" onClick={() => setShowEditModal(true)} style={{ marginRight: '0.5rem' }}>编辑项目</button>
+                    <button className="btn btn-danger" onClick={handleDelete}>删除项目</button>
+                </div>
             </div>
+
+            {showEditModal && (
+                <ProjectEditModal
+                    project={project}
+                    onClose={() => setShowEditModal(false)}
+                    onSuccess={() => {
+                        loadData();
+                        setShowEditModal(false);
+                    }}
+                />
+            )}
 
             <div className="detail-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
                 <div className="main-info">
@@ -114,10 +142,11 @@ export default function ProjectDetailPage() {
                             )}
                         </div>
                     </div>
+
+                    <ProjectTasks project={project} />
                 </div>
 
                 <div className="side-info">
-                    {/* Placeholder for future sidebar info like Team Members or recent activity */}
                     <div className="card">
                         <h3>团队</h3>
                         <div className="info-item" style={{ marginTop: '1rem' }}>
@@ -125,6 +154,8 @@ export default function ProjectDetailPage() {
                             <div>{project.pm_name || '未分配'}</div>
                         </div>
                     </div>
+
+                    <ProjectTeam project={project} />
                 </div>
             </div>
         </div>

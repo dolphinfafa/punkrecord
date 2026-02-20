@@ -11,10 +11,13 @@ from app.core.auth import get_current_user
 from app.core.exceptions import NotFoundException
 from app.core.response import success_response
 from app.models.iam import User
-from app.models.project import Project, ProjectStage, ProjectType, ProjectStatus, StageStatus
+from app.models.iam import User, OurEntity
+from app.models.project import Project, ProjectStage, ProjectMember, ProjectType, ProjectStatus, StageStatus
+from app.models.todo import TodoItem, TodoSourceType
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
-    ProjectStageResponse, StageStatusUpdate
+    ProjectStageResponse, StageStatusUpdate,
+    ProjectMemberCreate, ProjectMemberResponse, ProjectTaskResponse
 )
 
 router = APIRouter(prefix="/project", tags=["Project"])
@@ -53,8 +56,17 @@ async def create_project(
     current_user: User = Depends(get_current_user)
 ):
     """Create project with automatic stage generation"""
+    # Fetch default our_entity if not provided
+    our_entity_id = data.our_entity_id
+    if not our_entity_id:
+        default_entity = session.exec(select(OurEntity)).first()
+        if default_entity:
+            our_entity_id = default_entity.id
+        else:
+            raise NotFoundException("未找到可用的我方主体")
+            
     project = Project(
-        our_entity_id=data.our_entity_id,
+        our_entity_id=our_entity_id,
         project_no=data.project_no,
         name=data.name,
         project_type=ProjectType(data.project_type),
@@ -228,3 +240,155 @@ async def update_stage_status(
     session.refresh(stage)
     
     return success_response(ProjectStageResponse.model_validate(stage))
+
+
+@router.delete("/projects/{project_id}", response_model=dict)
+async def delete_project(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete project"""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+    
+    # Check if there are related todos or stages?
+    # For now, cascading delete is handled by database or we just delete
+    # But usually we should check. Pydantic/SQLAlchemy might handle cascade if configured
+    # For simplicity, we just delete the project and rely on DB cascade
+    
+    session.delete(project)
+    session.commit()
+    
+    return success_response({"message": "项目已删除"})
+
+
+# --- Project Members ---
+
+@router.post("/projects/{project_id}/members", response_model=dict)
+async def add_project_member(
+    project_id: UUID,
+    data: ProjectMemberCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Add member to project"""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+        
+    # Check if user exists
+    user = session.get(User, data.user_id)
+    if not user:
+        raise NotFoundException("未找到用户")
+        
+    # Check if already member
+    existing = session.exec(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project_id)
+        .where(ProjectMember.user_id == data.user_id)
+    ).first()
+    
+    if existing:
+        return success_response(ProjectMemberResponse.model_validate(existing))
+        
+    member = ProjectMember(
+        project_id=project_id,
+        user_id=data.user_id,
+        role_in_project=data.role_in_project
+    )
+    
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    
+    # Populate user info for response
+    member.user_name = user.name
+    member.user_email = user.email
+    
+    return success_response(ProjectMemberResponse.model_validate(member))
+
+
+@router.delete("/projects/{project_id}/members/{user_id}", response_model=dict)
+async def remove_project_member(
+    project_id: UUID,
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Remove member from project"""
+    member = session.exec(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project_id)
+        .where(ProjectMember.user_id == user_id)
+    ).first()
+    
+    if member:
+        session.delete(member)
+        session.commit()
+        
+    return success_response({"message": "成员已移除"})
+
+
+@router.get("/projects/{project_id}/members", response_model=dict)
+async def list_project_members(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List project members"""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+        
+    members = session.exec(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project_id)
+    ).all()
+    
+    # Enhance with user info
+    result = []
+    for m in members:
+        user = session.get(User, m.user_id)
+        resp = ProjectMemberResponse.model_validate(m)
+        if user:
+            resp.user_name = user.name
+            resp.user_email = user.email
+        result.append(resp)
+        
+    return success_response(result)
+
+
+# --- Project Tasks ---
+
+@router.get("/projects/{project_id}/todos", response_model=dict)
+async def list_project_todos(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List project todos"""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+        
+    # Find todos linked to this project
+    # source_type = PROJECT_TASK and source_id = project_id (as string)
+    
+    todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
+        .where(TodoItem.source_id == str(project_id))
+        .order_by(TodoItem.created_at.desc())
+    ).all()
+    
+    result = []
+    for t in todos:
+        assignee = session.get(User, t.assignee_user_id)
+        resp = ProjectTaskResponse.model_validate(t)
+        if assignee:
+            resp.assignee_name = assignee.name
+        result.append(resp)
+        
+    return success_response(result)

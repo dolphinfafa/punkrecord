@@ -57,6 +57,8 @@ backend/punkrecord.db
 backend/punkrecord.db-journal
 backend/punkrecord.db-wal
 backend/punkrecord.db-shm
+atlas.db
+backend/atlas.db
 
 # 日志
 logs/

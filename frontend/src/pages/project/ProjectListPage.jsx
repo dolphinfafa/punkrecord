@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import projectApi from '@/api/project';
+import ProjectCreateModal from './components/ProjectCreateModal';
 
 export default function ProjectListPage() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     useEffect(() => {
         loadProjects();
@@ -16,7 +18,6 @@ export default function ProjectListPage() {
         try {
             setLoading(true);
             const response = await projectApi.listProjects();
-            // Should adjust based on actual API response format (items usually inside data)
             setProjects(response.data?.items || []);
             setError(null);
         } catch (err) {
@@ -31,14 +32,36 @@ export default function ProjectListPage() {
         navigate(`/project/${projectId}`);
     };
 
+    const handleDelete = async (e, projectId) => {
+        e.stopPropagation();
+        if (!window.confirm('确定要删除该项目吗？此操作不可恢复。')) return;
+
+        try {
+            await projectApi.deleteProject(projectId);
+            loadProjects(); // Refresh list
+        } catch (err) {
+            alert(err.message || '删除失败');
+        }
+    };
+
     if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
     if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
 
     return (
         <div className="page-content">
             <div className="toolbar">
-                <button className="btn btn-primary">创建项目</button>
+                <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>创建项目</button>
             </div>
+
+            {showCreateModal && (
+                <ProjectCreateModal
+                    onClose={() => setShowCreateModal(false)}
+                    onSuccess={() => {
+                        loadProjects();
+                        setShowCreateModal(false);
+                    }}
+                />
+            )}
 
             <div className="data-table-container">
                 <table className="data-table">
@@ -78,6 +101,13 @@ export default function ProjectListPage() {
                                             }}
                                         >
                                             查看
+                                        </button>
+                                        <button
+                                            className="btn-link text-danger"
+                                            onClick={(e) => handleDelete(e, project.id)}
+                                            style={{ marginLeft: '0.5rem' }}
+                                        >
+                                            删除
                                         </button>
                                     </td>
                                 </tr>

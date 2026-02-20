@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 class ProjectCreate(BaseModel):
     """Project creation schema"""
-    our_entity_id: UUID
+    our_entity_id: Optional[UUID] = None
     project_no: str
     name: str
     project_type: str  # b2b or b2c
@@ -79,3 +79,39 @@ class StageStatusUpdate(BaseModel):
     status: str
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
+
+
+class ProjectMemberCreate(BaseModel):
+    """Project member creation schema"""
+    user_id: UUID
+    role_in_project: Optional[str] = None
+
+
+class ProjectMemberResponse(BaseModel):
+    """Project member response schema"""
+    id: UUID
+    project_id: UUID
+    user_id: UUID
+    role_in_project: Optional[str] = None
+    created_at: datetime
+    
+    # Joined fields
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ProjectTaskResponse(BaseModel):
+    """Project task response schema"""
+    id: UUID
+    title: str
+    status: str
+    priority: str
+    assignee_user_id: UUID
+    assignee_name: Optional[str] = None
+    due_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
