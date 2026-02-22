@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import projectApi from '@/api/project';
-// We might need a TodoModal to create tasks, or we can just link to todo page.
-// But for now let's just list tasks. Creating tasks usually requires more context.
-// Ideally rework TodoModal to define source.
-// However, I can reuse TodoModal if I pass props or use a simplified create here.
-// Let's implement a simple list for now, and maybe a "Go to Todo" button or a simple "Quick Create" if necessary.
-// Actually, user asked for "Tasks section with List/Create task functionality".
+import { todoApi } from '@/api/todo';
+import TodoModal from '@/components/todo/TodoModal';
 import { useNavigate } from 'react-router-dom';
 
 export default function ProjectTasks({ project }) {
     const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showTaskModal, setShowTaskModal] = useState(false);
 
     useEffect(() => {
         loadTasks();
@@ -30,22 +27,18 @@ export default function ProjectTasks({ project }) {
     };
 
     const handleCreateTask = () => {
-        // Navigate to todo create page with pre-filled project info? 
-        // Or open a modal. 
-        // Since I don't have a global TodoModal easily accessible without importing, 
-        // and TodoModal might be complex, I'll direct user to Todo page or just say "Creating form here"
-        // Better: create a simple task creation directly here or use a simplified mock for now.
-        // Actually, TodoPage has a CreateModal. I can try to import it if it's exported.
-        // But for this task, let's just add a button that navigates to Todo page with query params?
-        // Or simpler: Just a "Create Task" button that alerts "Go to Todo page to create task linked to this project" 
-        // No, that's bad UX.
-        // Let's implement a simple inline creation form for quick tasks.
+        setShowTaskModal(true);
+    };
 
-        // TODO: Implement quick create. For now, just placeholder or navigation.
-        // Navigation: /todos?source_type=project_task&source_id={project.id}
-        // But TodoPage might not support query params init.
-
-        alert("To create a task, please go to Todo page. (Integration pending)");
+    const handleSubmitTask = async (data) => {
+        // Override source type and id for project task
+        const payload = {
+            ...data,
+            source_type: 'project_task',
+            source_id: project.id
+        };
+        await todoApi.create(payload);
+        loadTasks(); // reload the task list
     };
 
     return (
@@ -56,6 +49,13 @@ export default function ProjectTasks({ project }) {
                     + 创建任务
                 </button>
             </div>
+
+            <TodoModal
+                isOpen={showTaskModal}
+                onClose={() => setShowTaskModal(false)}
+                onSubmit={handleSubmitTask}
+                mode="create"
+            />
 
             <div className="tasks-list">
                 {loading ? (

@@ -22,12 +22,12 @@ export const projectApi = {
     },
 
     // Project Stages
-    getProjectStages: async (projectId) => {
-        return client.get(`/project/projects/${projectId}/stages`);
+    getProjectStages: async (id) => {
+        return client.get(`/project/projects/${id}/stages`);
     },
 
-    updateStageStatus: async (stageId, data) => {
-        return client.patch(`/project/stages/${stageId}`, data);
+    updateProjectStage: async (projectId, stageId, data) => {
+        return client.patch(`/project/projects/${projectId}/stages/${stageId}`, data);
     },
 
     deleteProject: async (projectId) => {

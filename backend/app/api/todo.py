@@ -16,6 +16,7 @@ from app.models.todo import (
     NotificationLog, NotificationChannel, NotificationStatus
 )
 from app.schemas.todo import TodoCreate, TodoUpdate, TodoReviewAction, TodoResponse
+from app.api.project import sync_project_progress
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
 
@@ -261,6 +262,12 @@ async def update_todo(
     session.commit()
     session.refresh(todo)
 
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -291,6 +298,12 @@ async def start_todo(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
 
     return success_response(_enrich_todo(todo, session))
 
@@ -340,6 +353,12 @@ async def submit_todo(
         _notify_user(todo.creator_user_id, todo, session)
         session.commit()
 
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -387,6 +406,12 @@ async def approve_todo(
     session.commit()
     session.refresh(todo)
 
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -419,6 +444,12 @@ async def reject_todo(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
 
     return success_response(_enrich_todo(todo, session))
 
@@ -467,6 +498,12 @@ async def mark_todo_done(
         _notify_user(todo.creator_user_id, todo, session)
         session.commit()
 
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -493,6 +530,12 @@ async def block_todo(
     session.commit()
     session.refresh(todo)
 
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -518,6 +561,12 @@ async def dismiss_todo(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
 
     return success_response(_enrich_todo(todo, session))
 
@@ -629,5 +678,11 @@ async def update_todo_status(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+        try:
+            sync_project_progress(session, UUID(todo.source_id))
+        except ValueError:
+            pass
 
     return success_response(_enrich_todo(todo, session))

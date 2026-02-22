@@ -75,6 +75,8 @@ class ProjectStage(BaseDBModel, table=True):
     
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
+    deliverables: Optional[str] = None
+    feature_list: Optional[str] = None
 
 
 class ProjectMember(BaseDBModel, table=True):

@@ -3,7 +3,7 @@ Authentication dependencies
 """
 from typing import Optional
 from uuid import UUID
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from app.core.database import get_session
@@ -12,16 +12,25 @@ from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.models.iam import User, UserStatus
 
 # Security scheme
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     session: Session = Depends(get_session)
 ) -> User:
     """Get current authenticated user"""
     print(f"🔐 Authentication attempt...")
-    token = credentials.credentials
+    
+    # Try cookie first, then fallback to Bearer header
+    token = request.cookies.get("access_token")
+    if not token and credentials:
+        token = credentials.credentials
+        
+    if not token:
+        print(f"   ❌ No token found in cookie or header")
+        raise UnauthorizedException("Not authenticated")
     
     try:
         payload = decode_access_token(token)

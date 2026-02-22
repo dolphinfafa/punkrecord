@@ -63,7 +63,7 @@ export const iamApi = {
 
     // Our Entities
     listEntities: async () => {
-        return client.get('/iam/our-entities');
+        return client.get('/iam/entities');
     },
 
     createEntity: async (entityData) => {

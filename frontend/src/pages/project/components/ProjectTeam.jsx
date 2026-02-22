@@ -6,8 +6,7 @@ export default function ProjectTeam({ project }) {
     const [members, setMembers] = useState([]);
     const [users, setUsers] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [newMemberId, setNewMemberId] = useState('');
-    const [newMemberRole, setNewMemberRole] = useState('');
+    const [newMemberIds, setNewMemberIds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -36,21 +35,35 @@ export default function ProjectTeam({ project }) {
 
     const handleAddMember = async (e) => {
         e.preventDefault();
+        if (newMemberIds.length === 0) {
+            setError('请至少选择一名成员');
+            return;
+        }
+
         try {
             setLoading(true);
             await projectApi.addProjectMember(project.id, {
-                user_id: newMemberId,
-                role_in_project: newMemberRole
+                user_ids: newMemberIds
             });
             setShowAddModal(false);
-            setNewMemberId('');
-            setNewMemberRole('');
+            setNewMemberIds([]);
             loadMembers();
         } catch (err) {
             setError(err.message || '添加失败');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSelectChange = (e) => {
+        const options = e.target.options;
+        const selectedValues = [];
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].selected) {
+                selectedValues.push(options[i].value);
+            }
+        }
+        setNewMemberIds(selectedValues);
     };
 
     const handleRemoveMember = async (userId) => {
@@ -83,26 +96,28 @@ export default function ProjectTeam({ project }) {
                             <div className="modal-body">
                                 {error && <div className="error-message">{error}</div>}
                                 <div className="form-group">
-                                    <label>用户</label>
-                                    <select
-                                        value={newMemberId}
-                                        onChange={e => setNewMemberId(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">请选择...</option>
+                                    <label>用户 (勾选添加)</label>
+                                    <div className="checkbox-list" style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #dee2e6', padding: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
                                         {users.map(u => (
-                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                            <div key={u.id} style={{ marginBottom: '8px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', fontWeight: 'normal', margin: 0, cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={newMemberIds.includes(u.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setNewMemberIds([...newMemberIds, u.id]);
+                                                            } else {
+                                                                setNewMemberIds(newMemberIds.filter(id => id !== u.id));
+                                                            }
+                                                        }}
+                                                        style={{ marginRight: '8px', width: 'auto', marginTop: 0 }}
+                                                    />
+                                                    {u.display_name} {u.department_id ? '(已分配部门)' : ''}
+                                                </label>
+                                            </div>
                                         ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>角色 (可选)</label>
-                                    <input
-                                        type="text"
-                                        value={newMemberRole}
-                                        onChange={e => setNewMemberRole(e.target.value)}
-                                        placeholder="例如: 开发人员, 设计师"
-                                    />
+                                    </div>
                                 </div>
                             </div>
                             <div className="modal-footer">

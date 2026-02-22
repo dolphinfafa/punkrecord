@@ -26,8 +26,11 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     pm_user_id: Optional[UUID] = None
-    description: Optional[str] = None
+    our_entity_id: Optional[UUID] = None
+    customer_id: Optional[UUID] = None
+    start_at: Optional[date] = None
     due_at: Optional[date] = None
+    description: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -40,6 +43,7 @@ class ProjectResponse(BaseModel):
     status: str
     owner_user_id: UUID
     pm_user_id: UUID
+    pm_name: Optional[str] = None
     customer_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     start_at: Optional[date] = None
@@ -68,11 +72,23 @@ class ProjectStageResponse(BaseModel):
     actual_end_at: Optional[date] = None
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
+    deliverables: Optional[str] = None
+    feature_list: Optional[str] = None
     created_at: datetime
     
     class Config:
         from_attributes = True
 
+
+class ProjectStageUpdate(BaseModel):
+    """Project stage update schema"""
+    status: Optional[str] = None
+    planned_end_at: Optional[date] = None
+    actual_end_at: Optional[date] = None
+    blocked_reason: Optional[str] = None
+    skip_reason: Optional[str] = None
+    deliverables: Optional[str] = None
+    feature_list: Optional[str] = None
 
 class StageStatusUpdate(BaseModel):
     """Stage status update schema"""
@@ -81,10 +97,18 @@ class StageStatusUpdate(BaseModel):
     skip_reason: Optional[str] = None
 
 
+
 class ProjectMemberCreate(BaseModel):
-    """Project member creation schema"""
+    """Add a single member to a project"""
     user_id: UUID
     role_in_project: Optional[str] = None
+
+
+class ProjectMemberBatchCreate(BaseModel):
+    """Project member batch creation schema"""
+    user_ids: list[UUID]
+    role_in_project: Optional[str] = None
+
 
 
 class ProjectMemberResponse(BaseModel):

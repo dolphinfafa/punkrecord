@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import projectApi from '@/api/project';
 import iamApi from '@/api/iam';
-// Assuming contractApi exists, if not we might skip contract selection for now or mock it
-// import contractApi from '@/api/contract'; 
+import contractApi from '@/api/contract';
 
 export default function ProjectCreateModal({ onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -11,11 +10,13 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
         project_type: 'b2b',
         pm_user_id: '',
         description: '',
-        contract_id: '',   // Optional
-        customer_id: ''    // Optional
+        contract_id: '',
+        customer_id: '',
+        start_at: '',
+        due_at: ''
     });
     const [users, setUsers] = useState([]);
-    const [entities, setEntities] = useState([]);
+    const [counterparties, setCounterparties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -25,24 +26,15 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
 
     const loadOptions = async () => {
         try {
-            // Load users for PM selection
-            // Load entities for our_entity_id
-            // This part depends on existing IAM APIs. 
-            // I'll assume iamApi.listUsers and something for entities exists.
-            // If not I might need to check iamApi.
+            const [usersRes, counterpartiesRes] = await Promise.all([
+                iamApi.listUsers({ page_size: 100 }),
+                contractApi.listCounterparties()
+            ]);
 
-            const usersRes = await iamApi.listUsers({ page_size: 100 });
             setUsers(usersRes.data?.items || []);
-
-            // For entities, if no API, we might hardcode or fetch from somewhere else.
-            // Let's assume a getDictionary or similar exists, or use a hardcoded list for now if not found.
-            // Actually, `our_entity` usually comes from a specific API.
-            // Let's try to list entities if possible, or just mock it if I can't find it.
-            // checking list_dir of api/iam.py might help but I'll assume there is a way.
-            // For now, let's just fetch users.
-
+            setCounterparties(counterpartiesRes.data?.items || counterpartiesRes.data || []);
         } catch (err) {
-            console.error(err);
+            console.error('Failed to load options:', err);
         }
     };
 
@@ -56,7 +48,21 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
         try {
             setLoading(true);
             setError(null);
-            await projectApi.createProject(formData);
+
+            // Clean up empty strings for optional UUID fields
+            const payload = { ...formData };
+            if (payload.contract_id === '') payload.contract_id = null;
+            if (payload.customer_id === '') payload.customer_id = null;
+            if (payload.our_entity_id === '') payload.our_entity_id = null;
+            if (payload.start_at === '') payload.start_at = null;
+            if (payload.due_at === '') payload.due_at = null;
+
+            if (payload.project_type === 'b2c') {
+                payload.customer_id = null;
+                payload.our_entity_id = null;
+            }
+
+            await projectApi.createProject(payload);
             onSuccess();
             onClose();
         } catch (err) {
@@ -116,6 +122,49 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
                                     <option key={u.id} value={u.id}>{u.display_name}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        {formData.project_type === 'b2b' && (
+                            <>
+                                <div className="form-group">
+                                    <label>我方主体</label>
+                                    <select name="our_entity_id" value={formData.our_entity_id || ''} onChange={handleChange}>
+                                        <option value="">请选择我方主体</option>
+                                        {counterparties.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>客户方 (甲方)</label>
+                                    <select name="customer_id" value={formData.customer_id || ''} onChange={handleChange}>
+                                        <option value="">请选择客户方</option>
+                                        {counterparties.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="form-group">
+                            <label>开始日期</label>
+                            <input
+                                type="date"
+                                name="start_at"
+                                value={formData.start_at}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>截止日期</label>
+                            <input
+                                type="date"
+                                name="due_at"
+                                value={formData.due_at}
+                                onChange={handleChange}
+                            />
                         </div>
 
                         <div className="form-group">

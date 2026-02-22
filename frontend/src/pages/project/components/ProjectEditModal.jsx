@@ -1,28 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import projectApi from '@/api/project';
 import iamApi from '@/api/iam';
+import contractApi from '@/api/contract';
 
 export default function ProjectEditModal({ project, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
         name: project.name,
         status: project.status,
+        project_type: project.project_type,
         pm_user_id: project.pm_user_id,
+        our_entity_id: project.our_entity_id || '',
+        customer_id: project.customer_id || '',
+        start_at: project.start_at || '',
+        due_at: project.due_at || '',
         description: project.description || ''
     });
     const [users, setUsers] = useState([]);
+    const [counterparties, setCounterparties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        loadUsers();
+        loadOptions();
     }, []);
 
-    const loadUsers = async () => {
+    const loadOptions = async () => {
         try {
-            const res = await iamApi.listUsers({ page_size: 100 });
-            setUsers(res.data?.items || []);
+            const [usersRes, counterpartiesRes] = await Promise.all([
+                iamApi.listUsers({ page_size: 100 }),
+                contractApi.listCounterparties()
+            ]);
+            setUsers(usersRes.data?.items || []);
+            setCounterparties(counterpartiesRes.data?.items || counterpartiesRes.data || []);
         } catch (err) {
-            console.error(err);
+            console.error('Failed to load options:', err);
         }
     };
 
@@ -36,7 +47,19 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
         try {
             setLoading(true);
             setError(null);
-            await projectApi.updateProject(project.id, formData);
+
+            const payload = { ...formData };
+            if (payload.our_entity_id === '') payload.our_entity_id = null;
+            if (payload.customer_id === '') payload.customer_id = null;
+            if (payload.start_at === '') payload.start_at = null;
+            if (payload.due_at === '') payload.due_at = null;
+
+            if (payload.project_type === 'b2c') {
+                payload.our_entity_id = null;
+                payload.customer_id = null;
+            }
+
+            await projectApi.updateProject(project.id, payload);
             onSuccess();
             onClose();
         } catch (err) {
@@ -87,6 +110,49 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
                                     <option key={u.id} value={u.id}>{u.display_name}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        {formData.project_type === 'b2b' && (
+                            <>
+                                <div className="form-group">
+                                    <label>我方主体</label>
+                                    <select name="our_entity_id" value={formData.our_entity_id || ''} onChange={handleChange}>
+                                        <option value="">请选择我方主体</option>
+                                        {counterparties.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>客户方 (甲方)</label>
+                                    <select name="customer_id" value={formData.customer_id || ''} onChange={handleChange}>
+                                        <option value="">请选择客户方</option>
+                                        {counterparties.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="form-group">
+                            <label>开始日期</label>
+                            <input
+                                type="date"
+                                name="start_at"
+                                value={formData.start_at}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>截止日期</label>
+                            <input
+                                type="date"
+                                name="due_at"
+                                value={formData.due_at}
+                                onChange={handleChange}
+                            />
                         </div>
 
                         <div className="form-group">

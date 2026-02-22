@@ -8,24 +8,35 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Validate token on app initialization
         const initAuth = async () => {
             const token = localStorage.getItem('token');
-            const savedUser = localStorage.getItem('user');
+            const cachedUser = localStorage.getItem('user');
 
-            if (token && savedUser) {
-                try {
-                    // Validate token by calling /auth/me
-                    await client.get('/auth/me');
-                    // Token is valid, set user
-                    setUser(JSON.parse(savedUser));
-                } catch (error) {
-                    // Token is invalid (e.g., server restarted), clear storage
-                    console.log('Token validation failed, clearing auth state');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setUser(null);
+            if (!token) {
+                setLoading(false);
+                return;
+            }
+
+            // Immediately restore from cache so UI is fast
+            if (cachedUser) {
+                setUser(JSON.parse(cachedUser));
+            }
+
+            try {
+                // Re-validate token against backend
+                const resp = await client.get('/auth/me');
+                // Axios interceptor returns response.data, so resp is {code, data, message}
+                const profile = resp.data || resp;
+                if (profile && profile.id) {
+                    const userData = { id: profile.id, name: profile.display_name };
+                    setUser(userData);
+                    localStorage.setItem('user', JSON.stringify(userData));
                 }
+            } catch (error) {
+                console.log('Token validation failed, clearing auth state');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setUser(null);
             }
             setLoading(false);
         };
@@ -51,7 +62,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = async () => {
+        try {
+            await client.post('/auth/logout');
+        } catch (err) {
+            console.error('Logout API failed:', err);
+        }
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);

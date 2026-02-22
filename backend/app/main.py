@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import create_db_and_tables
 from app.core.exceptions import AtlasException
 from app.core.response import error_response
-from app.api import auth, iam, todo, contract, project, finance
+from app.api import auth, iam, todo, contract, project, finance, ai
 
 # Create FastAPI app
 app = FastAPI(
@@ -24,6 +24,7 @@ app.include_router(todo.router, prefix="/api/v1")
 app.include_router(contract.router, prefix="/api/v1")
 app.include_router(project.router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")
+app.include_router(ai.router, prefix="/api/v1")
 
 # CORS middleware
 app.add_middleware(
@@ -60,9 +61,14 @@ async def atlas_exception_handler(request: Request, exc: AtlasException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle general exceptions"""
+    import traceback
+    print(f"❌ Unhandled exception on {request.method} {request.url.path}:")
+    traceback.print_exc()
+    with open('error.log', 'w') as f:
+        traceback.print_exc(file=f)
     return JSONResponse(
         status_code=500,
-        content=error_response(500, "Internal server error")
+        content=error_response(500, f"Internal server error: {type(exc).__name__}: {str(exc)}")
     )
 
 

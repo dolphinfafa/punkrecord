@@ -295,6 +295,21 @@ async def delete_department(
     return success_response({"message": "删除成功"})
 
 
+# ─── OurEntity endpoints ─────────────────────────────────────────────────────
+
+@router.get("/entities", response_model=dict)
+async def list_entities(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List all our entities (company / branches)"""
+    entities = session.exec(select(OurEntity).order_by(OurEntity.name)).all()
+    return success_response({
+        "items": [{"id": str(e.id), "name": e.name, "type": e.type, "status": e.status} for e in entities],
+        "total": len(entities),
+    })
+
+
 # ─── Org Chart endpoint ──────────────────────────────────────────────────────
 
 @router.get("/org-chart", response_model=dict)
