@@ -51,6 +51,11 @@ export const projectApi = {
     getProjectTodos: async (projectId) => {
         return client.get(`/project/projects/${projectId}/todos`);
     },
+
+    // Contract context (enriched data for contract generation)
+    getProjectContractContext: async (projectId) => {
+        return client.get(`/project/projects/${projectId}/contract-context`);
+    },
 };
 
 export default projectApi;

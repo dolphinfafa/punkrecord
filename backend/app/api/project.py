@@ -788,3 +788,278 @@ async def export_quote_excel(
     filename = f"{project_name}_报价单.xlsx"
     encoded_filename = urllib.parse.quote(filename)
     return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"})
+
+
+# ─── Contract Canvas Endpoints ────────────────────────────────────────────────
+
+@router.get("/projects/{project_id}/contract-context", response_model=dict)
+async def get_contract_context(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get enriched project context for contract generation (project info, parties, amount)"""
+    from app.models.contract import Contract, Counterparty
+    
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+    
+    pm_user = session.get(User, project.pm_user_id) if project.pm_user_id else None
+    # 乙方 = 我方主体 (our entity)
+    our_entity = session.get(OurEntity, project.our_entity_id) if project.our_entity_id else None
+    # 甲方 defaults to the project's customer
+    customer = session.get(Counterparty, project.customer_id) if project.customer_id else None
+    contract = session.get(Contract, project.contract_id) if project.contract_id else None
+    
+    # If a contract is linked, use its parties; otherwise fall back to customer/our_entity
+    contract_party_a = None  # 甲方 from contract
+    contract_party_c = None  # 丙方 from contract (optional)
+    if contract:
+        contract_party_a = session.get(Counterparty, contract.party_a_id) if contract.party_a_id else None
+        contract_party_c = session.get(Counterparty, contract.party_c_id) if contract.party_c_id else None
+    
+    # 甲方: prefer contract party_a, else customer
+    party_a_data = contract_party_a or customer
+    
+    def counterparty_info(cp):
+        if not cp:
+            return None
+        return {
+            "name": cp.name,
+            "identifier": cp.identifier,  # 统一社会信用代码/税号
+            "address": cp.address,
+            "bank_name": cp.bank_name,
+            "bank_account": cp.bank_account,
+            "phone": cp.phone,
+        }
+    
+    def our_entity_info(oe):
+        if not oe:
+            return None
+        return {
+            "name": oe.name,
+            "legal_name": oe.legal_name,
+            "uscc": oe.uscc,  # 统一社会信用代码
+            "address": oe.address,
+        }
+    
+    context = {
+        "project": {
+            "id": str(project.id),
+            "name": project.name,
+            "project_no": project.project_no,
+            "project_type": project.project_type,
+            "description": project.description,
+            "start_at": str(project.start_at) if project.start_at else None,
+            "due_at": str(project.due_at) if project.due_at else None,
+        },
+        "pm": {
+            "name": pm_user.display_name,
+            "email": pm_user.email,
+        } if pm_user else None,
+        # 乙方 = 我方主体
+        "our_entity": our_entity_info(our_entity),
+        # 甲方 = customer or contract party_a
+        "party_a": counterparty_info(party_a_data),
+        # 乙方 = our_entity (alias for clarity in system prompt)
+        "party_b": our_entity_info(our_entity),
+        # 丙方 = optional third party from linked contract
+        "party_c": counterparty_info(contract_party_c),
+        "contract": {
+            "contract_no": contract.contract_no,
+            "name": contract.name,
+            "amount_total": str(contract.amount_total),
+            "currency": contract.currency,
+            "sign_date": str(contract.sign_date) if contract.sign_date else None,
+            "expire_date": str(contract.expire_date) if contract.expire_date else None,
+            "summary": contract.summary,
+        } if contract else None,
+    }
+    
+    return success_response(context)
+
+
+@router.post("/export-contract-docx")
+async def export_contract_docx(
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Export contract markdown as a Word (.docx) document"""
+    from docx import Document as DocxDocument
+    from docx.shared import Pt, Cm, RGBColor, Inches
+    from docx.oxml.ns import qn
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    import re
+
+    content_md = payload.get("content_md", "")
+    filename = payload.get("filename", "合同") + ".docx"
+    
+    doc = DocxDocument()
+    
+    # Set A4 page margins
+    for section in doc.sections:
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
+        section.left_margin = Cm(3.17)
+        section.right_margin = Cm(3.17)
+        section.top_margin = Cm(2.54)
+        section.bottom_margin = Cm(2.54)
+    
+    # Style defaults
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = '宋体'
+    font.size = Pt(11)
+    
+    def set_paragraph_font(para, size=None, bold=False, alignment=None):
+        """Apply font settings to a paragraph."""
+        for run in para.runs:
+            run.font.name = '宋体'
+            if size:
+                run.font.size = Pt(size)
+            run.font.bold = bold
+        if alignment:
+            para.alignment = alignment
+    
+    def parse_and_add(doc, line: str):
+        """Parse a single markdown line and add it to the document."""
+        line = line.rstrip()
+        
+        # Heading levels
+        heading_match = re.match(r'^(#{1,6})\s+(.*)', line)
+        if heading_match:
+            level = len(heading_match.group(1))
+            text = heading_match.group(2)
+            # Strip inline markdown from heading text
+            text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+            text = re.sub(r'\*(.+?)\*', r'\1', text)
+            docx_level = min(level, 4)  # docx supports Heading 1-9
+            para = doc.add_heading(text, level=docx_level)
+            set_paragraph_font(para, size=18 - (level * 2), bold=True)
+            return
+        
+        # Horizontal rule
+        if re.match(r'^[-*_]{3,}$', line.strip()):
+            doc.add_paragraph('─' * 40)
+            return
+        
+        # Unordered list item
+        list_match = re.match(r'^(\s*)[-*+]\s+(.*)', line)
+        if list_match:
+            text = list_match.group(2)
+            text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+            para = doc.add_paragraph(style='List Bullet')
+            run = para.add_run(text)
+            run.font.size = Pt(11)
+            run.font.name = '宋体'
+            return
+        
+        # Ordered list item
+        ordered_match = re.match(r'^\s*\d+\.\s+(.*)', line)
+        if ordered_match:
+            text = ordered_match.group(1)
+            text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+            para = doc.add_paragraph(style='List Number')
+            run = para.add_run(text)
+            run.font.size = Pt(11)
+            run.font.name = '宋体'
+            return
+        
+        # Empty line
+        if not line.strip():
+            doc.add_paragraph()
+            return
+        
+        # Regular paragraph with inline formatting
+        para = doc.add_paragraph()
+        # Split by bold/italic patterns
+        segments = re.split(r'(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|~~.*?~~|`.*?`)', line)
+        for seg in segments:
+            if seg.startswith('***') and seg.endswith('***'):
+                run = para.add_run(seg[3:-3])
+                run.bold = True
+                run.italic = True
+            elif seg.startswith('**') and seg.endswith('**'):
+                run = para.add_run(seg[2:-2])
+                run.bold = True
+            elif seg.startswith('*') and seg.endswith('*') and len(seg) > 2:
+                run = para.add_run(seg[1:-1])
+                run.italic = True
+            elif seg.startswith('~~') and seg.endswith('~~'):
+                run = para.add_run(seg[2:-2])
+                # strikethrough not directly supported, just add as normal
+            elif seg.startswith('`') and seg.endswith('`'):
+                run = para.add_run(seg[1:-1])
+                run.font.name = 'Courier New'
+            elif seg:
+                run = para.add_run(seg)
+            if seg:
+                run.font.size = Pt(11)
+                if run.font.name != 'Courier New':
+                    run.font.name = '宋体'
+        para.paragraph_format.line_spacing = Pt(22)
+    
+    # Process each line
+    lines = content_md.split('\n')
+    in_table = False
+    table_rows = []
+    
+    for i, line in enumerate(lines):
+        # Detect markdown tables
+        stripped = line.strip()
+        if '|' in stripped:
+            if not in_table:
+                in_table = True
+                table_rows = []
+            # Skip separator rows like |---|---|
+            if re.match(r'^[\|\s\-:]+$', stripped):
+                continue
+            cols = [c.strip() for c in stripped.strip('|').split('|')]
+            table_rows.append(cols)
+            continue
+        
+        if in_table:
+            # Render the collected table
+            if table_rows:
+                num_cols = max(len(r) for r in table_rows)
+                t = doc.add_table(rows=len(table_rows), cols=num_cols)
+                t.style = 'Table Grid'
+                for ri, row in enumerate(table_rows):
+                    for ci, cell_text in enumerate(row):
+                        if ci < num_cols:
+                            cell = t.cell(ri, ci)
+                            cell.text = cell_text
+                            if ri == 0:  # header row: bold
+                                for run in cell.paragraphs[0].runs:
+                                    run.bold = True
+            in_table = False
+            table_rows = []
+            # Process current line (not table)
+            parse_and_add(doc, line)
+        else:
+            parse_and_add(doc, line)
+    
+    # Flush any remaining table
+    if in_table and table_rows:
+        num_cols = max(len(r) for r in table_rows)
+        t = doc.add_table(rows=len(table_rows), cols=num_cols)
+        t.style = 'Table Grid'
+        for ri, row in enumerate(table_rows):
+            for ci, cell_text in enumerate(row):
+                if ci < num_cols:
+                    cell = t.cell(ri, ci)
+                    cell.text = cell_text
+                    if ri == 0:
+                        for run in cell.paragraphs[0].runs:
+                            run.bold = True
+    
+    out = io.BytesIO()
+    doc.save(out)
+    out.seek(0)
+    encoded_filename = urllib.parse.quote(filename)
+    return StreamingResponse(
+        out,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
+    )

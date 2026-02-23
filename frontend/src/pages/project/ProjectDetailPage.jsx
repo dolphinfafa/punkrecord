@@ -6,9 +6,10 @@ import ProjectTeam from './components/ProjectTeam';
 import ProjectTasks from './components/ProjectTasks';
 import FeatureListModal from './components/FeatureListModal';
 import QuoteModal from './components/QuoteModal';
+import ContractCanvasModal from './components/ContractCanvasModal';
 import {
     Briefcase, FileText, Activity, Layers,
-    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List
+    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
@@ -21,6 +22,7 @@ export default function ProjectDetailPage() {
     const [showEditModal, setShowEditModal] = useState(false);
     const [featureListStage, setFeatureListStage] = useState(null);
     const [quoteStage, setQuoteStage] = useState(null);
+    const [contractCanvasStage, setContractCanvasStage] = useState(null);
 
     useEffect(() => {
         if (id) {
@@ -258,10 +260,20 @@ export default function ProjectDetailPage() {
                                                                     <FileText size={14} /> 报价单
                                                                 </button>
                                                             )}
-                                                            {project?.project_type?.toLowerCase() !== 'b2b' && '-'}
+                                                            {stage?.stage_code?.toLowerCase() === 'contract_signed' && (
+                                                                <button
+                                                                    className="btn-link text-primary"
+                                                                    onClick={() => setContractCanvasStage({ ...stage, project_name: project.name })}
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                >
+                                                                    <PenTool size={14} /> AI生成合同
+                                                                </button>
+                                                            )}
+                                                            {project?.project_type?.toLowerCase() !== 'b2b' && stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
                                                             {project?.project_type?.toLowerCase() === 'b2b' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'quotation' && '-'}
+                                                                stage?.stage_code?.toLowerCase() !== 'quotation' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -317,6 +329,20 @@ export default function ProjectDetailPage() {
                     allStages={stages}
                     onClose={() => setQuoteStage(null)}
                     onSave={async () => {
+                        loadData();
+                    }}
+                />
+            )}
+
+            {contractCanvasStage && (
+                <ContractCanvasModal
+                    isOpen={!!contractCanvasStage}
+                    stage={contractCanvasStage}
+                    project={project}
+                    onClose={() => setContractCanvasStage(null)}
+                    onSave={async (data) => {
+                        await projectApi.updateProjectStage(project.id, contractCanvasStage.id, data);
+                        setContractCanvasStage(null);
                         loadData();
                     }}
                 />

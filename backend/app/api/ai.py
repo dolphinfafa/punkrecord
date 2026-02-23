@@ -97,3 +97,61 @@ async def ai_chat(
         import traceback
         traceback.print_exc()
         raise AtlasException(f"AI Service Error: {str(e)}", code=500)
+
+
+@router.post("/chat-stream")
+async def ai_chat_stream(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Chat with Gemini AI using server-sent events (SSE) for streaming responses"""
+    from fastapi.responses import StreamingResponse
+    import json
+    
+    async def generate_chunks():
+        try:
+            api_key = settings.GEMINI_API_KEY if hasattr(settings, 'GEMINI_API_KEY') else os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                yield f"data: {json.dumps({'error': 'Gemini API key is not configured'})}\n\n"
+                return
+
+            model = request.model_name or "gemini-3.1-pro-preview"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
+            
+            gemini_contents = []
+            for msg in request.messages:
+                gemini_contents.append({
+                    "role": msg.role, 
+                    "parts": [{"text": part} for part in msg.parts]
+                })
+
+            payload = {
+                "contents": gemini_contents,
+                "systemInstruction": {
+                    "role": "user",
+                    "parts": [{"text": request.system_instruction or "You are a helpful AI assistant."}]
+                }
+            }
+            
+            async with httpx.AsyncClient(verify=False, timeout=300.0) as client:
+                async with client.stream("POST", url, json=payload) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        yield f"data: {json.dumps({'error': f'API Error {response.status_code}: {error_text.decode()}'})}\n\n"
+                        return
+                        
+                    async for line in response.aiter_lines():
+                        if line:
+                            # Forward the SSE data structure directly
+                            # Gemini's stream format is usually data: {...}
+                            yield f"{line}\n\n"
+                            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'error': f'Stream failed: {str(e)}'})}\n\n"
+
+    return StreamingResponse(
+        generate_chunks(),
+        media_type="text/event-stream"
+    )
