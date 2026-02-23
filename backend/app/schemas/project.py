@@ -91,10 +91,14 @@ class ProjectStageUpdate(BaseModel):
     feature_list: Optional[str] = None
 
 class StageStatusUpdate(BaseModel):
-    """Stage status update schema"""
-    status: str
+    """Stage status update schema — all fields optional so callers can do partial updates."""
+    status: Optional[str] = None
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
+    deliverables: Optional[str] = None
+    feature_list: Optional[str] = None
+    planned_start_at: Optional[date] = None
+    planned_end_at: Optional[date] = None
 
 
 

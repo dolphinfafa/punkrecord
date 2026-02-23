@@ -9,6 +9,7 @@ import urllib.parse
 
 from fastapi import APIRouter, Depends, Query, Body
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlmodel import Session, select
@@ -230,34 +231,44 @@ async def get_project_stages(
     return success_response([ProjectStageResponse.model_validate(s) for s in stages])
 
 
-@router.patch("/stages/{stage_id}", response_model=dict)
+@router.patch("/projects/{project_id}/stages/{stage_id}", response_model=dict)
 async def update_stage_status(
+    project_id: UUID,
     stage_id: UUID,
     data: StageStatusUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Update project stage status"""
+    """Update project stage (status, deliverables, feature_list)"""
     stage = session.get(ProjectStage, stage_id)
-    if not stage:
+    if not stage or stage.project_id != project_id:
         raise NotFoundException("未找到阶段")
-    
-    stage.status = StageStatus(data.status)
-    if data.blocked_reason:
-        stage.blocked_reason = data.blocked_reason
-    if data.skip_reason:
-        stage.skip_reason = data.skip_reason
-    
-    if stage.status == StageStatus.IN_PROGRESS and not stage.actual_start_at:
-        stage.actual_start_at = datetime.utcnow().date()
-    elif stage.status == StageStatus.DONE and not stage.actual_end_at:
-        stage.actual_end_at = datetime.utcnow().date()
-    
+
+    if data.status is not None:
+        stage.status = StageStatus(data.status)
+        if data.blocked_reason:
+            stage.blocked_reason = data.blocked_reason
+        if data.skip_reason:
+            stage.skip_reason = data.skip_reason
+        if stage.status == StageStatus.IN_PROGRESS and not stage.actual_start_at:
+            stage.actual_start_at = datetime.utcnow().date()
+        elif stage.status == StageStatus.DONE and not stage.actual_end_at:
+            stage.actual_end_at = datetime.utcnow().date()
+
+    if data.deliverables is not None:
+        stage.deliverables = data.deliverables
+    if data.feature_list is not None:
+        stage.feature_list = data.feature_list
+    if data.planned_start_at is not None:
+        stage.planned_start_at = data.planned_start_at
+    if data.planned_end_at is not None:
+        stage.planned_end_at = data.planned_end_at
+
     stage.updated_at = datetime.utcnow()
     session.add(stage)
     session.commit()
     session.refresh(stage)
-    
+
     return success_response(ProjectStageResponse.model_validate(stage))
 
 
@@ -788,6 +799,171 @@ async def export_quote_excel(
     filename = f"{project_name}_报价单.xlsx"
     encoded_filename = urllib.parse.quote(filename)
     return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"})
+
+
+# ─── Dev Task Generation Endpoints ───────────────────────────────────────────
+
+@router.get("/projects/{project_id}/feature-list", response_model=dict)
+async def get_project_feature_list(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the feature list (功能清单) from this project's stages, used to generate dev tasks."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    # Look for feature_list in all stages, prefer quotation/prototype stages
+    stages = session.exec(
+        select(ProjectStage)
+        .where(ProjectStage.project_id == project_id)
+        .order_by(ProjectStage.sequence_no)
+    ).all()
+
+    feature_list_data = []
+    source_stage = None
+    # Priority order: requirement_alignment has the feature spec list; quotation has price rows (different format)
+    # So prefer requirement_alignment → prototype_confirmed → then anything else with valid feature list keys
+    priority_codes = ["requirement_alignment", "prototype_confirmed", "quotation"]
+    stage_map = {s.stage_code: s for s in stages}
+
+    def _is_feature_list(data):
+        """Check that parsed data looks like a feature spec list (not a quotation row list)."""
+        if not isinstance(data, list) or len(data) == 0:
+            return False
+        first = data[0]
+        if not isinstance(first, dict):
+            return False
+        # Feature list rows have these keys; quotation rows have 'total_price', 'final_price' etc.
+        feature_keys = {"l1_feature", "l2_feature", "module", "dev_backend", "dev_frontend"}
+        return bool(feature_keys & set(first.keys()))
+
+    import json as _json
+
+    for code in priority_codes:
+        if code in stage_map and stage_map[code].feature_list:
+            try:
+                candidate = _json.loads(stage_map[code].feature_list)
+                if _is_feature_list(candidate):
+                    feature_list_data = candidate
+                    source_stage = stage_map[code]
+                    break
+            except Exception:
+                continue
+
+    if not source_stage:
+        # Fallback: any stage with a valid feature_list format
+        for s in stages:
+            if s.feature_list:
+                try:
+                    candidate = _json.loads(s.feature_list)
+                    if _is_feature_list(candidate):
+                        feature_list_data = candidate
+                        source_stage = s
+                        break
+                except Exception:
+                    continue
+
+    # Get project members for assignment
+    members_rows = session.exec(
+        select(ProjectMember).where(ProjectMember.project_id == project_id)
+    ).all()
+    members = []
+    for m in members_rows:
+        u = session.get(User, m.user_id)
+        if u:
+            members.append({"id": str(u.id), "display_name": u.display_name, "email": u.email})
+
+    # Also include PM
+    if project.pm_user_id:
+        pm = session.get(User, project.pm_user_id)
+        if pm and not any(m["id"] == str(pm.id) for m in members):
+            members.insert(0, {"id": str(pm.id), "display_name": pm.display_name, "email": pm.email, "is_pm": True})
+
+    return success_response({
+        "feature_list": feature_list_data,
+        "source_stage": source_stage.stage_name if source_stage else None,
+        "members": members,
+        "project": {
+            "id": str(project.id),
+            "name": project.name,
+            "our_entity_id": str(project.our_entity_id),
+            "due_at": str(project.due_at) if project.due_at else None,
+        }
+    })
+
+
+class DevTaskItem(BaseModel):
+    title: str
+    description: Optional[str] = None
+    assignee_user_id: UUID
+    priority: str = "p2"
+    due_at: Optional[str] = None
+    dev_type: Optional[str] = None  # backend / frontend / ui / product
+    feature_key: Optional[str] = None
+
+
+class GenerateDevTasksRequest(BaseModel):
+    tasks: List[DevTaskItem]
+
+
+@router.post("/projects/{project_id}/generate-dev-tasks", response_model=dict)
+async def generate_dev_tasks(
+    project_id: UUID,
+    payload: GenerateDevTasksRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Batch-create TodoItems from feature list rows for the development stage."""
+    from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
+    from datetime import datetime as _dt
+
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    created_ids = []
+    for item in payload.tasks:
+        # Parse due_at
+        due_at = None
+        if item.due_at:
+            try:
+                due_at = _dt.fromisoformat(item.due_at)
+            except ValueError:
+                pass
+
+        priority_map = {"p0": TodoPriority.P0, "p1": TodoPriority.P1, "p2": TodoPriority.P2, "p3": TodoPriority.P3}
+        priority = priority_map.get(item.priority, TodoPriority.P2)
+
+        import uuid as _uuid
+        source_id = f"project_dev_{project_id}_{_uuid.uuid4().hex[:8]}"
+
+        todo = TodoItem(
+            our_entity_id=project.our_entity_id,
+            assignee_user_id=item.assignee_user_id,
+            creator_user_id=current_user.id,
+            title=item.title,
+            description=item.description or "",
+            source_type=TodoSourceType.PROJECT_TASK,
+            source_id=source_id,
+            action_type=TodoActionType.DO,
+            priority=priority,
+            status=TodoStatus.OPEN,
+            due_at=due_at,
+            tags=[item.dev_type] if item.dev_type else [],
+            link={"project_id": str(project_id), "project_name": project.name, "dev_type": item.dev_type or ""}
+        )
+        session.add(todo)
+        session.flush()
+        created_ids.append(str(todo.id))
+
+    session.commit()
+
+    return success_response({
+        "created": len(created_ids),
+        "todo_ids": created_ids
+    })
 
 
 # ─── Contract Canvas Endpoints ────────────────────────────────────────────────

@@ -7,9 +7,10 @@ import ProjectTasks from './components/ProjectTasks';
 import FeatureListModal from './components/FeatureListModal';
 import QuoteModal from './components/QuoteModal';
 import ContractCanvasModal from './components/ContractCanvasModal';
+import GenerateTasksModal from './components/GenerateTasksModal';
 import {
     Briefcase, FileText, Activity, Layers,
-    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool
+    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, Zap
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
@@ -23,6 +24,7 @@ export default function ProjectDetailPage() {
     const [featureListStage, setFeatureListStage] = useState(null);
     const [quoteStage, setQuoteStage] = useState(null);
     const [contractCanvasStage, setContractCanvasStage] = useState(null);
+    const [generateTasksProject, setGenerateTasksProject] = useState(null);
 
     useEffect(() => {
         if (id) {
@@ -269,11 +271,21 @@ export default function ProjectDetailPage() {
                                                                     <PenTool size={14} /> AI生成合同
                                                                 </button>
                                                             )}
+                                                            {stage?.stage_code?.toLowerCase() === 'development' && (
+                                                                <button
+                                                                    className="btn-link"
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#7c3aed' }}
+                                                                    onClick={() => setGenerateTasksProject(project)}
+                                                                >
+                                                                    <Zap size={14} /> 生成开发任务
+                                                                </button>
+                                                            )}
                                                             {project?.project_type?.toLowerCase() !== 'b2b' && stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
                                                             {project?.project_type?.toLowerCase() === 'b2b' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'quotation' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
+                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -345,6 +357,14 @@ export default function ProjectDetailPage() {
                         setContractCanvasStage(null);
                         loadData();
                     }}
+                />
+            )}
+            {generateTasksProject && (
+                <GenerateTasksModal
+                    isOpen={!!generateTasksProject}
+                    project={generateTasksProject}
+                    onClose={() => setGenerateTasksProject(null)}
+                    onSuccess={() => { setGenerateTasksProject(null); loadData(); }}
                 />
             )}
         </div >

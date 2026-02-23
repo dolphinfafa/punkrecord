@@ -52,6 +52,15 @@ export const projectApi = {
         return client.get(`/project/projects/${projectId}/todos`);
     },
 
+    // Dev Task Generation
+    getProjectFeatureList: async (projectId) => {
+        return client.get(`/project/projects/${projectId}/feature-list`);
+    },
+
+    generateDevTasks: async (projectId, tasks) => {
+        return client.post(`/project/projects/${projectId}/generate-dev-tasks`, { tasks });
+    },
+
     // Contract context (enriched data for contract generation)
     getProjectContractContext: async (projectId) => {
         return client.get(`/project/projects/${projectId}/contract-context`);

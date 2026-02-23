@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     X, Send, Bot, User, RefreshCw, FileText,
     Save, Maximize2, Minimize2, Download,
-    Building2, Calendar, ChevronDown, ChevronUp, DollarSign, PenTool
+    Building2, Calendar, ChevronDown, ChevronUp, DollarSign, PenTool,
+    CheckCircle, AlertCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import projectApi from '@/api/project';
@@ -225,6 +226,8 @@ export default function ContractCanvasModal({ isOpen, stage, project, onClose, o
     const [contractCtx, setContractCtx] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMsg, setSaveMsg] = useState(null); // null | 'ok' | 'err'
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -330,7 +333,22 @@ ${contractContent || '（空）'}
         }
     };
 
-    const handleSave = () => onSave({ deliverables: contractContent });
+    const handleSave = async () => {
+        if (!contractContent || isSaving) return;
+        setIsSaving(true);
+        setSaveMsg(null);
+        try {
+            await onSave({ deliverables: contractContent });
+            setSaveMsg('ok');
+            setTimeout(() => setSaveMsg(null), 2500);
+        } catch (err) {
+            console.error('Save failed:', err);
+            setSaveMsg('err');
+            setTimeout(() => setSaveMsg(null), 3000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleExportWord = async () => {
         if (!contractContent || isExporting) return;
@@ -434,14 +452,23 @@ ${contractContent || '（空）'}
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={!contractContent}
+                            disabled={!contractContent || isSaving}
                             style={{
                                 ...styles.btn,
-                                backgroundColor: contractContent ? '#0ea5e9' : '#94a3b8',
-                                color: 'white'
+                                backgroundColor: saveMsg === 'ok' ? '#16a34a' : saveMsg === 'err' ? '#dc2626' : contractContent ? '#0ea5e9' : '#94a3b8',
+                                color: 'white',
+                                opacity: isSaving ? 0.8 : 1,
+                                transition: 'background-color 0.3s',
                             }}
                         >
-                            <Save size={14} />保存到交付物
+                            {isSaving
+                                ? <><RefreshCw size={14} className="spinning" /> 保存中...</>
+                                : saveMsg === 'ok'
+                                    ? <><CheckCircle size={14} /> 已保存</>
+                                    : saveMsg === 'err'
+                                        ? <><AlertCircle size={14} /> 保存失败</>
+                                        : <><Save size={14} /> 保存</>
+                            }
                         </button>
                         <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 0.25rem' }} />
                         <button
