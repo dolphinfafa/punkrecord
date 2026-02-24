@@ -17,7 +17,7 @@ const ACTION_LABELS = { do: '执行', approve: '审批', review: '审阅', ack: 
 
 export default function TodoDetailModal({
     isOpen, onClose, todo, onEdit, onStart, onSubmit, onApprove, onReject, onBlock, onDismiss,
-    currentUserId, isManager
+    currentUserId
 }) {
     const [rejectComment, setRejectComment] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
@@ -25,9 +25,13 @@ export default function TodoDetailModal({
     if (!isOpen || !todo) return null;
 
     const isAssignee = todo.assignee_user_id === currentUserId;
+    const isReviewer = todo.creator_user_id === currentUserId;
+    const reviewerName = todo.creator_user_id === todo.assignee_user_id
+        ? '无需审核（创建人本人）'
+        : (todo.creator_name || '—');
     const canStart = isAssignee && todo.status === 'open';
     const canSubmit = isAssignee && ['open', 'in_progress', 'blocked'].includes(todo.status);
-    const canApproveReject = isManager && todo.status === 'pending_review';
+    const canApproveReject = isReviewer && todo.status === 'pending_review';
     const isFinished = ['done', 'dismissed'].includes(todo.status);
 
     const handleBlock = () => {
@@ -99,6 +103,13 @@ export default function TodoDetailModal({
                                     <div className="info-value">{todo.creator_name || '—'}</div>
                                 </div>
                             </div>
+                            <div className="info-item">
+                                <User size={16} />
+                                <div>
+                                    <div className="info-label">审核员</div>
+                                    <div className="info-value">{reviewerName}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -163,7 +174,7 @@ export default function TodoDetailModal({
                     {todo.status === 'pending_review' && isAssignee && (
                         <div className="detail-section pending-notice">
                             <Clock size={16} />
-                            <span>已上报完成，等待上级审核</span>
+                            <span>已上报完成，等待审核员审核</span>
                         </div>
                     )}
 
@@ -202,7 +213,7 @@ export default function TodoDetailModal({
                         </>
                     )}
 
-                    {/* Manager review actions */}
+                    {/* Reviewer actions */}
                     {canApproveReject && (
                         <>
                             <button onClick={() => onApprove(todo.id)} className="btn-success">

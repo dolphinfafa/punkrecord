@@ -195,4 +195,17 @@ curl http://localhost:8000/health
 
 ---
 
+## 7. 增量更新（2026-02-24）
+
+- 新增页面：`frontend/src/pages/project/DevelopmentProgressPage.jsx` + `frontend/src/pages/project/DevelopmentProgressPage.css`
+- 新增路由：`/project/:id/dev-progress`（项目开发进度管理页）
+- 项目详情“development”阶段入口文案由“生成开发任务”改为“开发进度”
+- 新增接口：`POST /api/v1/project/projects/{project_id}/todos/{todo_id}/assign`（仅项目经理可改指派）
+- 开发任务生成规则更新：`generate-dev-tasks` 生成的 Todo 统一使用
+  - `source_type=project_task`
+  - `source_id={project_id}`（确保可被项目任务列表和进度统计正确检索）
+  - `creator_user_id=project.pm_user_id`（统一由项目经理作为审核员）
+
+---
+
 *最后更新：2026-02-24 | 如有结构性变更请同步更新本文件*

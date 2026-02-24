@@ -89,7 +89,7 @@ export default function ProjectTasks({ project }) {
                 </div>
             ) : tasks.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>
-                    暂无任务，点击"生成开发任务"从功能清单批量生成
+                    暂无任务，请进入“开发进度”页面自动从功能清单生成
                 </div>
             ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>

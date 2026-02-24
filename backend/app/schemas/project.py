@@ -139,7 +139,15 @@ class ProjectTaskResponse(BaseModel):
     priority: str
     assignee_user_id: UUID
     assignee_name: Optional[str] = None
+    creator_user_id: UUID
+    creator_name: Optional[str] = None
     due_at: Optional[datetime] = None
+    tags: list = []
     
     class Config:
         from_attributes = True
+
+
+class ProjectTaskAssignRequest(BaseModel):
+    """Assign/reassign a project task assignee"""
+    assignee_user_id: UUID

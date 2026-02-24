@@ -20,6 +20,7 @@ import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
 import ProjectLayout from '@/pages/project/ProjectLayout';
 import ProjectListPage from '@/pages/project/ProjectListPage';
 import ProjectDetailPage from '@/pages/project/ProjectDetailPage';
+import DevelopmentProgressPage from '@/pages/project/DevelopmentProgressPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -64,6 +65,7 @@ function App() {
             <Route path="project" element={<ProjectLayout />}>
               <Route index element={<ProjectListPage />} />
               <Route path=":id" element={<ProjectDetailPage />} />
+              <Route path=":id/dev-progress" element={<DevelopmentProgressPage />} />
             </Route>
 
             <Route path="finance" element={<FinanceLayout />}>

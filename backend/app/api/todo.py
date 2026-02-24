@@ -262,7 +262,7 @@ async def update_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -286,6 +286,10 @@ async def start_todo(
 
     if todo.assignee_user_id != current_user.id:
         raise NotFoundException("只有被分配人才能开始任务")
+    # Idempotent start: duplicate drag/drop or click should not fail.
+    if todo.status == TodoStatus.IN_PROGRESS:
+        return success_response(_enrich_todo(todo, session))
+
 
     if todo.status != TodoStatus.OPEN:
         from app.core.exceptions import ValidationException
@@ -299,7 +303,7 @@ async def start_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -323,6 +327,10 @@ async def submit_todo(
 
     if todo.assignee_user_id != current_user.id:
         raise NotFoundException("只有被分配人才能提交完成")
+
+    # Idempotent submit: duplicate drag/drop or click should not fail.
+    if todo.status in (TodoStatus.PENDING_REVIEW, TodoStatus.DONE):
+        return success_response(_enrich_todo(todo, session))
 
     if todo.status not in (TodoStatus.OPEN, TodoStatus.IN_PROGRESS, TodoStatus.BLOCKED):
         from app.core.exceptions import ValidationException
@@ -353,7 +361,7 @@ async def submit_todo(
         _notify_user(todo.creator_user_id, todo, session)
         session.commit()
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -406,7 +414,7 @@ async def approve_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -445,7 +453,7 @@ async def reject_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -498,7 +506,7 @@ async def mark_todo_done(
         _notify_user(todo.creator_user_id, todo, session)
         session.commit()
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -530,7 +538,7 @@ async def block_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -562,7 +570,7 @@ async def dismiss_todo(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
@@ -679,7 +687,7 @@ async def update_todo_status(
     session.commit()
     session.refresh(todo)
 
-    if todo.source_type == TodoSourceType.PROJECT and todo.source_id:
+    if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:

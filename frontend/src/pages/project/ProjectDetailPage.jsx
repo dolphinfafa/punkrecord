@@ -7,10 +7,9 @@ import ProjectTasks from './components/ProjectTasks';
 import FeatureListModal from './components/FeatureListModal';
 import QuoteModal from './components/QuoteModal';
 import ContractCanvasModal from './components/ContractCanvasModal';
-import GenerateTasksModal from './components/GenerateTasksModal';
 import {
     Briefcase, FileText, Activity, Layers,
-    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, Zap
+    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, BarChart3
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
@@ -24,7 +23,6 @@ export default function ProjectDetailPage() {
     const [featureListStage, setFeatureListStage] = useState(null);
     const [quoteStage, setQuoteStage] = useState(null);
     const [contractCanvasStage, setContractCanvasStage] = useState(null);
-    const [generateTasksProject, setGenerateTasksProject] = useState(null);
 
     useEffect(() => {
         if (id) {
@@ -274,10 +272,10 @@ export default function ProjectDetailPage() {
                                                             {stage?.stage_code?.toLowerCase() === 'development' && (
                                                                 <button
                                                                     className="btn-link"
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#7c3aed' }}
-                                                                    onClick={() => setGenerateTasksProject(project)}
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#0369a1' }}
+                                                                    onClick={() => navigate(`/project/${project.id}/dev-progress`)}
                                                                 >
-                                                                    <Zap size={14} /> 生成开发任务
+                                                                    <BarChart3 size={14} /> 开发进度
                                                                 </button>
                                                             )}
                                                             {project?.project_type?.toLowerCase() !== 'b2b' && stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
@@ -357,14 +355,6 @@ export default function ProjectDetailPage() {
                         setContractCanvasStage(null);
                         loadData();
                     }}
-                />
-            )}
-            {generateTasksProject && (
-                <GenerateTasksModal
-                    isOpen={!!generateTasksProject}
-                    project={generateTasksProject}
-                    onClose={() => setGenerateTasksProject(null)}
-                    onSuccess={() => { setGenerateTasksProject(null); loadData(); }}
                 />
             )}
         </div >

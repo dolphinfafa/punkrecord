@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { todoApi } from '@/api/todo';
 import { useAuth } from '@/contexts/AuthContext';
 import client from '@/api/client';
@@ -32,6 +32,7 @@ export default function TodoPage() {
     const [hasSubordinates, setHasSubordinates] = useState(false);
     const [subordinates, setSubordinates] = useState([]);
     const [draggedTodo, setDraggedTodo] = useState(null);
+    const actioningTodoIdsRef = useRef(new Set());
 
     // Fetch entity and check if user has subordinates
     useEffect(() => {
@@ -40,14 +41,19 @@ export default function TodoPage() {
                 const res = await client.get('/iam/our-entities');
                 const entities = res.data;
                 if (entities?.length > 0) setEntityId(entities[0].id);
-            } catch { }
+            } catch {
+                setEntityId(null);
+            }
 
             try {
                 const res = await todoApi.listTeam({ page_size: 1 });
                 const subs = res.data?.subordinates || [];
                 setHasSubordinates(subs.length > 0);
                 setSubordinates(subs);
-            } catch { }
+            } catch {
+                setHasSubordinates(false);
+                setSubordinates([]);
+            }
         };
         init();
     }, []);
@@ -69,7 +75,7 @@ export default function TodoPage() {
             }
             // For board view, we might want to filter out dismissed or very old done tasks if not done by backend
             setTodos(response.data?.items || []);
-        } catch (error) {
+        } catch {
             showNotification('获取任务列表失败', 'error');
         } finally {
             setLoading(false);
@@ -83,12 +89,15 @@ export default function TodoPage() {
         setTimeout(() => setNotification(null), 3000);
     };
 
+    const getErrorMessage = (err, fallback = '操作失败') =>
+        err?.response?.data?.message || err?.response?.data?.detail || err?.message || fallback;
+
     const handleCreateTodo = async (formData) => {
         try {
             await todoApi.create({ ...formData, our_entity_id: entityId });
             showNotification('任务创建成功');
             fetchTodos();
-        } catch (error) {
+        } catch {
             throw new Error('创建任务失败，请重试');
         }
     };
@@ -113,7 +122,7 @@ export default function TodoPage() {
             setSelectedTodo(null);
             fetchTodos();
         } catch (err) {
-            showNotification(err.response?.data?.detail || '操作失败', 'error');
+            showNotification(getErrorMessage(err, '操作失败'), 'error');
         }
     };
 
@@ -125,7 +134,7 @@ export default function TodoPage() {
             setSelectedTodo(null);
             fetchTodos();
         } catch (err) {
-            showNotification(err.response?.data?.detail || '提交失败', 'error');
+            showNotification(getErrorMessage(err, '提交失败'), 'error');
         }
     };
 
@@ -137,7 +146,7 @@ export default function TodoPage() {
             setSelectedTodo(null);
             fetchTodos();
         } catch (err) {
-            showNotification(err.response?.data?.detail || '操作失败', 'error');
+            showNotification(getErrorMessage(err, '操作失败'), 'error');
         }
     };
 
@@ -149,7 +158,7 @@ export default function TodoPage() {
             setSelectedTodo(null);
             fetchTodos();
         } catch (err) {
-            showNotification(err.response?.data?.detail || '操作失败', 'error');
+            showNotification(getErrorMessage(err, '操作失败'), 'error');
         }
     };
 
@@ -223,15 +232,18 @@ export default function TodoPage() {
 
         const todo = draggedTodo;
         setDraggedTodo(null); // Reset immediately
+        if (actioningTodoIdsRef.current.has(todo.id)) return;
+        actioningTodoIdsRef.current.add(todo.id);
 
         try {
             // Forward Transitions
             if (todo.status === 'open' && targetStatus === 'in_progress') {
                 await todoApi.start(todo.id);
                 showNotification('任务已开始');
-            } else if (todo.status === 'in_progress' && targetStatus === 'pending_review') {
-                await todoApi.submit(todo.id);
-                showNotification('已提交完成');
+            } else if ((todo.status === 'open' || todo.status === 'in_progress') && targetStatus === 'pending_review') {
+                const res = await todoApi.submit(todo.id);
+                const nextStatus = res?.data?.status;
+                showNotification(nextStatus === 'done' ? '任务已完成（无需审核）' : '已上报完成');
             } else if (targetStatus === 'done') {
                 if (todo.status === 'pending_review') {
                     // Manager Approve
@@ -244,8 +256,9 @@ export default function TodoPage() {
                     }
                 } else if (todo.status === 'in_progress' && todo.assignee_user_id === user?.id) {
                     // Self-assigned direct completion handled by submit
-                    await todoApi.submit(todo.id);
-                    showNotification('已提交');
+                    const res = await todoApi.submit(todo.id);
+                    const nextStatus = res?.data?.status;
+                    showNotification(nextStatus === 'done' ? '任务已完成（无需审核）' : '已上报完成');
                 } else {
                     showNotification('无法直接完成任务', 'error');
                     return;
@@ -261,6 +274,9 @@ export default function TodoPage() {
             } else if (todo.status === 'done' && targetStatus === 'in_progress') {
                 await todoApi.updateStatus(todo.id, 'in_progress', 'Reopen via Drag');
                 showNotification('任务已重新打开');
+            } else if (todo.status === 'done' && targetStatus === 'open') {
+                await todoApi.updateStatus(todo.id, 'open', 'Reset via Drag');
+                showNotification('任务已重置为未开始');
             } else if (todo.status === 'pending_review' && targetStatus === 'open') {
                 // Reject
                 await todoApi.updateStatus(todo.id, 'open', 'Rejected via Board');
@@ -272,7 +288,9 @@ export default function TodoPage() {
             }
             fetchTodos();
         } catch (err) {
-            showNotification(err.response?.data?.detail || '操作失败', 'error');
+            showNotification(getErrorMessage(err, '操作失败'), 'error');
+        } finally {
+            actioningTodoIdsRef.current.delete(todo.id);
         }
     };
 
@@ -463,7 +481,6 @@ export default function TodoPage() {
                 onBlock={handleBlock}
                 onDismiss={handleDismiss}
                 currentUserId={user?.id}
-                isManager={isManagerOfTodo(selectedTodo)}
             />
         </div>
     );

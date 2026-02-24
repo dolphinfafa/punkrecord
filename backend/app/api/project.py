@@ -1,7 +1,7 @@
 """
 Project API endpoints
 """
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from uuid import UUID
 from datetime import datetime
 import io
@@ -15,7 +15,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ForbiddenException
 from app.core.response import success_response
 from app.models.iam import User
 from app.models.iam import User, OurEntity
@@ -24,7 +24,8 @@ from app.models.todo import TodoItem, TodoSourceType
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectStageResponse, StageStatusUpdate,
-    ProjectMemberCreate, ProjectMemberBatchCreate, ProjectMemberResponse, ProjectTaskResponse
+    ProjectMemberCreate, ProjectMemberBatchCreate, ProjectMemberResponse, ProjectTaskResponse,
+    ProjectTaskAssignRequest
 )
 
 router = APIRouter(prefix="/project", tags=["Project"])
@@ -299,45 +300,67 @@ async def delete_project(
 @router.post("/projects/{project_id}/members", response_model=dict)
 async def add_project_member(
     project_id: UUID,
-    data: ProjectMemberCreate,
+    data: Union[ProjectMemberCreate, ProjectMemberBatchCreate],
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Add member to project"""
+    """Add member(s) to project"""
     project = session.get(Project, project_id)
     if not project:
         raise NotFoundException("未找到项目")
-        
-    # Check if user exists
-    user = session.get(User, data.user_id)
-    if not user:
-        raise NotFoundException("未找到用户")
-        
-    # Check if already member
-    existing = session.exec(
-        select(ProjectMember)
-        .where(ProjectMember.project_id == project_id)
-        .where(ProjectMember.user_id == data.user_id)
-    ).first()
-    
-    if existing:
-        return success_response(ProjectMemberResponse.model_validate(existing))
-        
-    member = ProjectMember(
-        project_id=project_id,
-        user_id=data.user_id,
-        role_in_project=data.role_in_project
-    )
-    
-    session.add(member)
-    session.commit()
-    session.refresh(member)
-    
-    # Populate user info for response
-    member.user_name = user.display_name
-    member.user_email = user.email
-    
-    return success_response(ProjectMemberResponse.model_validate(member))
+
+    # Backward compatible:
+    # - {"user_id": "..."} for single add
+    # - {"user_ids": ["...", "..."]} for batch add
+    if isinstance(data, ProjectMemberBatchCreate):
+        target_user_ids = data.user_ids
+        role_in_project = data.role_in_project
+    else:
+        target_user_ids = [data.user_id]
+        role_in_project = data.role_in_project
+
+    members: List[ProjectMemberResponse] = []
+    seen = set()
+    for user_id in target_user_ids:
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+
+        user = session.get(User, user_id)
+        if not user:
+            raise NotFoundException("未找到用户")
+
+        existing = session.exec(
+            select(ProjectMember)
+            .where(ProjectMember.project_id == project_id)
+            .where(ProjectMember.user_id == user_id)
+        ).first()
+
+        if existing:
+            resp = ProjectMemberResponse.model_validate(existing)
+            resp.user_name = user.display_name
+            resp.user_email = user.email
+            members.append(resp)
+            continue
+
+        member = ProjectMember(
+            project_id=project_id,
+            user_id=user_id,
+            role_in_project=role_in_project
+        )
+
+        session.add(member)
+        session.commit()
+        session.refresh(member)
+
+        resp = ProjectMemberResponse.model_validate(member)
+        resp.user_name = user.display_name
+        resp.user_email = user.email
+        members.append(resp)
+
+    if len(members) == 1 and isinstance(data, ProjectMemberCreate):
+        return success_response(members[0])
+    return success_response(members)
 
 
 @router.delete("/projects/{project_id}/members/{user_id}", response_model=dict)
@@ -416,12 +439,63 @@ async def list_project_todos(
     result = []
     for t in todos:
         assignee = session.get(User, t.assignee_user_id)
+        creator = session.get(User, t.creator_user_id)
         resp = ProjectTaskResponse.model_validate(t)
         if assignee:
             resp.assignee_name = assignee.display_name
+        if creator:
+            resp.creator_name = creator.display_name
         result.append(resp)
         
     return success_response(result)
+
+
+@router.post("/projects/{project_id}/todos/{todo_id}/assign", response_model=dict)
+async def assign_project_todo(
+    project_id: UUID,
+    todo_id: UUID,
+    data: ProjectTaskAssignRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Assign/reassign a project task to a member. Only PM can assign."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    if project.pm_user_id != current_user.id:
+        raise ForbiddenException("仅项目经理可分配任务")
+
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到任务")
+    if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
+        raise NotFoundException("任务不属于当前项目")
+
+    assignee = session.get(User, data.assignee_user_id)
+    if not assignee:
+        raise NotFoundException("未找到用户")
+
+    member = session.exec(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project_id)
+        .where(ProjectMember.user_id == data.assignee_user_id)
+    ).first()
+    if not member and data.assignee_user_id != project.pm_user_id:
+        raise ForbiddenException("只能指派给项目成员或项目经理")
+
+    todo.assignee_user_id = data.assignee_user_id
+    todo.updated_at = datetime.utcnow()
+    session.add(todo)
+    session.commit()
+    session.refresh(todo)
+
+    resp = ProjectTaskResponse.model_validate(todo)
+    resp.assignee_name = assignee.display_name
+    creator = session.get(User, todo.creator_user_id)
+    if creator:
+        resp.creator_name = creator.display_name
+    return success_response(resp)
 
 
 def sync_project_progress(session, project_id: UUID):
@@ -435,7 +509,7 @@ def sync_project_progress(session, project_id: UUID):
         if not stages:
             project.progress_percentage = 0
         else:
-            done = sum(1 for s in stages if s.status == StageStatus.COMPLETED)
+            done = sum(1 for s in stages if s.status == StageStatus.DONE)
             skipped = sum(1 for s in stages if s.status == StageStatus.SKIPPED)
             project.progress_percentage = int(((done + skipped) / len(stages)) * 100)
     else:
@@ -936,13 +1010,13 @@ async def generate_dev_tasks(
         priority_map = {"p0": TodoPriority.P0, "p1": TodoPriority.P1, "p2": TodoPriority.P2, "p3": TodoPriority.P3}
         priority = priority_map.get(item.priority, TodoPriority.P2)
 
-        import uuid as _uuid
-        source_id = f"project_dev_{project_id}_{_uuid.uuid4().hex[:8]}"
+        source_id = str(project_id)
 
         todo = TodoItem(
             our_entity_id=project.our_entity_id,
             assignee_user_id=item.assignee_user_id,
-            creator_user_id=current_user.id,
+            # PM is the unified reviewer for development tasks.
+            creator_user_id=project.pm_user_id or current_user.id,
             title=item.title,
             description=item.description or "",
             source_type=TodoSourceType.PROJECT_TASK,
