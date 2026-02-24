@@ -18,6 +18,53 @@ const emptyRow = {
     dev_product: ''
 };
 
+const FEATURE_COLUMNS = [
+    { key: 'index', label: '序号' },
+    { key: 'product', label: '产品' },
+    { key: 'module', label: '模块' },
+    { key: 'l1_feature', label: '一级功能' },
+    { key: 'l2_feature', label: '二级功能' },
+    { key: 'description', label: '功能说明' },
+    { key: 'dev_backend', label: '后端' },
+    { key: 'dev_frontend', label: '前端' },
+    { key: 'dev_ui', label: 'UI设计' },
+    { key: 'dev_product', label: '产品工时' },
+];
+
+const HEADER_ALIASES = {
+    index: ['序号', 'index', 'idx'],
+    product: ['产品', 'product'],
+    module: ['模块', 'module'],
+    l1_feature: ['一级功能', 'l1功能', 'l1_feature', '一级', '一级模块'],
+    l2_feature: ['二级功能', 'l2功能', 'l2_feature', '二级', '二级模块'],
+    description: ['功能说明', '说明', '描述', 'description'],
+    dev_backend: ['后端', '后端工时', 'dev_backend', 'backend'],
+    dev_frontend: ['前端', '前端工时', 'dev_frontend', 'frontend'],
+    dev_ui: ['ui设计', 'ui', 'ui工时', 'dev_ui'],
+    dev_product: ['产品工时', '产品经理', 'dev_product', 'pm'],
+};
+
+const normalizeHeader = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+
+const resolveFieldByHeader = (header) => {
+    const normalized = normalizeHeader(header);
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+        if (aliases.some((a) => normalizeHeader(a) === normalized)) {
+            return field;
+        }
+    }
+    return null;
+};
+
+const normalizeImportedRow = (row) => {
+    const next = { ...emptyRow };
+    Object.entries(row || {}).forEach(([header, value]) => {
+        const field = resolveFieldByHeader(header);
+        if (field) next[field] = String(value ?? '').trim();
+    });
+    return next;
+};
+
 const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const [tableData, setTableData] = useState([]);
     const [messages, setMessages] = useState([]);
@@ -27,6 +74,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
     const messagesEndRef = useRef(null);
+    const uploadInputRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && stage) {
@@ -37,7 +85,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
                 } else {
                     setTableData([{ ...emptyRow }]);
                 }
-            } catch (e) {
+            } catch {
                 console.warn('Failed to parse existing feature_list, starting fresh');
                 setTableData([{ ...emptyRow }]);
             }
@@ -76,24 +124,70 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const exportToExcel = async () => {
         if (tableData.length === 0) return;
         try {
-            const response = await client.post('/project/export_features_excel', {
-                project_name: stage?.project_name || '当前项目',
-                features: tableData
-            }, {
-                responseType: 'blob' // Important for downloading files
+            const rows = tableData.map((row) => {
+                const out = {};
+                FEATURE_COLUMNS.forEach((col) => {
+                    out[col.label] = row[col.key] ?? '';
+                });
+                return out;
             });
-
-            // Create a blob link to download
-            const url = window.URL.createObjectURL(new Blob([response]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `${stage?.project_name || '当前项目'}_功能清单.xlsx`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '功能清单');
+            XLSX.writeFile(wb, `${stage?.project_name || '当前项目'}_功能清单.xlsx`);
         } catch (error) {
             console.error('Failed to export Excel:', error);
-            alert('导出 Excel 失败，请检查网络或后端服务。');
+            alert('导出 Excel 失败，请检查文件权限。');
+        }
+    };
+
+    const downloadTemplate = () => {
+        const templateHeader = FEATURE_COLUMNS.reduce((acc, cur) => {
+            acc[cur.label] = '';
+            return acc;
+        }, {});
+        const sample = {
+            序号: '1',
+            产品: '小程序',
+            模块: '订单中心',
+            一级功能: '订单管理',
+            二级功能: '订单列表',
+            功能说明: '支持按状态筛选、搜索、分页',
+            后端: '8',
+            前端: '6',
+            UI设计: '2',
+            产品工时: '1',
+        };
+        const ws = XLSX.utils.json_to_sheet([templateHeader, sample], { skipHeader: false });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '功能清单模板');
+        XLSX.writeFile(wb, '功能清单导入模板.xlsx');
+    };
+
+    const handleImportFile = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            const sheetName = wb.SheetNames[0];
+            const ws = wb.Sheets[sheetName];
+            const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            const parsed = rawRows
+                .map(normalizeImportedRow)
+                .filter((row) => Object.values(row).some((v) => String(v || '').trim() !== ''));
+
+            if (parsed.length === 0) {
+                alert('未识别到可导入数据，请检查模板表头是否正确。');
+            } else {
+                setTableData(parsed);
+                alert(`导入成功：共 ${parsed.length} 条记录。`);
+            }
+        } catch (error) {
+            console.error('Import feature list failed:', error);
+            alert('导入失败，请确认文件为 Excel(.xlsx) 且表头与模板一致。');
+        } finally {
+            event.target.value = '';
         }
     };
 
@@ -198,6 +292,29 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
                                 {saveSuccess && <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14} /> 已保存至云端</span>}
                             </h3>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    className="btn-secondary"
+                                    onClick={downloadTemplate}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <Download size={16} />
+                                    下载模板
+                                </button>
+                                <button
+                                    className="btn-secondary"
+                                    onClick={() => uploadInputRef.current?.click()}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <Plus size={16} />
+                                    上传导入
+                                </button>
+                                <input
+                                    ref={uploadInputRef}
+                                    type="file"
+                                    accept=".xlsx,.xls,.csv"
+                                    style={{ display: 'none' }}
+                                    onChange={handleImportFile}
+                                />
                                 <button
                                     className="btn-secondary"
                                     onClick={exportToExcel}
@@ -377,7 +494,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
                                                         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>下方点击按钮即可将全部明细覆盖至您的主表内。</span>
                                                     </div>
                                                 );
-                                            } catch (e) {
+                                            } catch {
                                                 // Fallback if parsing fails despite starting with [
                                                 return (
                                                     <div className="markdown-prose" style={{ color: 'inherit', fontSize: '0.9rem' }}>

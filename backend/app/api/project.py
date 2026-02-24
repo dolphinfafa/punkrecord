@@ -15,17 +15,17 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user
-from app.core.exceptions import NotFoundException, ForbiddenException
+from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
 from app.models.iam import User
 from app.models.iam import User, OurEntity
 from app.models.project import Project, ProjectStage, ProjectMember, ProjectType, ProjectStatus, StageStatus
-from app.models.todo import TodoItem, TodoSourceType
+from app.models.todo import TodoItem, TodoSourceType, TodoPriority
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectStageResponse, StageStatusUpdate,
     ProjectMemberCreate, ProjectMemberBatchCreate, ProjectMemberResponse, ProjectTaskResponse,
-    ProjectTaskAssignRequest
+    ProjectTaskAssignRequest, ProjectTaskPlanUpdateRequest
 )
 
 router = APIRouter(prefix="/project", tags=["Project"])
@@ -492,6 +492,70 @@ async def assign_project_todo(
 
     resp = ProjectTaskResponse.model_validate(todo)
     resp.assignee_name = assignee.display_name
+    creator = session.get(User, todo.creator_user_id)
+    if creator:
+        resp.creator_name = creator.display_name
+    return success_response(resp)
+
+
+@router.post("/projects/{project_id}/todos/{todo_id}/plan", response_model=dict)
+async def update_project_todo_plan(
+    project_id: UUID,
+    todo_id: UUID,
+    data: ProjectTaskPlanUpdateRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Update assignee and/or due date for a project task. Only PM can update."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    if project.pm_user_id != current_user.id:
+        raise ForbiddenException("仅项目经理可修改开发计划")
+
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到任务")
+    if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
+        raise NotFoundException("任务不属于当前项目")
+
+    if data.assignee_user_id is None and data.due_at is None and data.priority is None:
+        raise ValidationException("至少需要修改一个字段")
+
+    assignee = None
+    if data.assignee_user_id is not None:
+        assignee = session.get(User, data.assignee_user_id)
+        if not assignee:
+            raise NotFoundException("未找到用户")
+
+        member = session.exec(
+            select(ProjectMember)
+            .where(ProjectMember.project_id == project_id)
+            .where(ProjectMember.user_id == data.assignee_user_id)
+        ).first()
+        if not member and data.assignee_user_id != project.pm_user_id:
+            raise ForbiddenException("只能指派给项目成员或项目经理")
+        todo.assignee_user_id = data.assignee_user_id
+
+    if data.due_at is not None:
+        todo.due_at = data.due_at
+    if data.priority is not None:
+        priority_map = {"p0": TodoPriority.P0, "p1": TodoPriority.P1, "p2": TodoPriority.P2, "p3": TodoPriority.P3}
+        priority = priority_map.get(str(data.priority).lower())
+        if not priority:
+            raise ValidationException("优先级仅支持 p0/p1/p2/p3")
+        todo.priority = priority
+
+    todo.updated_at = datetime.utcnow()
+    session.add(todo)
+    session.commit()
+    session.refresh(todo)
+
+    resp = ProjectTaskResponse.model_validate(todo)
+    final_assignee = assignee or session.get(User, todo.assignee_user_id)
+    if final_assignee:
+        resp.assignee_name = final_assignee.display_name
     creator = session.get(User, todo.creator_user_id)
     if creator:
         resp.creator_name = creator.display_name

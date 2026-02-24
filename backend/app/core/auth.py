@@ -23,10 +23,11 @@ async def get_current_user(
     """Get current authenticated user"""
     print(f"🔐 Authentication attempt...")
     
-    # Try cookie first, then fallback to Bearer header
-    token = request.cookies.get("access_token")
-    if not token and credentials:
-        token = credentials.credentials
+    # Prefer explicit Bearer token from frontend, then fallback to cookie.
+    # This avoids account-mismatch when stale cookies exist across logins.
+    token = credentials.credentials if credentials else None
+    if not token:
+        token = request.cookies.get("access_token")
         
     if not token:
         print(f"   ❌ No token found in cookie or header")

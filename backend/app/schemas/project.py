@@ -151,3 +151,10 @@ class ProjectTaskResponse(BaseModel):
 class ProjectTaskAssignRequest(BaseModel):
     """Assign/reassign a project task assignee"""
     assignee_user_id: UUID
+
+
+class ProjectTaskPlanUpdateRequest(BaseModel):
+    """Update project task planning fields"""
+    assignee_user_id: Optional[UUID] = None
+    due_at: Optional[datetime] = None
+    priority: Optional[str] = None

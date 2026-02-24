@@ -29,7 +29,6 @@ export default function TodoPage() {
     const [selectedTodo, setSelectedTodo] = useState(null);
     const [notification, setNotification] = useState(null);
     const [entityId, setEntityId] = useState(null);
-    const [hasSubordinates, setHasSubordinates] = useState(false);
     const [subordinates, setSubordinates] = useState([]);
     const [draggedTodo, setDraggedTodo] = useState(null);
     const actioningTodoIdsRef = useRef(new Set());
@@ -48,10 +47,8 @@ export default function TodoPage() {
             try {
                 const res = await todoApi.listTeam({ page_size: 1 });
                 const subs = res.data?.subordinates || [];
-                setHasSubordinates(subs.length > 0);
                 setSubordinates(subs);
             } catch {
-                setHasSubordinates(false);
                 setSubordinates([]);
             }
         };
@@ -317,14 +314,12 @@ export default function TodoPage() {
                 >
                     <User size={15} /> 我的任务
                 </button>
-                {hasSubordinates && (
-                    <button
-                        className={clsx('view-tab', { active: viewMode === 'team' })}
-                        onClick={() => { setViewMode('team'); setFilter('board'); }}
-                    >
-                        <Users size={15} /> 团队任务
-                    </button>
-                )}
+                <button
+                    className={clsx('view-tab', { active: viewMode === 'team' })}
+                    onClick={() => { setViewMode('team'); setFilter('board'); }}
+                >
+                    <Users size={15} /> 团队任务
+                </button>
             </div>
 
             {/* View Toggle (Board vs List) */}

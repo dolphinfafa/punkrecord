@@ -201,10 +201,23 @@ curl http://localhost:8000/health
 - 新增路由：`/project/:id/dev-progress`（项目开发进度管理页）
 - 项目详情“development”阶段入口文案由“生成开发任务”改为“开发进度”
 - 新增接口：`POST /api/v1/project/projects/{project_id}/todos/{todo_id}/assign`（仅项目经理可改指派）
+- 新增接口：`POST /api/v1/project/projects/{project_id}/todos/{todo_id}/plan`
+  - 支持开发任务计划字段更新：`assignee_user_id`、`due_at`、`priority`
+- 开发进度页能力增强：
+  - 支持负责人、截止日期、优先级在线修改
+  - 支持按类型分组排序与折叠（前端/后端/UI/产品）
+  - 支持表格视图与甘特视图切换
+- 功能清单（FeatureListModal）增强：
+  - 支持“下载模板”
+  - 支持“上传导入（Excel/CSV）并自动识别表头导入”
+  - 功能清单导出改为前端本地 `xlsx` 导出
 - 开发任务生成规则更新：`generate-dev-tasks` 生成的 Todo 统一使用
   - `source_type=project_task`
   - `source_id={project_id}`（确保可被项目任务列表和进度统计正确检索）
   - `creator_user_id=project.pm_user_id`（统一由项目经理作为审核员）
+- 认证读取顺序更新（`backend/app/core/auth.py`）：
+  - 优先使用 `Authorization: Bearer` token
+  - 无 Bearer 时再回退读取 cookie，避免多账号切换时身份错位
 
 ---
 

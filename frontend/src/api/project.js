@@ -54,6 +54,9 @@ export const projectApi = {
     assignProjectTodo: async (projectId, todoId, assignee_user_id) => {
         return client.post(`/project/projects/${projectId}/todos/${todoId}/assign`, { assignee_user_id });
     },
+    updateProjectTodoPlan: async (projectId, todoId, data) => {
+        return client.post(`/project/projects/${projectId}/todos/${todoId}/plan`, data);
+    },
 
     // Dev Task Generation
     getProjectFeatureList: async (projectId) => {
