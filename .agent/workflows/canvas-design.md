@@ -4,13 +4,16 @@ description: Create visual design artifacts (PDF/PNG) with a strong design philo
 
 # Canvas Design Skill
 
-This workflow uses the globally installed `canvas-design` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design`
+This workflow uses the globally installed `canvas-design` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/canvas-design`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/canvas-design/SKILL.md`
 
 ## When to Use
 
@@ -23,9 +26,8 @@ Use this skill when:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\canvas-design\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/canvas-design/SKILL.md`
 
 ### 2. Define the Design Philosophy
 

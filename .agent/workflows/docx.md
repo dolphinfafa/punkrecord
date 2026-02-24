@@ -4,13 +4,16 @@ description: Create, edit, and analyze Word (.docx) documents including tracked 
 
 # DOCX Skill
 
-This workflow uses the globally installed `docx` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\docx`
+This workflow uses the globally installed `docx` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\docx`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/docx`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\docx\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\docx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/docx/SKILL.md`
 
 ## When to Use
 
@@ -25,9 +28,8 @@ Use this skill any time a `.docx` file is involved:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\docx\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\docx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/docx/SKILL.md`
 
 ### 2. Identify the Task
 

@@ -4,12 +4,21 @@ description: Generate algorithmic art using p5.js with seeded randomness and Ant
 
 # Algorithmic Art Skill
 
-This workflow uses the globally installed `algorithmic-art` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art`
+This workflow uses the globally installed `algorithmic-art` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/algorithmic-art`
 
 Read the full skill instructions before proceeding:
+
+**Windows:**
 ```
-C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md
+view_file C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md
+```
+**macOS:**
+```
+view_file /Users/yangzhe/.antigravity/skills/algorithmic-art/SKILL.md
 ```
 
 ## When to Use
@@ -25,9 +34,8 @@ Use this skill when the user asks to:
 
 Always read the SKILL.md before starting:
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/algorithmic-art/SKILL.md`
 
 ### 2. Understand the Request
 

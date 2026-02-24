@@ -4,13 +4,16 @@ description: Create animated GIFs optimized for Slack (emoji or message size) us
 
 # Slack GIF Creator Skill
 
-This workflow uses the globally installed `slack-gif-creator` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator`
+This workflow uses the globally installed `slack-gif-creator` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/slack-gif-creator`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/slack-gif-creator/SKILL.md`
 
 ## When to Use
 
@@ -32,9 +35,8 @@ Use this skill when:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\slack-gif-creator\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/slack-gif-creator/SKILL.md`
 
 ### 2. Plan the Animation
 

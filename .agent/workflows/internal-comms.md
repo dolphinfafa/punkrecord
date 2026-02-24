@@ -4,13 +4,16 @@ description: Write internal communications including 3P updates, newsletters, FA
 
 # Internal Comms Skill
 
-This workflow uses the globally installed `internal-comms` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms`
+This workflow uses the globally installed `internal-comms` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/internal-comms`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/internal-comms/SKILL.md`
 
 ## When to Use
 
@@ -25,9 +28,8 @@ Use this skill when writing:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/internal-comms/SKILL.md`
 
 ### 2. Identify the Communication Type
 

@@ -4,13 +4,16 @@ description: Create, edit, and analyze Excel (.xlsx) spreadsheets including form
 
 # XLSX Skill
 
-This workflow uses the globally installed `xlsx` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\xlsx`
+This workflow uses the globally installed `xlsx` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\xlsx`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/xlsx`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\xlsx\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\xlsx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/xlsx/SKILL.md`
 
 ## When to Use
 
@@ -24,9 +27,8 @@ Use this skill any time a spreadsheet file is the primary input or output:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\xlsx\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\xlsx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/xlsx/SKILL.md`
 
 ### 2. Choose the Right Library
 

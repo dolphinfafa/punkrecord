@@ -4,13 +4,16 @@ description: Build MCP (Model Context Protocol) servers for LLM integration usin
 
 # MCP Builder Skill
 
-This workflow uses the globally installed `mcp-builder` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\mcp-builder`
+This workflow uses the globally installed `mcp-builder` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\mcp-builder`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/mcp-builder`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\mcp-builder\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\mcp-builder\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/mcp-builder/SKILL.md`
 
 ## When to Use
 

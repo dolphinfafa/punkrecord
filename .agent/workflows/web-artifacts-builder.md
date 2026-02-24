@@ -4,13 +4,16 @@ description: Build elaborate multi-component HTML artifacts using React, Tailwin
 
 # Web Artifacts Builder Skill
 
-This workflow uses the globally installed `web-artifacts-builder` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder`
+This workflow uses the globally installed `web-artifacts-builder` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/web-artifacts-builder`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/web-artifacts-builder/SKILL.md`
 
 ## When to Use
 

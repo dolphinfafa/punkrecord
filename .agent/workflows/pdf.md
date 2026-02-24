@@ -4,13 +4,16 @@ description: Work with PDF files — merge, split, rotate, extract text/tables, 
 
 # PDF Skill
 
-This workflow uses the globally installed `pdf` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\pdf`
+This workflow uses the globally installed `pdf` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\pdf`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/pdf`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\pdf\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\pdf\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/pdf/SKILL.md`
 
 ## When to Use
 
@@ -25,9 +28,8 @@ Use this skill any time a PDF file is involved:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\pdf\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\pdf\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/pdf/SKILL.md`
 
 ### 2. Choose the Right Tool
 

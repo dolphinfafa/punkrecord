@@ -4,13 +4,16 @@ description: Test local web applications using Playwright — verify frontend fu
 
 # Webapp Testing Skill
 
-This workflow uses the globally installed `webapp-testing` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing`
+This workflow uses the globally installed `webapp-testing` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/webapp-testing`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/webapp-testing/SKILL.md`
 
 ## When to Use
 
@@ -33,9 +36,8 @@ Is it static HTML?
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\webapp-testing\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/webapp-testing/SKILL.md`
 
 ### 2. Start Server (if needed)
 

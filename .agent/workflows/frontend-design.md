@@ -4,12 +4,16 @@ description: Apply the frontend-design skill to create distinctive, production-g
 
 # Frontend Design Workflow
 
-This workflow guides the creation of distinctive, production-grade frontend interfaces using the globally installed `frontend-design` skill at `C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design`.
+This workflow uses the globally installed `frontend-design` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/frontend-design`
 
 Before starting, read the skill instructions:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/frontend-design/SKILL.md`
 
 ## 1. Analyze Requirements
 

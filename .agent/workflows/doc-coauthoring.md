@@ -4,13 +4,16 @@ description: Collaboratively write and refine documents through a three-stage wo
 
 # Doc Co-authoring Skill
 
-This workflow uses the globally installed `doc-coauthoring` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\doc-coauthoring`
+This workflow uses the globally installed `doc-coauthoring` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\doc-coauthoring`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/doc-coauthoring`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\doc-coauthoring\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\doc-coauthoring\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/doc-coauthoring/SKILL.md`
 
 ## When to Use
 

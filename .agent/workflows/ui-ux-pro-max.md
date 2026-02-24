@@ -4,7 +4,11 @@ description: Generate a professional design system using the globally installed 
 
 # UI UX Pro Max Workflow
 
-This workflow uses the globally installed `ui-ux-pro-max-skill` at `C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill` to generate a comprehensive design system and implementation guidelines.
+This workflow uses the globally installed `ui-ux-pro-max-skill`.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill`
 
 ## 1. Identify Requirements
 
@@ -16,12 +20,20 @@ This workflow uses the globally installed `ui-ux-pro-max-skill` at `C:\Users\YZ\
 Run the search script to generate the design system.
 
 **Command**:
+
+**Windows:**
 ```bash
 python C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max\scripts\search.py "[User Query]" --design-system --format markdown --stack react
+```
+**macOS:**
+```bash
+python /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py "[User Query]" --design-system --format markdown --stack react
 ```
 _(Replace `[User Query]` with the actual request, e.g., "finance management dashboard")_
 
 **Other useful commands**:
+
+**Windows:**
 ```bash
 # Search by style
 python C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max\scripts\search.py "glassmorphism" --domain style
@@ -31,6 +43,17 @@ python C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max\scr
 
 # Stack-specific guidelines
 python C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max\scripts\search.py "form validation" --stack react
+```
+**macOS:**
+```bash
+# Search by style
+python /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py "glassmorphism" --domain style
+
+# Search typography
+python /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py "elegant serif" --domain typography
+
+# Stack-specific guidelines
+python /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py "form validation" --stack react
 ```
 
 ## 3. Apply Design

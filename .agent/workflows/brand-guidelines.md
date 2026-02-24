@@ -4,13 +4,16 @@ description: Apply Anthropic brand guidelines (colors, typography) to any artifa
 
 # Brand Guidelines Skill
 
-This workflow uses the globally installed `brand-guidelines` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines`
+This workflow uses the globally installed `brand-guidelines` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/brand-guidelines`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/brand-guidelines/SKILL.md`
 
 ## When to Use
 
@@ -33,9 +36,8 @@ Use this skill when:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\brand-guidelines\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/brand-guidelines/SKILL.md`
 
 ### 2. Identify the Artifact Type
 

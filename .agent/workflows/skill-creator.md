@@ -4,13 +4,16 @@ description: Create or update agent skills that extend Claude's capabilities wit
 
 # Skill Creator Skill
 
-This workflow uses the globally installed `skill-creator` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\skill-creator`
+This workflow uses the globally installed `skill-creator` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\skill-creator`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/skill-creator`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\skill-creator\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\skill-creator\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/skill-creator/SKILL.md`
 
 ## When to Use
 

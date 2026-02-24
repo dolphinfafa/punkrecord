@@ -4,13 +4,16 @@ description: Apply professional color and font themes to any artifact (slides, d
 
 # Theme Factory Skill
 
-This workflow uses the globally installed `theme-factory` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory`
+This workflow uses the globally installed `theme-factory` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/theme-factory`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/theme-factory/SKILL.md`
 
 ## When to Use
 
@@ -38,9 +41,8 @@ Use this skill when:
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\theme-factory\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/theme-factory/SKILL.md`
 
 ### 2. Show Theme Showcase
 

@@ -6,27 +6,44 @@ description: List all available agent skills — both global and project-local.
 
 ## Global Skills Directory
 
-All globally installed skills are located at `C:\Users\YZ\.antigravity\skills\`.
+> **全局 Skills 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/`
 
 ### 1. Check Anthropic Skills
 
 // turbo
+**Windows (PowerShell):**
 ```powershell
 Get-ChildItem "C:\Users\YZ\.antigravity\skills\skills\skills" -Directory | Select-Object Name
+```
+**macOS:**
+```bash
+ls /Users/yangzhe/.antigravity/skills/
 ```
 
 ### 2. Check UI UX Pro Max Skill
 
 // turbo
+**Windows (PowerShell):**
 ```powershell
 Get-ChildItem "C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max" -Directory | Select-Object Name
+```
+**macOS:**
+```bash
+ls /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/
 ```
 
 
 
 ## Known Skills Summary
 
-### Global — Anthropic Skills (`C:\Users\YZ\.antigravity\skills\skills\skills\`)
+### Global — Anthropic Skills
+
+| Platform | Skills 根目录 |
+|----------|-------------|
+| **Windows** | `C:\Users\YZ\.antigravity\skills\skills\skills\` |
+| **macOS** | `/Users/yangzhe/.antigravity/skills/` |
 
 | Skill | Description |
 |-------|-------------|
@@ -47,7 +64,12 @@ Get-ChildItem "C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro
 | `webapp-testing` | Automated web app testing |
 | `xlsx` | Excel spreadsheet processing |
 
-### Global — UI UX Pro Max (`C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\`)
+### Global — UI UX Pro Max
+
+| Platform | 根目录 |
+|----------|------|
+| **Windows** | `C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\` |
+| **macOS** | `/Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/` |
 
 | Resource | Path |
 |----------|------|
@@ -63,6 +85,11 @@ Get-ChildItem "C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro
 
 Reference the SKILL.md file path when asking the AI to use a specific skill:
 
+**Windows:**
 ```
 请使用 C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design\SKILL.md 中的 skill 来设计这个组件
+```
+**macOS:**
+```
+请使用 /Users/yangzhe/.antigravity/skills/frontend-design/SKILL.md 中的 skill 来设计这个组件
 ```

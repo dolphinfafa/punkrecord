@@ -4,13 +4,16 @@ description: Create, edit, and analyze PowerPoint (.pptx) presentations with pro
 
 # PPTX Skill
 
-This workflow uses the globally installed `pptx` skill at:
-`C:\Users\YZ\.antigravity\skills\skills\skills\pptx`
+This workflow uses the globally installed `pptx` skill.
+
+> **Skill 路径（按操作系统）**
+> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\pptx`
+> - **macOS**: `/Users/yangzhe/.antigravity/skills/pptx`
 
 Read the full skill instructions before proceeding:
-```
-C:\Users\YZ\.antigravity\skills\skills\skills\pptx\SKILL.md
-```
+
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\pptx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/pptx/SKILL.md`
 
 ## When to Use
 
@@ -26,9 +29,8 @@ Trigger whenever the user mentions "deck," "slides," "presentation," or referenc
 
 ### 1. Read the Skill
 
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\pptx\SKILL.md
-```
+**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\pptx\SKILL.md`
+**macOS:** `view_file /Users/yangzhe/.antigravity/skills/pptx/SKILL.md`
 
 ### 2. Choose Your Approach
 
