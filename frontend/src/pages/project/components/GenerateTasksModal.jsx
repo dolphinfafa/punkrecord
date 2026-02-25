@@ -358,7 +358,7 @@ export default function GenerateTasksModal({ isOpen, project, onClose, onSuccess
                     ) : featureList.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
                             <p>本项目暂无功能清单数据</p>
-                            <p style={{ fontSize: '0.82rem' }}>请先在"报价"阶段使用 AI 生成功能清单</p>
+                            <p style={{ fontSize: '0.82rem' }}>请先在项目阶段维护功能清单（B2B: 需求对齐；B2C: 项目立项）</p>
                         </div>
                     ) : successCount !== null ? (
                         <div style={{ textAlign: 'center', padding: '3rem', color: '#16a34a' }}>

@@ -256,7 +256,10 @@ export default function ProjectDetailPage() {
                                                     </td>
                                                     <td className="col-action">
                                                         <div className="stage-action-wrap" style={{ display: 'flex', gap: '10px' }}>
-                                                            {project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'requirement_alignment' && (
+                                                            {(
+                                                                (project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'requirement_alignment') ||
+                                                                (project?.project_type?.toLowerCase() === 'b2c' && stage?.stage_code?.toLowerCase() === 'project_initiation')
+                                                            ) && (
                                                                 <button
                                                                     className="btn-link text-success"
                                                                     onClick={() => setFeatureListStage({ ...stage, project_name: project.name })}
@@ -292,7 +295,10 @@ export default function ProjectDetailPage() {
                                                                     <BarChart3 size={14} /> 开发进度
                                                                 </button>
                                                             )}
-                                                            {project?.project_type?.toLowerCase() !== 'b2b' && stage?.stage_code?.toLowerCase() !== 'contract_signed' && '-'}
+                                                            {project?.project_type?.toLowerCase() === 'b2c' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'project_initiation' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                             {project?.project_type?.toLowerCase() === 'b2b' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'quotation' &&

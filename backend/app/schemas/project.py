@@ -136,6 +136,7 @@ class ProjectTaskResponse(BaseModel):
     """Project task response schema"""
     id: UUID
     title: str
+    description: Optional[str] = None
     status: str
     priority: str
     assignee_user_id: UUID
@@ -159,3 +160,6 @@ class ProjectTaskPlanUpdateRequest(BaseModel):
     assignee_user_id: Optional[UUID] = None
     due_at: Optional[datetime] = None
     priority: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    dev_type: Optional[str] = None

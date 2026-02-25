@@ -12,6 +12,11 @@
     margin-bottom: 12px;
 }
 
+.dev-progress-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
 .dev-progress-back,
 .dev-progress-refresh {
     border: 1px solid var(--line);
@@ -24,6 +29,25 @@
     gap: 6px;
     cursor: pointer;
     color: var(--ink);
+}
+
+.dev-progress-primary {
+    border: 1px solid #0f172a;
+    background: #0f172a;
+    color: #fff;
+    border-radius: 10px;
+    padding: 0 12px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.dev-progress-refresh:disabled,
+.dev-progress-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .dev-progress-hero {
@@ -209,6 +233,23 @@
     font-size: 12px;
 }
 
+.dev-edit-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.dev-edit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .task-title {
     max-width: 320px;
     white-space: nowrap;
@@ -351,7 +392,107 @@
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.dev-progress-page .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+}
+
+.dev-progress-page .modal-content {
+    width: min(680px, 92vw);
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #dbe3ef;
+}
+
+.dev-progress-page .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.dev-progress-page .modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.dev-progress-page .modal-close-btn {
+    border: none;
+    background: transparent;
+    color: #334155;
+    cursor: pointer;
+}
+
+.dev-progress-page .modal-body {
+    padding: 14px;
+}
+
+.dev-progress-page .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.dev-progress-page .form-group label {
+    font-size: 12px;
+    color: #475569;
+}
+
+.dev-progress-page .form-group input,
+.dev-progress-page .form-group textarea,
+.dev-progress-page .form-group select {
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+}
+
+.dev-progress-page .form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.dev-progress-page .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.dev-progress-page .btn-primary,
+.dev-progress-page .btn-secondary {
+    border-radius: 8px;
+    padding: 7px 12px;
+    border: 1px solid #dbe3ef;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.dev-progress-page .btn-primary {
+    background: #0f172a;
+    color: #fff;
+    border-color: #0f172a;
+}
+
+.dev-progress-page .btn-secondary {
+    background: #fff;
+    color: #334155;
+}
+
 @media (max-width: 1100px) {
     .dev-progress-hero { grid-template-columns: 1fr; }
     .dev-progress-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dev-progress-actions { flex-wrap: wrap; justify-content: flex-end; }
+    .dev-progress-page .form-row { grid-template-columns: 1fr; }
 }

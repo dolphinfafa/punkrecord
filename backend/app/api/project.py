@@ -1,7 +1,7 @@
 """
 Project API endpoints
 """
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Tuple
 from uuid import UUID, uuid4
 from datetime import datetime
 import io
@@ -18,8 +18,7 @@ from app.core.database import get_session
 from app.core.auth import get_current_user
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User
-from app.models.iam import User, OurEntity
+from app.models.iam import User, OurEntity, JobTitle
 from app.models.project import Project, ProjectStage, ProjectMember, ProjectType, ProjectStatus, StageStatus
 from app.models.todo import TodoItem, TodoSourceType, TodoPriority
 from app.schemas.project import (
@@ -34,6 +33,13 @@ PROJECT_ATTACHMENT_DIR = Path(__file__).resolve().parents[2] / "uploads" / "proj
 MAX_PROJECT_ATTACHMENT_SIZE = 20 * 1024 * 1024  # 20 MB per file
 STAGE_ATTACHMENT_DIR = Path(__file__).resolve().parents[2] / "uploads" / "project-stage-attachments"
 MAX_STAGE_ATTACHMENT_SIZE = 20 * 1024 * 1024  # 20 MB per file
+DEV_TYPE_LABELS = {
+    "dev_backend": "\u540e\u7aef",
+    "dev_frontend": "\u524d\u7aef",
+    "dev_ui": "UI",
+    "dev_product": "\u4ea7\u54c1",
+}
+VALID_DEV_TYPES = set(DEV_TYPE_LABELS.keys()) | {"other"}
 
 
 # Standard stages for B2B projects
@@ -69,6 +75,72 @@ def enrich_project_response(session: Session, project: Project) -> ProjectRespon
         if pm:
             resp.pm_name = pm.display_name or pm.email
     return resp
+
+
+def _extract_feature_list_for_project(project_id: UUID, session: Session) -> Tuple[List[dict], Optional[ProjectStage]]:
+    """Get parsed feature list and its source stage for a project."""
+    import json as _json
+
+    stages = session.exec(
+        select(ProjectStage)
+        .where(ProjectStage.project_id == project_id)
+        .order_by(ProjectStage.sequence_no)
+    ).all()
+
+    # Priority order:
+    # - B2B feature list usually comes from requirement_alignment
+    # - B2C feature list usually comes from project_initiation
+    # - quotation may contain a different row shape, so keep it lower priority
+    priority_codes = ["requirement_alignment", "project_initiation", "prototype_confirmed", "quotation"]
+    stage_map = {s.stage_code: s for s in stages}
+
+    def _is_feature_list(data):
+        if not isinstance(data, list) or len(data) == 0:
+            return False
+        first = data[0]
+        if not isinstance(first, dict):
+            return False
+        feature_keys = {"l1_feature", "l2_feature", "module", "dev_backend", "dev_frontend"}
+        return bool(feature_keys & set(first.keys()))
+
+    for code in priority_codes:
+        stage = stage_map.get(code)
+        if not stage or not stage.feature_list:
+            continue
+        try:
+            candidate = _json.loads(stage.feature_list)
+            if _is_feature_list(candidate):
+                return candidate, stage
+        except Exception:
+            continue
+
+    for stage in stages:
+        if not stage.feature_list:
+            continue
+        try:
+            candidate = _json.loads(stage.feature_list)
+            if _is_feature_list(candidate):
+                return candidate, stage
+        except Exception:
+            continue
+
+    return [], None
+
+
+def _feature_row_dev_types(row: dict) -> List[str]:
+    types = []
+    for key in ["dev_backend", "dev_frontend", "dev_ui", "dev_product"]:
+        value = str(row.get(key, "")).strip()
+        if value and value != "-" and value != "0":
+            types.append(key)
+    # Keep behavior consistent with frontend generation: rows with no dev split default to backend.
+    return types if types else ["dev_backend"]
+
+
+def _build_feature_task_title(row: dict, dev_type: str) -> str:
+    label = DEV_TYPE_LABELS.get(dev_type, dev_type)
+    name = " - ".join([x for x in [row.get("l1_feature"), row.get("l2_feature")] if x])
+    return f"[{label}] {name or '开发任务'}"
 
 
 @router.post("/projects", response_model=dict)
@@ -572,6 +644,15 @@ async def add_project_member(
         role_in_project = data.role_in_project
 
     members: List[ProjectMemberResponse] = []
+
+    def _resolve_role_name(user_obj: User, incoming_role: Optional[str]) -> str:
+        if incoming_role and incoming_role.strip():
+            return incoming_role.strip()
+        if user_obj and user_obj.job_title_id:
+            jt = session.get(JobTitle, user_obj.job_title_id)
+            if jt and jt.name:
+                return jt.name
+        return "项目成员"
     seen = set()
     for user_id in target_user_ids:
         if user_id in seen:
@@ -588,7 +669,16 @@ async def add_project_member(
             .where(ProjectMember.user_id == user_id)
         ).first()
 
+        resolved_role = _resolve_role_name(user, role_in_project)
+
         if existing:
+            # Keep existing role when already set; otherwise backfill from org job title.
+            if not existing.role_in_project:
+                existing.role_in_project = resolved_role
+                existing.updated_at = datetime.utcnow()
+                session.add(existing)
+                session.commit()
+                session.refresh(existing)
             resp = ProjectMemberResponse.model_validate(existing)
             resp.user_name = user.display_name
             resp.user_email = user.email
@@ -598,7 +688,7 @@ async def add_project_member(
         member = ProjectMember(
             project_id=project_id,
             user_id=user_id,
-            role_in_project=role_in_project
+            role_in_project=resolved_role
         )
 
         session.add(member)
@@ -660,6 +750,12 @@ async def list_project_members(
         if user:
             resp.user_name = user.display_name
             resp.user_email = user.email
+            if not resp.role_in_project:
+                jt_name = None
+                if user.job_title_id:
+                    jt = session.get(JobTitle, user.job_title_id)
+                    jt_name = jt.name if jt else None
+                resp.role_in_project = jt_name or "项目成员"
         result.append(resp)
         
     return success_response(result)
@@ -715,7 +811,7 @@ async def assign_project_todo(
     if not project:
         raise NotFoundException("未找到项目")
 
-    if project.pm_user_id != current_user.id:
+    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
         raise ForbiddenException("仅项目经理可分配任务")
 
     todo = session.get(TodoItem, todo_id)
@@ -763,7 +859,7 @@ async def update_project_todo_plan(
     if not project:
         raise NotFoundException("未找到项目")
 
-    if project.pm_user_id != current_user.id:
+    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
         raise ForbiddenException("仅项目经理可修改开发计划")
 
     todo = session.get(TodoItem, todo_id)
@@ -772,7 +868,14 @@ async def update_project_todo_plan(
     if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
         raise NotFoundException("任务不属于当前项目")
 
-    if data.assignee_user_id is None and data.due_at is None and data.priority is None:
+    if (
+        data.assignee_user_id is None
+        and data.due_at is None
+        and data.priority is None
+        and data.title is None
+        and data.description is None
+        and data.dev_type is None
+    ):
         raise ValidationException("至少需要修改一个字段")
 
     assignee = None
@@ -798,6 +901,21 @@ async def update_project_todo_plan(
         if not priority:
             raise ValidationException("优先级仅支持 p0/p1/p2/p3")
         todo.priority = priority
+    if data.title is not None:
+        title = data.title.strip()
+        if not title:
+            raise ValidationException("Task title cannot be empty")
+        todo.title = title
+    if data.description is not None:
+        todo.description = data.description
+    if data.dev_type is not None:
+        dev_type = data.dev_type.strip()
+        if dev_type and dev_type not in VALID_DEV_TYPES:
+            raise ValidationException("Invalid dev_type")
+        todo.tags = [dev_type] if dev_type else []
+        link = dict(todo.link or {})
+        link["dev_type"] = dev_type or ""
+        todo.link = link
 
     todo.updated_at = datetime.utcnow()
     session.add(todo)
@@ -812,6 +930,115 @@ async def update_project_todo_plan(
     if creator:
         resp.creator_name = creator.display_name
     return success_response(resp)
+
+
+@router.post("/projects/{project_id}/sync-dev-tasks", response_model=dict)
+async def sync_dev_tasks_from_feature_list(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Strictly sync project tasks from feature list so task list matches feature list."""
+    from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
+
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("Project not found")
+    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
+        raise ForbiddenException("Only PM or owner can sync development tasks")
+
+    feature_list, source_stage = _extract_feature_list_for_project(project_id, session)
+    if not feature_list:
+        return success_response({
+            "created": 0,
+            "deleted": 0,
+            "feature_total": 0,
+            "source_stage": None,
+            "message": "No feature list found",
+        })
+
+    expected_rows: List[Dict[str, Any]] = []
+    for idx, row in enumerate(feature_list):
+        if not isinstance(row, dict):
+            continue
+        for dev_type in _feature_row_dev_types(row):
+            expected_rows.append({
+                "feature_key": f"{idx}|{dev_type}",
+                "dev_type": dev_type,
+                "title": _build_feature_task_title(row, dev_type),
+                "description": row.get("description") or "",
+                "l1_feature": row.get("l1_feature"),
+                "l2_feature": row.get("l2_feature"),
+                "module": row.get("module"),
+            })
+
+    existing_todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
+        .where(TodoItem.source_id == str(project_id))
+    ).all()
+
+    # Preserve assignee/priority/due for rows that can be matched by feature_key.
+    preserved: Dict[str, Dict[str, Any]] = {}
+    for todo in existing_todos:
+        link = todo.link or {}
+        feature_key = link.get("feature_key")
+        if not feature_key:
+            continue
+        preserved[feature_key] = {
+            "assignee_user_id": todo.assignee_user_id,
+            "priority": todo.priority,
+            "due_at": todo.due_at,
+        }
+
+    deleted = 0
+    for todo in existing_todos:
+        session.delete(todo)
+        deleted += 1
+    session.flush()
+
+    default_assignee = project.pm_user_id or project.owner_user_id or current_user.id
+    default_due_at = datetime.combine(project.due_at, datetime.min.time()) if project.due_at else None
+
+    created = 0
+    for row in expected_rows:
+        feature_key = row["feature_key"]
+        keep = preserved.get(feature_key, {})
+        todo = TodoItem(
+            our_entity_id=project.our_entity_id,
+            assignee_user_id=keep.get("assignee_user_id") or default_assignee,
+            creator_user_id=project.pm_user_id or current_user.id,
+            title=row["title"],
+            description=row["description"],
+            source_type=TodoSourceType.PROJECT_TASK,
+            source_id=str(project_id),
+            action_type=TodoActionType.DO,
+            priority=keep.get("priority") or TodoPriority.P2,
+            status=TodoStatus.OPEN,
+            due_at=keep.get("due_at") or default_due_at,
+            tags=[row["dev_type"]],
+            link={
+                "project_id": str(project_id),
+                "project_name": project.name,
+                "dev_type": row["dev_type"],
+                "feature_key": feature_key,
+                "generated_from_feature_list": True,
+                "l1_feature": row["l1_feature"],
+                "l2_feature": row["l2_feature"],
+                "module": row["module"],
+            },
+        )
+        session.add(todo)
+        created += 1
+
+    session.commit()
+
+    return success_response({
+        "created": created,
+        "deleted": deleted,
+        "feature_total": len(expected_rows),
+        "source_stage": source_stage.stage_name if source_stage else None,
+    })
 
 
 def sync_project_progress(session, project_id: UUID):
@@ -1204,56 +1431,7 @@ async def get_project_feature_list(
     if not project:
         raise NotFoundException("未找到项目")
 
-    # Look for feature_list in all stages, prefer quotation/prototype stages
-    stages = session.exec(
-        select(ProjectStage)
-        .where(ProjectStage.project_id == project_id)
-        .order_by(ProjectStage.sequence_no)
-    ).all()
-
-    feature_list_data = []
-    source_stage = None
-    # Priority order: requirement_alignment has the feature spec list; quotation has price rows (different format)
-    # So prefer requirement_alignment → prototype_confirmed → then anything else with valid feature list keys
-    priority_codes = ["requirement_alignment", "prototype_confirmed", "quotation"]
-    stage_map = {s.stage_code: s for s in stages}
-
-    def _is_feature_list(data):
-        """Check that parsed data looks like a feature spec list (not a quotation row list)."""
-        if not isinstance(data, list) or len(data) == 0:
-            return False
-        first = data[0]
-        if not isinstance(first, dict):
-            return False
-        # Feature list rows have these keys; quotation rows have 'total_price', 'final_price' etc.
-        feature_keys = {"l1_feature", "l2_feature", "module", "dev_backend", "dev_frontend"}
-        return bool(feature_keys & set(first.keys()))
-
-    import json as _json
-
-    for code in priority_codes:
-        if code in stage_map and stage_map[code].feature_list:
-            try:
-                candidate = _json.loads(stage_map[code].feature_list)
-                if _is_feature_list(candidate):
-                    feature_list_data = candidate
-                    source_stage = stage_map[code]
-                    break
-            except Exception:
-                continue
-
-    if not source_stage:
-        # Fallback: any stage with a valid feature_list format
-        for s in stages:
-            if s.feature_list:
-                try:
-                    candidate = _json.loads(s.feature_list)
-                    if _is_feature_list(candidate):
-                        feature_list_data = candidate
-                        source_stage = s
-                        break
-                except Exception:
-                    continue
+    feature_list_data, source_stage = _extract_feature_list_for_project(project_id, session)
 
     # Get project members for assignment
     members_rows = session.exec(
@@ -1342,7 +1520,13 @@ async def generate_dev_tasks(
             status=TodoStatus.OPEN,
             due_at=due_at,
             tags=[item.dev_type] if item.dev_type else [],
-            link={"project_id": str(project_id), "project_name": project.name, "dev_type": item.dev_type or ""}
+            link={
+                "project_id": str(project_id),
+                "project_name": project.name,
+                "dev_type": item.dev_type or "",
+                "feature_key": item.feature_key or "",
+                "generated_from_feature_list": True if item.feature_key else False,
+            }
         )
         session.add(todo)
         session.flush()

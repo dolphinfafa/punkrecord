@@ -89,6 +89,9 @@ export const projectApi = {
     generateDevTasks: async (projectId, tasks) => {
         return client.post(`/project/projects/${projectId}/generate-dev-tasks`, { tasks });
     },
+    syncDevTasks: async (projectId) => {
+        return client.post(`/project/projects/${projectId}/sync-dev-tasks`);
+    },
 
     // Contract context (enriched data for contract generation)
     getProjectContractContext: async (projectId) => {
