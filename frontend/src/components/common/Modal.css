@@ -59,7 +59,7 @@
     color: var(--text-primary, #cad3f5);
 }
 
-.modal-content {
+.base-modal-content {
     padding: 1.5rem;
     overflow-y: auto;
     color: var(--text-primary, #cad3f5);

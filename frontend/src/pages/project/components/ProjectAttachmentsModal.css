@@ -1,0 +1,199 @@
+.attachment-dropzone {
+    box-sizing: border-box;
+    width: 100%;
+    border: 2px dashed var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    background-color: var(--bg-hover, #f8fafc);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.attachment-dropzone:hover,
+.attachment-dropzone.dragging {
+    border-color: var(--primary-color, #3b82f6);
+    background-color: var(--primary-lighter, #eff6ff);
+}
+
+.attachment-dropzone.dragging * {
+    pointer-events: none;
+}
+
+.attachment-dropzone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-color, #1e293b);
+}
+
+.attachment-dropzone-icon {
+    color: var(--primary-color, #3b82f6);
+    background: var(--bg-hover, #f1f5f9);
+    padding: 12px;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+
+.attachment-dropzone:hover .attachment-dropzone-icon,
+.attachment-dropzone.dragging .attachment-dropzone-icon {
+    transform: scale(1.1);
+}
+
+.attachment-dropzone-title {
+    font-weight: 500;
+    font-size: 1.05rem;
+}
+
+.attachment-dropzone-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted, #64748b);
+}
+
+.attachment-list {
+    box-sizing: border-box;
+    width: 100%;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.attachment-item {
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    background-color: var(--bg-color, #ffffff);
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.attachment-item:hover {
+    border-color: var(--primary-color, #3b82f6);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transform: translateY(-1px);
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    /* Ensures truncation works */
+}
+
+.attachment-icon-wrapper {
+    background: var(--bg-hover, #f8fafc);
+    color: var(--primary-color, #3b82f6);
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.attachment-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.attachment-name {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-color, #1e293b);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    transition: color 0.1s ease;
+}
+
+.attachment-name:-webkit-any-link {
+    text-decoration: none;
+}
+
+.attachment-name:hover {
+    color: var(--primary-color, #3b82f6);
+}
+
+.attachment-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted, #64748b);
+}
+
+.attachment-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.attachment-item:hover .attachment-actions {
+    opacity: 1;
+}
+
+.attachment-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #64748b);
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.attachment-action-btn:hover {
+    background-color: var(--bg-hover, #f1f5f9);
+    color: var(--text-color, #1e293b);
+}
+
+.attachment-action-btn.danger:hover {
+    background-color: var(--danger-lighter, #fef2f2);
+    color: var(--danger-color, #ef4444);
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-muted, #64748b);
+    text-align: center;
+    background: var(--bg-hover, #f8fafc);
+    border-radius: 12px;
+    border: 1px dashed var(--border-color, #e2e8f0);
+}
+
+.empty-state-icon {
+    margin-bottom: 12px;
+    opacity: 0.5;
+}

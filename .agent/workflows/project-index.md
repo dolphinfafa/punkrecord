@@ -86,8 +86,8 @@ TodoItem: title, description, source_type(manual/project_task), action_type, pri
 
 # Project
 Project: name, type(internal/client), status(planning/active/on_hold/completed/cancelled),
-         entity_id→OurEntity, contract_id→Contract, budget
-ProjectStage: project_id, name, status(pending/active/done), order, description
+         entity_id→OurEntity, contract_id→Contract, budget, attachments(JSON)
+ProjectStage: project_id, name, status(pending/active/done), order, description, attachments(JSON)
 ProjectMember: project_id, user_id, role
 
 # Contract
@@ -195,7 +195,7 @@ curl http://localhost:8000/health
 
 ---
 
-## 7. 增量更新（2026-02-24）
+## 7. 增量更新（2026-02-24 ~ 2026-02-25）
 
 - 新增页面：`frontend/src/pages/project/DevelopmentProgressPage.jsx` + `frontend/src/pages/project/DevelopmentProgressPage.css`
 - 新增路由：`/project/:id/dev-progress`（项目开发进度管理页）
@@ -218,7 +218,15 @@ curl http://localhost:8000/health
 - 认证读取顺序更新（`backend/app/core/auth.py`）：
   - 优先使用 `Authorization: Bearer` token
   - 无 Bearer 时再回退读取 cookie，避免多账号切换时身份错位
+- 附件管理改为“项目级”入口（位于项目详情页“阶段”模块右上角“附件”按钮）：
+  - 支持上传、下载、删除并查看本项目相关附件（合同、原型确认单等）
+  - 新增接口：`GET /api/v1/project/projects/{project_id}/attachments`
+  - 新增接口：`POST /api/v1/project/projects/{project_id}/attachments`
+  - 新增接口：`GET /api/v1/project/projects/{project_id}/attachments/{attachment_id}/download`
+  - 新增接口：`DELETE /api/v1/project/projects/{project_id}/attachments/{attachment_id}`
+  - `Project` 新增字段：`attachments`（JSON，存项目附件元数据）
+  - SQLite 启动时自动补齐 `project.attachments` 列并修复空值（兼容旧库）
 
 ---
 
-*最后更新：2026-02-24 | 如有结构性变更请同步更新本文件*
+*最后更新：2026-02-25 | 如有结构性变更请同步更新本文件*

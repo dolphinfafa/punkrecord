@@ -1,4 +1,5 @@
 import client from './client';
+import axios from 'axios';
 
 export const projectApi = {
     // Projects
@@ -11,6 +12,28 @@ export const projectApi = {
 
     getProject: async (projectId) => {
         return client.get(`/project/projects/${projectId}`);
+    },
+    getProjectAttachments: async (projectId) => {
+        return client.get(`/project/projects/${projectId}/attachments`);
+    },
+    uploadProjectAttachment: async (projectId, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/project/projects/${projectId}/attachments`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    deleteProjectAttachment: async (projectId, attachmentId) => {
+        return client.delete(`/project/projects/${projectId}/attachments/${attachmentId}`);
+    },
+    downloadProjectAttachment: async (projectId, attachmentId) => {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        return axios.get(`/api/v1/project/projects/${projectId}/attachments/${attachmentId}/download`, {
+            responseType: 'blob',
+            withCredentials: true,
+            headers,
+        });
     },
 
     createProject: async (data) => {

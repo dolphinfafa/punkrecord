@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import './Modal.css';
 
-export default function Modal({ isOpen, onClose, title, children, footer }) {
+export default function Modal({ isOpen, onClose, title, children, footer, className = '', style = {} }) {
     const modalRef = useRef(null);
 
     useEffect(() => {
@@ -32,14 +32,14 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
 
     return (
         <div className="modal-backdrop" onClick={handleBackdropClick}>
-            <div className="modal-container" ref={modalRef}>
+            <div className={`modal-container ${className}`} ref={modalRef} style={style}>
                 <div className="modal-header">
                     <h3>{title}</h3>
                     <button className="modal-close-btn" onClick={onClose}>
                         <X size={20} />
                     </button>
                 </div>
-                <div className="modal-content">
+                <div className="base-modal-content">
                     {children}
                 </div>
                 {footer && (

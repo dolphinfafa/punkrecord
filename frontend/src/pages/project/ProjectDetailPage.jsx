@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import projectApi from '@/api/project';
+import './ProjectDetailPage.css';
 import ProjectEditModal from './components/ProjectEditModal';
 import ProjectTeam from './components/ProjectTeam';
 import ProjectTasks from './components/ProjectTasks';
 import FeatureListModal from './components/FeatureListModal';
 import QuoteModal from './components/QuoteModal';
 import ContractCanvasModal from './components/ContractCanvasModal';
+import ProjectAttachmentsModal from './components/ProjectAttachmentsModal';
 import {
     Briefcase, FileText, Activity, Layers,
-    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, BarChart3
+    Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, BarChart3, Paperclip
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
@@ -23,6 +25,7 @@ export default function ProjectDetailPage() {
     const [featureListStage, setFeatureListStage] = useState(null);
     const [quoteStage, setQuoteStage] = useState(null);
     const [contractCanvasStage, setContractCanvasStage] = useState(null);
+    const [showProjectAttachments, setShowProjectAttachments] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -75,7 +78,7 @@ export default function ProjectDetailPage() {
     if (!project) return <div className="page-content"><div className="error">未找到项目</div></div>;
 
     return (
-        <div className="page-content">
+        <div className="page-content project-detail-page">
             <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <button className="btn btn-secondary" onClick={() => navigate('/project')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <ArrowLeft size={16} /> 返回列表
@@ -101,7 +104,7 @@ export default function ProjectDetailPage() {
                 />
             )}
 
-            <div className="detail-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+            <div className="detail-container project-detail-grid">
                 <div className="main-info">
                     <div className="card" style={{ padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #eee' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
@@ -163,32 +166,43 @@ export default function ProjectDetailPage() {
                         )}
                     </div>
 
-                    <div className="card" style={{ marginTop: '2rem' }}>
-                        <h3>阶段</h3>
+                    <div className="card stage-card" style={{ marginTop: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <h3>阶段</h3>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setShowProjectAttachments(true)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                <Paperclip size={15} />
+                                附件
+                            </button>
+                        </div>
                         <div className="stages-list" style={{ marginTop: '1rem' }}>
                             {stages.length === 0 ? (
                                 <p>暂无阶段。</p>
                             ) : (
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>阶段</th>
-                                            <th>状态</th>
-                                            <th>计划结束日期</th>
-                                            <th>备注/交付物</th>
-                                            <th>操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stages.map((stage, index) => {
-                                            const prevStage = index > 0 ? stages[index - 1] : null;
-                                            const isEditable = index === 0 || (prevStage && (prevStage.status === 'done' || prevStage.status === 'skipped'));
+                                <div className="stage-table-scroll">
+                                    <table className="data-table stage-table">
+                                        <thead>
+                                            <tr>
+                                                <th className="col-seq">#</th>
+                                                <th className="col-name">阶段</th>
+                                                <th className="col-status">状态</th>
+                                                <th className="col-date">计划结束日期</th>
+                                                <th className="col-note">备注/交付物</th>
+                                                <th className="col-action">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stages.map((stage, index) => {
+                                                const prevStage = index > 0 ? stages[index - 1] : null;
+                                                const isEditable = index === 0 || (prevStage && (prevStage.status === 'done' || prevStage.status === 'skipped'));
 
-                                            return (
-                                                <tr key={stage.id}>
-                                                    <td>{stage.sequence_no}</td>
-                                                    <td>{stage.stage_name}</td>
+                                                return (
+                                                    <tr key={stage.id}>
+                                                        <td className="col-seq">{stage.sequence_no}</td>
+                                                        <td className="col-name">{stage.stage_name}</td>
                                                     <td>
                                                         <select
                                                             value={stage.status}
@@ -223,7 +237,7 @@ export default function ProjectDetailPage() {
                                                             }}
                                                         />
                                                     </td>
-                                                    <td>
+                                                    <td className="col-note">
                                                         <input
                                                             type="text"
                                                             value={stage.deliverables || ''}
@@ -240,8 +254,8 @@ export default function ProjectDetailPage() {
                                                             }}
                                                         />
                                                     </td>
-                                                    <td>
-                                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <td className="col-action">
+                                                        <div className="stage-action-wrap" style={{ display: 'flex', gap: '10px' }}>
                                                             {project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'requirement_alignment' && (
                                                                 <button
                                                                     className="btn-link text-success"
@@ -286,11 +300,12 @@ export default function ProjectDetailPage() {
                                                                 stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                         </div>
                                                     </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -355,6 +370,15 @@ export default function ProjectDetailPage() {
                         setContractCanvasStage(null);
                         loadData();
                     }}
+                />
+            )}
+
+            {showProjectAttachments && (
+                <ProjectAttachmentsModal
+                    isOpen={showProjectAttachments}
+                    onClose={() => setShowProjectAttachments(false)}
+                    projectId={project.id}
+                    projectName={project.name}
                 />
             )}
         </div >

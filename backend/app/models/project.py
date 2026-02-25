@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 from enum import Enum
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Column, JSON
 from app.models.base import BaseDBModel
 
 
@@ -56,6 +56,7 @@ class Project(BaseDBModel, table=True):
     progress: float = Field(default=0.0, nullable=False)  # 0.0 to 1.0
     
     description: Optional[str] = None
+    attachments: list = Field(default=[], sa_column=Column(JSON))
 
 
 class ProjectStage(BaseDBModel, table=True):
@@ -77,6 +78,7 @@ class ProjectStage(BaseDBModel, table=True):
     skip_reason: Optional[str] = None
     deliverables: Optional[str] = None
     feature_list: Optional[str] = None
+    attachments: list = Field(default=[], sa_column=Column(JSON))
 
 
 class ProjectMember(BaseDBModel, table=True):

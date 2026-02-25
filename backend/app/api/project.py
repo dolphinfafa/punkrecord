@@ -2,13 +2,14 @@
 Project API endpoints
 """
 from typing import Optional, Dict, Any, List, Union
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 import io
 import urllib.parse
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query, Body
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Query, Body, UploadFile, File
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -29,6 +30,10 @@ from app.schemas.project import (
 )
 
 router = APIRouter(prefix="/project", tags=["Project"])
+PROJECT_ATTACHMENT_DIR = Path(__file__).resolve().parents[2] / "uploads" / "project-attachments"
+MAX_PROJECT_ATTACHMENT_SIZE = 20 * 1024 * 1024  # 20 MB per file
+STAGE_ATTACHMENT_DIR = Path(__file__).resolve().parents[2] / "uploads" / "project-stage-attachments"
+MAX_STAGE_ATTACHMENT_SIZE = 20 * 1024 * 1024  # 20 MB per file
 
 
 # Standard stages for B2B projects
@@ -175,6 +180,131 @@ async def get_project(
     return success_response(enrich_project_response(session, project))
 
 
+@router.get("/projects/{project_id}/attachments", response_model=dict)
+async def list_project_attachments(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List project-level attachments."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    attachments = list(project.attachments or [])
+    return success_response(attachments)
+
+
+@router.post("/projects/{project_id}/attachments", response_model=dict)
+async def upload_project_attachment(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload an attachment for the project."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    if not file.filename:
+        raise ValidationException("附件文件名不能为空")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise ValidationException("附件内容不能为空")
+    if len(file_bytes) > MAX_PROJECT_ATTACHMENT_SIZE:
+        raise ValidationException("附件大小不能超过 20MB")
+
+    PROJECT_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+    attachment_id = uuid4().hex
+    safe_suffix = Path(file.filename).suffix[:20]
+    stored_name = f"{project_id}_{attachment_id}{safe_suffix}"
+    file_path = PROJECT_ATTACHMENT_DIR / stored_name
+    file_path.write_bytes(file_bytes)
+
+    attachment = {
+        "id": attachment_id,
+        "file_name": file.filename,
+        "stored_name": stored_name,
+        "content_type": file.content_type or "application/octet-stream",
+        "size": len(file_bytes),
+        "uploaded_at": datetime.utcnow().isoformat()
+    }
+    attachments = list(project.attachments or [])
+    attachments.append(attachment)
+    project.attachments = attachments
+    project.updated_at = datetime.utcnow()
+    session.add(project)
+    session.commit()
+
+    return success_response(attachment)
+
+
+@router.get("/projects/{project_id}/attachments/{attachment_id}/download")
+async def download_project_attachment(
+    project_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download a project-level attachment."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    attachment = next((a for a in (project.attachments or []) if a.get("id") == attachment_id), None)
+    if not attachment:
+        raise NotFoundException("未找到附件")
+
+    stored_name = attachment.get("stored_name")
+    file_name = attachment.get("file_name") or "attachment"
+    if not stored_name:
+        raise NotFoundException("附件元数据异常")
+
+    file_path = PROJECT_ATTACHMENT_DIR / stored_name
+    if not file_path.exists():
+        raise NotFoundException("附件文件不存在")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=attachment.get("content_type") or "application/octet-stream",
+        filename=file_name
+    )
+
+
+@router.delete("/projects/{project_id}/attachments/{attachment_id}", response_model=dict)
+async def delete_project_attachment(
+    project_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a project-level attachment."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    attachments = list(project.attachments or [])
+    idx = next((i for i, item in enumerate(attachments) if item.get("id") == attachment_id), None)
+    if idx is None:
+        raise NotFoundException("未找到附件")
+
+    removed = attachments.pop(idx)
+    stored_name = removed.get("stored_name")
+    if stored_name:
+        file_path = PROJECT_ATTACHMENT_DIR / stored_name
+        if file_path.exists():
+            file_path.unlink()
+
+    project.attachments = attachments
+    project.updated_at = datetime.utcnow()
+    session.add(project)
+    session.commit()
+
+    return success_response({"message": "附件已删除"})
+
+
 @router.patch("/projects/{project_id}", response_model=dict)
 async def update_project(
     project_id: UUID,
@@ -228,7 +358,11 @@ async def get_project_stages(
         .where(ProjectStage.project_id == project_id)
         .order_by(ProjectStage.sequence_no)
     ).all()
-    
+
+    for stage in stages:
+        if stage.attachments is None:
+            stage.attachments = []
+
     return success_response([ProjectStageResponse.model_validate(s) for s in stages])
 
 
@@ -270,7 +404,125 @@ async def update_stage_status(
     session.commit()
     session.refresh(stage)
 
+    if stage.attachments is None:
+        stage.attachments = []
     return success_response(ProjectStageResponse.model_validate(stage))
+
+
+@router.post("/projects/{project_id}/stages/{stage_id}/attachments", response_model=dict)
+async def upload_stage_attachment(
+    project_id: UUID,
+    stage_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload a stage attachment and append metadata into stage.attachments."""
+    stage = session.get(ProjectStage, stage_id)
+    if not stage or stage.project_id != project_id:
+        raise NotFoundException("未找到阶段")
+
+    if not file.filename:
+        raise ValidationException("附件文件名不能为空")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise ValidationException("附件内容不能为空")
+    if len(file_bytes) > MAX_STAGE_ATTACHMENT_SIZE:
+        raise ValidationException("附件大小不能超过 20MB")
+
+    STAGE_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+    safe_suffix = Path(file.filename).suffix[:20]
+    attachment_id = uuid4().hex
+    stored_name = f"{project_id}_{stage_id}_{attachment_id}{safe_suffix}"
+    file_path = STAGE_ATTACHMENT_DIR / stored_name
+    file_path.write_bytes(file_bytes)
+
+    attachment = {
+        "id": attachment_id,
+        "file_name": file.filename,
+        "stored_name": stored_name,
+        "content_type": file.content_type or "application/octet-stream",
+        "size": len(file_bytes),
+        "uploaded_at": datetime.utcnow().isoformat()
+    }
+
+    attachments = list(stage.attachments or [])
+    attachments.append(attachment)
+    stage.attachments = attachments
+    stage.updated_at = datetime.utcnow()
+
+    session.add(stage)
+    session.commit()
+    session.refresh(stage)
+
+    return success_response(attachment)
+
+
+@router.get("/projects/{project_id}/stages/{stage_id}/attachments/{attachment_id}/download")
+async def download_stage_attachment(
+    project_id: UUID,
+    stage_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download a specific stage attachment."""
+    stage = session.get(ProjectStage, stage_id)
+    if not stage or stage.project_id != project_id:
+        raise NotFoundException("未找到阶段")
+
+    attachment = next((a for a in (stage.attachments or []) if a.get("id") == attachment_id), None)
+    if not attachment:
+        raise NotFoundException("未找到附件")
+
+    stored_name = attachment.get("stored_name")
+    file_name = attachment.get("file_name") or "attachment"
+    if not stored_name:
+        raise NotFoundException("附件元数据异常")
+
+    file_path = STAGE_ATTACHMENT_DIR / stored_name
+    if not file_path.exists():
+        raise NotFoundException("附件文件不存在")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=attachment.get("content_type") or "application/octet-stream",
+        filename=file_name
+    )
+
+
+@router.delete("/projects/{project_id}/stages/{stage_id}/attachments/{attachment_id}", response_model=dict)
+async def delete_stage_attachment(
+    project_id: UUID,
+    stage_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete stage attachment metadata and file."""
+    stage = session.get(ProjectStage, stage_id)
+    if not stage or stage.project_id != project_id:
+        raise NotFoundException("未找到阶段")
+
+    attachments = list(stage.attachments or [])
+    idx = next((i for i, item in enumerate(attachments) if item.get("id") == attachment_id), None)
+    if idx is None:
+        raise NotFoundException("未找到附件")
+
+    removed = attachments.pop(idx)
+    stored_name = removed.get("stored_name")
+    if stored_name:
+        file_path = STAGE_ATTACHMENT_DIR / stored_name
+        if file_path.exists():
+            file_path.unlink()
+
+    stage.attachments = attachments
+    stage.updated_at = datetime.utcnow()
+    session.add(stage)
+    session.commit()
+
+    return success_response({"message": "附件已删除"})
 
 
 @router.delete("/projects/{project_id}", response_model=dict)

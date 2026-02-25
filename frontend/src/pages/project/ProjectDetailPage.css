@@ -1,0 +1,67 @@
+.project-detail-page {
+    max-width: min(1600px, calc(100vw - 48px));
+}
+
+.project-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    gap: 1.5rem;
+}
+
+.stage-card {
+    overflow: hidden;
+}
+
+.stage-table-scroll {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+.stage-table {
+    min-width: 1080px;
+}
+
+.stage-table td,
+.stage-table th {
+    padding: 0.75rem 0.9rem;
+}
+
+.stage-table .col-seq {
+    width: 52px;
+}
+
+.stage-table .col-name {
+    min-width: 120px;
+}
+
+.stage-table .col-status {
+    min-width: 150px;
+}
+
+.stage-table .col-date {
+    min-width: 160px;
+}
+
+.stage-table .col-note {
+    min-width: 260px;
+}
+
+.stage-table .col-action {
+    min-width: 280px;
+}
+
+.stage-action-wrap {
+    flex-wrap: wrap;
+    row-gap: 8px;
+}
+
+@media (max-width: 1200px) {
+    .project-detail-page {
+        max-width: calc(100vw - 24px);
+    }
+
+    .project-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}

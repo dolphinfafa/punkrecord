@@ -2,9 +2,9 @@
 Project module Pydantic schemas
 """
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProjectCreate(BaseModel):
@@ -74,6 +74,7 @@ class ProjectStageResponse(BaseModel):
     skip_reason: Optional[str] = None
     deliverables: Optional[str] = None
     feature_list: Optional[str] = None
+    attachments: Optional[list[dict[str, Any]]] = Field(default_factory=list)
     created_at: datetime
     
     class Config:
