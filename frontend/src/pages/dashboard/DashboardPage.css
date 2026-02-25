@@ -282,3 +282,128 @@
     color: var(--text-secondary);
     font-size: 14px;
 }
+
+.leave-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.leave-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.leave-form input,
+.leave-form select,
+.leave-form textarea {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    background: var(--bg-color);
+    color: var(--text-primary);
+}
+
+.leave-submit-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.leave-list h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.leave-balance-panel {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+}
+
+.leave-balance-title {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.leave-balance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.leave-l0-tip {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #f97316;
+}
+
+.leave-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    margin-bottom: 8px;
+}
+
+.leave-review-item {
+    align-items: center;
+}
+
+.leave-item-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.leave-type {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.leave-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.leave-status {
+    font-size: 12px;
+    border-radius: 8px;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.leave-status.leave-pending {
+    color: #f97316;
+    background: #fff7ed;
+}
+
+.leave-status.leave-approved {
+    color: #10b981;
+    background: #ecfdf5;
+}
+
+.leave-status.leave-rejected {
+    color: #ef4444;
+    background: #fef2f2;
+}
+
+.leave-status.leave-cancelled {
+    color: #64748b;
+    background: #f1f5f9;
+}

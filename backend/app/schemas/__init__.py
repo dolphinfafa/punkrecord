@@ -105,6 +105,11 @@ class UserUpdate(BaseModel):
     manager_user_id: Optional[UUID] = None
     job_title_id: Optional[UUID] = None
     department_id: Optional[UUID] = None
+    leave_annual_remaining: Optional[float] = None
+    leave_maternity_remaining: Optional[float] = None
+    leave_marriage_remaining: Optional[float] = None
+    leave_personal_remaining: Optional[float] = None
+    leave_sick_remaining: Optional[float] = None
 
 
 class UserResponse(BaseModel):
@@ -123,6 +128,11 @@ class UserResponse(BaseModel):
     job_title_name: Optional[str] = None
     department_id: Optional[UUID] = None
     department_name: Optional[str] = None
+    leave_annual_remaining: float = 5.0
+    leave_maternity_remaining: float = 15.0
+    leave_marriage_remaining: float = 3.0
+    leave_personal_remaining: float = 3.0
+    leave_sick_remaining: float = 3.0
     created_at: datetime
     
     class Config:

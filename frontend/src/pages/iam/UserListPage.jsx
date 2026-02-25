@@ -5,11 +5,12 @@ import './IAMPage.css';
 
 const STATUS_LABELS = { active: '在职', inactive: '离职' };
 
-function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments }) {
+function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments, canEditLeaveBalance }) {
     const [form, setForm] = useState({
         display_name: '', username: '', email: '', phone: '',
         password: '', is_shareholder: false,
         manager_user_id: '', job_title_id: '', department_id: '', status: 'active',
+        leave_annual_remaining: 5, leave_maternity_remaining: 15, leave_marriage_remaining: 3, leave_personal_remaining: 3, leave_sick_remaining: 3,
     });
     const [loading, setLoading] = useState(false);
     const isEdit = !!initialData;
@@ -27,9 +28,14 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                 job_title_id: initialData.job_title_id || '',
                 department_id: initialData.department_id || '',
                 status: initialData.status || 'active',
+                leave_annual_remaining: initialData.leave_annual_remaining ?? 5,
+                leave_maternity_remaining: initialData.leave_maternity_remaining ?? 15,
+                leave_marriage_remaining: initialData.leave_marriage_remaining ?? 3,
+                leave_personal_remaining: initialData.leave_personal_remaining ?? 3,
+                leave_sick_remaining: initialData.leave_sick_remaining ?? 3,
             });
         } else {
-            setForm({ display_name: '', username: '', email: '', phone: '', password: '', is_shareholder: false, manager_user_id: '', job_title_id: '', department_id: '', status: 'active' });
+            setForm({ display_name: '', username: '', email: '', phone: '', password: '', is_shareholder: false, manager_user_id: '', job_title_id: '', department_id: '', status: 'active', leave_annual_remaining: 5, leave_maternity_remaining: 15, leave_marriage_remaining: 3, leave_personal_remaining: 3, leave_sick_remaining: 3 });
         }
     }, [initialData, isOpen]);
 
@@ -60,6 +66,13 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
             };
             if (!isEdit) data.password = form.password;
             if (isEdit) data.status = form.status;
+            if (isEdit && canEditLeaveBalance) {
+                data.leave_annual_remaining = Number(form.leave_annual_remaining || 0);
+                data.leave_maternity_remaining = Number(form.leave_maternity_remaining || 0);
+                data.leave_marriage_remaining = Number(form.leave_marriage_remaining || 0);
+                data.leave_personal_remaining = Number(form.leave_personal_remaining || 0);
+                data.leave_sick_remaining = Number(form.leave_sick_remaining || 0);
+            }
             await onSubmit(data);
             onClose();
         } finally {
@@ -144,11 +157,88 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                             <Crown size={14} style={{ color: 'var(--warning-color)' }} /> 股东（最高级别）
                         </label>
                     </div>
+                    {isEdit && (
+                        <div className="iam-form-row">
+                            <div className="iam-form-group">
+                                <label>年假剩余（天）</label>
+                                <input type="number" step="0.5" min="0" value={form.leave_annual_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_annual_remaining: e.target.value }))} />
+                            </div>
+                            <div className="iam-form-group">
+                                <label>产假剩余（天）</label>
+                                <input type="number" step="0.5" min="0" value={form.leave_maternity_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_maternity_remaining: e.target.value }))} />
+                            </div>
+                        </div>
+                    )}
+                    {isEdit && (
+                        <div className="iam-form-row">
+                            <div className="iam-form-group">
+                                <label>婚假剩余（天）</label>
+                                <input type="number" step="0.5" min="0" value={form.leave_marriage_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_marriage_remaining: e.target.value }))} />
+                            </div>
+                            <div className="iam-form-group">
+                                <label>事假剩余（天）</label>
+                                <input type="number" step="0.5" min="0" value={form.leave_personal_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_personal_remaining: e.target.value }))} />
+                            </div>
+                            <div className="iam-form-group">
+                                <label>病假剩余（天）</label>
+                                <input type="number" step="0.5" min="0" value={form.leave_sick_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_sick_remaining: e.target.value }))} />
+                            </div>
+                        </div>
+                    )}
+                    {isEdit && !canEditLeaveBalance && (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                            仅 L0 级别员工可修改假期余额
+                        </div>
+                    )}
                     <div className="iam-modal-footer">
                         <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
                         <button type="submit" className="btn-primary" disabled={loading}>{loading ? '保存中...' : '保存'}</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+function LeaveResetModal({ isOpen, onClose, onConfirm }) {
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(false);
+        }
+    }, [isOpen]);
+
+    const handleConfirm = async () => {
+        if (!window.confirm('确定将所有员工假期余额重置为默认值吗？')) return;
+        try {
+            setLoading(true);
+            await onConfirm();
+            onClose();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+    return (
+        <div className="iam-modal-overlay" onClick={onClose}>
+            <div className="iam-modal" onClick={e => e.stopPropagation()}>
+                <div className="iam-modal-header">
+                    <h3>重置假期余额</h3>
+                    <button onClick={onClose}><X size={18} /></button>
+                </div>
+                <div className="iam-modal-body">
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        将为所有员工重置为：年假5天、产假15天、婚假3天、事假3天、病假3天
+                    </div>
+                    <div className="iam-modal-footer">
+                        <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
+                        <button type="button" onClick={handleConfirm} className="btn-primary" disabled={loading}>
+                            {loading ? '重置中...' : '确认重置'}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -163,6 +253,8 @@ export default function UserListPage() {
     const [editTarget, setEditTarget] = useState(null);
     const [notification, setNotification] = useState(null);
     const [search, setSearch] = useState('');
+    const [currentUserLevel, setCurrentUserLevel] = useState(null);
+    const [resetModalOpen, setResetModalOpen] = useState(false);
 
     const showNotification = (msg, type = 'success') => {
         setNotification({ msg, type });
@@ -178,6 +270,9 @@ export default function UserListPage() {
                 iamApi.listDepartments(),
             ]);
             setUsers(usersRes.data?.items || []);
+            const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')?.id;
+            const me = (usersRes.data?.items || []).find(u => u.id === currentUserId);
+            setCurrentUserLevel(me?.level ?? null);
             setJobTitles(jtRes.data || []);
             setDepartments(deptRes.data || []);
         } catch {
@@ -198,6 +293,12 @@ export default function UserListPage() {
     const handleEdit = async (data) => {
         await iamApi.updateUser(editTarget.id, data);
         showNotification('员工信息更新成功');
+        load();
+    };
+
+    const handleResetLeaveBalances = async () => {
+        await iamApi.resetAllLeaveBalances();
+        showNotification('所有员工假期余额已重置为默认值');
         load();
     };
 
@@ -223,6 +324,11 @@ export default function UserListPage() {
                     <button className="btn-primary" onClick={() => { setEditTarget(null); setModalOpen(true); }}>
                         <Plus size={16} /> 新建员工
                     </button>
+                    {currentUserLevel === 0 && (
+                        <button className="btn-secondary" onClick={() => setResetModalOpen(true)}>
+                            重置假期余额
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -245,7 +351,7 @@ export default function UserListPage() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
                             ) : filtered.map(user => (
                                 <tr key={user.id}>
                                     <td>
@@ -286,6 +392,13 @@ export default function UserListPage() {
                 users={users}
                 jobTitles={jobTitles}
                 departments={departments}
+                canEditLeaveBalance={currentUserLevel === 0}
+            />
+
+            <LeaveResetModal
+                isOpen={resetModalOpen}
+                onClose={() => setResetModalOpen(false)}
+                onConfirm={handleResetLeaveBalances}
             />
         </div>
     );

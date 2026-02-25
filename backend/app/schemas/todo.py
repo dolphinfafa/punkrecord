@@ -75,3 +75,33 @@ class TodoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LeaveRequestCreate(BaseModel):
+    """Leave request creation schema"""
+    our_entity_id: Optional[UUID] = None
+    leave_type: str
+    start_at: datetime
+    end_at: datetime
+    reason: Optional[str] = None
+
+
+class LeaveRequestResponse(BaseModel):
+    """Leave request response schema"""
+    id: UUID
+    our_entity_id: Optional[UUID] = None
+    applicant_user_id: UUID
+    applicant_name: Optional[str] = None
+    leave_type: str
+    status: str
+    start_at: datetime
+    end_at: datetime
+    reason: Optional[str] = None
+    approved_by_user_id: Optional[UUID] = None
+    approved_at: Optional[datetime] = None
+    review_comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

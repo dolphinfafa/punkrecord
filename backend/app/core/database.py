@@ -1,6 +1,7 @@
 """
 Database connection and session management
 """
+from datetime import datetime
 from sqlmodel import create_engine, Session, SQLModel
 from app.core.config import settings
 
@@ -25,6 +26,35 @@ def _ensure_legacy_columns():
         return
 
     with engine.begin() as conn:
+        user_columns = {
+            row[1] for row in conn.exec_driver_sql(
+                "PRAGMA table_info('user')"
+            ).fetchall()
+        }
+        user_leave_defaults = {
+            "leave_annual_remaining": 5.0,
+            "leave_maternity_remaining": 15.0,
+            "leave_marriage_remaining": 3.0,
+            "leave_personal_remaining": 3.0,
+            "leave_sick_remaining": 3.0,
+        }
+        current_year = datetime.utcnow().year
+        if "leave_balance_reset_year" not in user_columns:
+            conn.exec_driver_sql(
+                f"ALTER TABLE user ADD COLUMN leave_balance_reset_year INTEGER NOT NULL DEFAULT {current_year}"
+            )
+        conn.exec_driver_sql(
+            f"UPDATE user SET leave_balance_reset_year = {current_year} WHERE leave_balance_reset_year IS NULL"
+        )
+        for col_name, default_val in user_leave_defaults.items():
+            if col_name not in user_columns:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE user ADD COLUMN {col_name} FLOAT NOT NULL DEFAULT {default_val}"
+                )
+            conn.exec_driver_sql(
+                f"UPDATE user SET {col_name} = {default_val} WHERE {col_name} IS NULL"
+            )
+
         project_columns = {
             row[1] for row in conn.exec_driver_sql(
                 "PRAGMA table_info('project')"

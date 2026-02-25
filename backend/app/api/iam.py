@@ -2,13 +2,14 @@
 IAM API endpoints (Users, Roles, Entities, Departments, Job Titles, Org Chart)
 """
 from typing import List, Optional
+from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user
 from app.core.security import get_password_hash
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
 from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit
 from app.schemas import (
@@ -82,6 +83,11 @@ def _enrich_user(user: User, session: Session, user_map: dict = None) -> UserRes
         job_title_name=job_title_name,
         department_id=user.department_id,
         department_name=department_name,
+        leave_annual_remaining=user.leave_annual_remaining,
+        leave_maternity_remaining=user.leave_maternity_remaining,
+        leave_marriage_remaining=user.leave_marriage_remaining,
+        leave_personal_remaining=user.leave_personal_remaining,
+        leave_sick_remaining=user.leave_sick_remaining,
         created_at=user.created_at,
     )
 
@@ -445,12 +451,86 @@ async def update_user(
         user.job_title_id = user_data.job_title_id
     if user_data.department_id is not None:
         user.department_id = user_data.department_id
+
+    leave_fields = [
+        ("leave_annual_remaining", user_data.leave_annual_remaining),
+        ("leave_maternity_remaining", user_data.leave_maternity_remaining),
+        ("leave_marriage_remaining", user_data.leave_marriage_remaining),
+        ("leave_personal_remaining", user_data.leave_personal_remaining),
+        ("leave_sick_remaining", user_data.leave_sick_remaining),
+    ]
+    if any(value is not None for _, value in leave_fields):
+        all_users = session.exec(select(User)).all()
+        user_map = {u.id: u for u in all_users}
+        current_level = _compute_level(current_user, user_map)
+        if current_level != 0:
+            raise ForbiddenException("仅 L0 级别员工可调整假期余额")
+        for field_name, field_value in leave_fields:
+            if field_value is not None:
+                if field_value < 0:
+                    raise ValidationException("假期余额不能小于 0")
+                setattr(user, field_name, float(field_value))
     
     session.add(user)
     session.commit()
     session.refresh(user)
     
     return success_response(_enrich_user(user, session))
+
+
+@router.post("/users/{user_id}/reset-leave-balances", response_model=dict)
+async def reset_user_leave_balances(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Manually reset leave balances for a user. Only L0 can perform."""
+    user = session.get(User, user_id)
+    if not user:
+        raise NotFoundException("未找到用户")
+
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    current_level = _compute_level(current_user, user_map)
+    if current_level != 0:
+        raise ForbiddenException("仅 L0 级别员工可重置假期余额")
+
+    user.leave_annual_remaining = 5.0
+    user.leave_maternity_remaining = 15.0
+    user.leave_marriage_remaining = 3.0
+    user.leave_personal_remaining = 3.0
+    user.leave_sick_remaining = 3.0
+    user.leave_balance_reset_year = datetime.utcnow().year
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return success_response(_enrich_user(user, session, user_map))
+
+
+@router.post("/users/reset-leave-balances", response_model=dict)
+async def reset_all_users_leave_balances(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Manually reset leave balances for all users. Only L0 can perform."""
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    current_level = _compute_level(current_user, user_map)
+    if current_level != 0:
+        raise ForbiddenException("仅 L0 级别员工可重置假期余额")
+
+    current_year = datetime.utcnow().year
+    for user in all_users:
+        user.leave_annual_remaining = 5.0
+        user.leave_maternity_remaining = 15.0
+        user.leave_marriage_remaining = 3.0
+        user.leave_personal_remaining = 3.0
+        user.leave_sick_remaining = 3.0
+        user.leave_balance_reset_year = current_year
+        session.add(user)
+    session.commit()
+    return success_response({"message": "已重置所有员工假期余额", "count": len(all_users)})
 
 
 # ─── OurEntity endpoints ─────────────────────────────────────────────────────

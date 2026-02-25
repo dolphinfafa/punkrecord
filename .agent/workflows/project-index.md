@@ -46,7 +46,7 @@ punkrecord/
 |------|------------|------|
 | **auth** | `/api/v1` | 登录(`/login`)、登出(`/logout`)、当前用户(`/me`)；JWT Bearer Token |
 | **iam** | `/api/v1` | 用户、部门(OrgUnit)、职位(JobTitle)、法人主体(OurEntity)、角色权限、组织架构图 |
-| **todo** | `/api/v1/todos` | 待办全生命周期：创建→开始→提交→审批→完成/拒绝/阻塞/忽略 |
+| **todo** | `/api/v1/todo` | 待办全生命周期：创建→开始→提交→审批→完成/拒绝/阻塞/忽略；请假申请创建与查询 |
 | **contract** | `/api/v1` | 合同、对手方(Counterparty)、付款计划(PaymentPlan)、合同提交审批 |
 | **project** | `/api/v1` | 项目、阶段(Stage)、成员、待办关联、报价单导出Excel、功能清单、AI生成开发任务、合同画布、合同Word导出 |
 | **finance** | `/api/v1` | 账户(FinanceAccount)、收支流水(Transaction)、发票(Invoice)、报销(Reimbursement) |
@@ -83,6 +83,11 @@ OrgMembership: user_id, org_unit_id, job_title_id, is_primary
 TodoItem: title, description, source_type(manual/project_task), action_type, priority(low/medium/high/urgent),
           status(pending/in_progress/submitted/approved/rejected/done/blocked/dismissed),
           assignee_id→User, reporter_id→User, project_id→Project, due_date, started_at, completed_at
+LeaveRequest: applicant_user_id→User, leave_type(annual/maternity/marriage/personal/sick),
+              status(pending/approved/rejected/cancelled), start_at, end_at, reason
+User(假期余额): leave_annual_remaining(5), leave_maternity_remaining(15),
+              leave_marriage_remaining(3), leave_personal_remaining(3), leave_sick_remaining(3),
+              leave_balance_reset_year(最近重置年份标记)
 
 # Project
 Project: name, type(internal/client), status(planning/active/on_hold/completed/cancelled),
@@ -120,6 +125,17 @@ pending → [start] → in_progress → [submit] → submitted
 in_progress / submitted → [block]   → blocked
 Any → [dismiss] → dismissed
 ```
+
+### 工作台请假流程
+1. L0 员工（无直属上级）不可提交请假，L0 以下员工可提交
+2. 提交请假后：
+   - 创建 `LeaveRequest`（状态 `pending`）
+   - 在“待我审批”请假列表中由直属主管处理
+3. 直属主管审批通过后：
+   - `LeaveRequest` 变更为 `approved`
+   - 按请假类型扣减申请人的假期余额
+4. 驳回后：
+   - `LeaveRequest` 变更为 `rejected`
 
 ### 项目 → Todo 关联
 `project.py` `POST /projects/{id}/generate-dev-tasks` 调用 AI 生成 `TodoItem`（source_type=project_task），绑定 project_id 和 stage 信息。
@@ -226,6 +242,20 @@ curl http://localhost:8000/health
   - 新增接口：`DELETE /api/v1/project/projects/{project_id}/attachments/{attachment_id}`
   - `Project` 新增字段：`attachments`（JSON，存项目附件元数据）
   - SQLite 启动时自动补齐 `project.attachments` 列并修复空值（兼容旧库）
+- 工作台新增“请假功能”：
+  - 新增工作台请假申请表单、剩余假期展示、最近请假记录
+  - 新增“待我审批”列表（直属主管审批入口）
+  - 规则：L0 员工无需请假；L0 以下由直属主管审批
+  - 新增接口：`POST /api/v1/todo/leaves`
+  - 新增接口：`GET /api/v1/todo/leaves/my`
+  - 新增接口：`GET /api/v1/todo/leaves/team/pending`
+  - 新增接口：`POST /api/v1/todo/leaves/{leave_id}/approve`
+  - 新增接口：`POST /api/v1/todo/leaves/{leave_id}/reject`
+  - 新增模型：`LeaveRequest`
+  - 用户模型新增假期余额字段（L0 可在用户管理中编辑）
+  - 取消自动重置；改为 L0 手动重置
+  - 员工管理调整：重置入口从“编辑员工弹窗”迁移至“员工管理主页面统一入口”，支持一键重置所有员工
+  - 新增 IAM 接口：`POST /api/v1/iam/users/reset-leave-balances`（L0 触发全员重置）
 
 ---
 

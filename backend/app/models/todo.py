@@ -99,3 +99,36 @@ class NotificationLog(BaseDBModel, table=True):
     status: NotificationStatus = Field(default=NotificationStatus.PENDING, nullable=False)
     sent_at: Optional[datetime] = None
     error_message: Optional[str] = None
+
+
+class LeaveType(str, Enum):
+    """Leave type"""
+    ANNUAL = "annual"
+    MATERNITY = "maternity"
+    MARRIAGE = "marriage"
+    PERSONAL = "personal"
+    SICK = "sick"
+
+
+class LeaveStatus(str, Enum):
+    """Leave status"""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
+class LeaveRequest(BaseDBModel, table=True):
+    """Leave request model"""
+    __tablename__ = "leave_request"
+
+    our_entity_id: Optional[UUID] = Field(default=None, foreign_key="our_entity.id", index=True)
+    applicant_user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    leave_type: LeaveType = Field(nullable=False, index=True)
+    status: LeaveStatus = Field(default=LeaveStatus.PENDING, nullable=False, index=True)
+    start_at: datetime = Field(nullable=False)
+    end_at: datetime = Field(nullable=False)
+    reason: Optional[str] = None
+    approved_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    approved_at: Optional[datetime] = None
+    review_comment: Optional[str] = None

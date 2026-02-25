@@ -38,4 +38,11 @@ export const todoApi = {
     markDone: (id) => client.post(`/todo/${id}/done`),
     // Generic status update for DnD (Backward transitions)
     updateStatus: (id, status, comment) => client.post(`/todo/${id}/status`, { status, comment }),
+
+    // Leave requests
+    createLeave: (data) => client.post('/todo/leaves', data),
+    listMyLeaves: (params) => client.get('/todo/leaves/my', { params }),
+    listTeamPendingLeaves: () => client.get('/todo/leaves/team/pending'),
+    approveLeave: (leaveId) => client.post(`/todo/leaves/${leaveId}/approve`),
+    rejectLeave: (leaveId, comment) => client.post(`/todo/leaves/${leaveId}/reject`, { comment }),
 };

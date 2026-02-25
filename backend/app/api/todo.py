@@ -4,18 +4,23 @@ Todo API endpoints
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
+import math
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User
+from app.models.iam import User, OurEntity
 from app.models.todo import (
     TodoItem, TodoStatus, TodoSourceType, TodoActionType,
-    NotificationLog, NotificationChannel, NotificationStatus
+    NotificationLog, NotificationChannel, NotificationStatus,
+    LeaveRequest, LeaveType, LeaveStatus
 )
-from app.schemas.todo import TodoCreate, TodoUpdate, TodoReviewAction, TodoResponse
+from app.schemas.todo import (
+    TodoCreate, TodoUpdate, TodoReviewAction, TodoResponse,
+    LeaveRequestCreate, LeaveRequestResponse
+)
 from app.api.project import sync_project_progress
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
@@ -74,6 +79,48 @@ def _notify_user(user_id: UUID, todo: TodoItem, session: Session):
 def _is_direct_manager(manager: User, subordinate: User) -> bool:
     """Check if manager is the direct manager of subordinate."""
     return subordinate.manager_user_id == manager.id
+
+
+def _enrich_leave(leave: LeaveRequest, session: Session) -> LeaveRequestResponse:
+    """Build LeaveRequestResponse with resolved applicant name."""
+    applicant = session.get(User, leave.applicant_user_id)
+    data = LeaveRequestResponse.model_validate(leave)
+    data.applicant_name = applicant.display_name if applicant else None
+    return data
+
+
+def _compute_level(user: User, user_map: dict, max_depth: int = 20) -> int:
+    """Walk manager chain to compute org level. L0 = no manager."""
+    level = 0
+    current = user
+    visited = set()
+    while current.manager_user_id and level < max_depth:
+        if current.manager_user_id in visited:
+            break
+        visited.add(current.id)
+        parent = user_map.get(current.manager_user_id)
+        if not parent:
+            break
+        current = parent
+        level += 1
+    return level
+
+
+def _resolve_leave_balance_field(leave_type: LeaveType) -> str:
+    mapping = {
+        LeaveType.ANNUAL: "leave_annual_remaining",
+        LeaveType.MATERNITY: "leave_maternity_remaining",
+        LeaveType.MARRIAGE: "leave_marriage_remaining",
+        LeaveType.PERSONAL: "leave_personal_remaining",
+        LeaveType.SICK: "leave_sick_remaining",
+    }
+    return mapping[leave_type]
+
+
+def _calc_leave_days(start_at: datetime, end_at: datetime) -> int:
+    """Round up leave duration to whole days."""
+    seconds = (end_at - start_at).total_seconds()
+    return max(1, math.ceil(seconds / 86400))
 
 
 # ─── Create ──────────────────────────────────────────────────────────────────
@@ -201,6 +248,176 @@ async def get_team_todos(
         "pages": (total + page_size - 1) // page_size,
         "subordinates": [{"id": str(u.id), "display_name": u.display_name} for u in subordinates]
     })
+
+
+# ─── Leave requests ───────────────────────────────────────────────────────────
+
+@router.post("/leaves", response_model=dict)
+async def create_leave_request(
+    data: LeaveRequestCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a leave request for current user."""
+    if data.end_at <= data.start_at:
+        raise ValidationException("请假结束时间必须晚于开始时间")
+
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    current_level = _compute_level(current_user, user_map)
+    if current_level == 0:
+        raise ValidationException("L0 级别员工无需请假")
+    if not current_user.manager_user_id:
+        raise ValidationException("未配置直属主管，无法提交请假")
+
+    leave_type = LeaveType(data.leave_type)
+    leave_days = _calc_leave_days(data.start_at, data.end_at)
+    balance_field = _resolve_leave_balance_field(leave_type)
+    current_balance = float(getattr(current_user, balance_field, 0.0) or 0.0)
+    if leave_days > current_balance:
+        raise ValidationException(f"可用假期不足，当前剩余 {current_balance:.1f} 天")
+
+    our_entity_id = data.our_entity_id
+    if not our_entity_id:
+        default_entity = session.exec(select(OurEntity)).first()
+        if default_entity:
+            our_entity_id = default_entity.id
+    if not our_entity_id:
+        raise ValidationException("未找到可用主体，无法创建请假申请")
+
+    leave = LeaveRequest(
+        our_entity_id=our_entity_id,
+        applicant_user_id=current_user.id,
+        leave_type=leave_type,
+        status=LeaveStatus.PENDING,
+        start_at=data.start_at,
+        end_at=data.end_at,
+        reason=data.reason
+    )
+    session.add(leave)
+    session.commit()
+    session.refresh(leave)
+    return success_response(_enrich_leave(leave, session))
+
+
+@router.get("/leaves/my", response_model=dict)
+async def list_my_leave_requests(
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List current user's leave requests."""
+    query = select(LeaveRequest).where(LeaveRequest.applicant_user_id == current_user.id)
+    if status:
+        query = query.where(LeaveRequest.status == status)
+    query = query.order_by(LeaveRequest.created_at.desc())
+
+    total = len(session.exec(query).all())
+    offset = (page - 1) * page_size
+    leaves = session.exec(query.offset(offset).limit(page_size)).all()
+    return success_response({
+        "items": [_enrich_leave(item, session) for item in leaves],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size
+    })
+
+
+@router.get("/leaves/team/pending", response_model=dict)
+async def list_team_pending_leave_requests(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """List pending leave requests where current user is the direct manager approver."""
+    subordinates = session.exec(
+        select(User).where(User.manager_user_id == current_user.id)
+    ).all()
+    subordinate_ids = [u.id for u in subordinates]
+    if not subordinate_ids:
+        return success_response([])
+
+    from sqlmodel import col
+    requests = session.exec(
+        select(LeaveRequest)
+        .where(col(LeaveRequest.applicant_user_id).in_(subordinate_ids))
+        .where(LeaveRequest.status == LeaveStatus.PENDING)
+        .order_by(LeaveRequest.created_at.desc())
+    ).all()
+    return success_response([_enrich_leave(item, session) for item in requests])
+
+
+@router.post("/leaves/{leave_id}/approve", response_model=dict)
+async def approve_leave_request(
+    leave_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Approve leave request by direct manager and deduct leave balance."""
+    leave = session.get(LeaveRequest, leave_id)
+    if not leave:
+        raise NotFoundException("未找到请假申请")
+    if leave.status != LeaveStatus.PENDING:
+        raise ValidationException("仅待审批的请假可通过")
+
+    applicant = session.get(User, leave.applicant_user_id)
+    if not applicant:
+        raise NotFoundException("未找到请假申请人")
+    if applicant.manager_user_id != current_user.id:
+        raise ValidationException("仅直属主管可审批此请假申请")
+
+    leave_days = _calc_leave_days(leave.start_at, leave.end_at)
+    balance_field = _resolve_leave_balance_field(leave.leave_type)
+    current_balance = float(getattr(applicant, balance_field, 0.0) or 0.0)
+    if leave_days > current_balance:
+        raise ValidationException(f"请假申请人剩余假期不足（剩余 {current_balance:.1f} 天）")
+
+    setattr(applicant, balance_field, current_balance - leave_days)
+    leave.status = LeaveStatus.APPROVED
+    leave.approved_by_user_id = current_user.id
+    leave.approved_at = datetime.utcnow()
+    leave.review_comment = None
+    leave.updated_at = datetime.utcnow()
+    session.add(applicant)
+    session.add(leave)
+
+    session.commit()
+    session.refresh(leave)
+    return success_response(_enrich_leave(leave, session))
+
+
+@router.post("/leaves/{leave_id}/reject", response_model=dict)
+async def reject_leave_request(
+    leave_id: UUID,
+    data: TodoReviewAction,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Reject leave request by direct manager."""
+    leave = session.get(LeaveRequest, leave_id)
+    if not leave:
+        raise NotFoundException("未找到请假申请")
+    if leave.status != LeaveStatus.PENDING:
+        raise ValidationException("仅待审批的请假可拒绝")
+
+    applicant = session.get(User, leave.applicant_user_id)
+    if not applicant:
+        raise NotFoundException("未找到请假申请人")
+    if applicant.manager_user_id != current_user.id:
+        raise ValidationException("仅直属主管可审批此请假申请")
+
+    leave.status = LeaveStatus.REJECTED
+    leave.approved_by_user_id = current_user.id
+    leave.approved_at = datetime.utcnow()
+    leave.review_comment = data.comment or "请假申请未通过"
+    leave.updated_at = datetime.utcnow()
+    session.add(leave)
+
+    session.commit()
+    session.refresh(leave)
+    return success_response(_enrich_leave(leave, session))
 
 
 # ─── Single todo ─────────────────────────────────────────────────────────────

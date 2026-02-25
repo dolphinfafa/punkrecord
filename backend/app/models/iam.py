@@ -92,6 +92,14 @@ class User(BaseDBModel, table=True):
     job_title_id: Optional[UUID] = Field(default=None, foreign_key="job_title.id")
     department_id: Optional[UUID] = Field(default=None, foreign_key="org_unit.id")
 
+    # Leave balances (days)
+    leave_annual_remaining: float = Field(default=5.0, nullable=False)
+    leave_maternity_remaining: float = Field(default=15.0, nullable=False)
+    leave_marriage_remaining: float = Field(default=3.0, nullable=False)
+    leave_personal_remaining: float = Field(default=3.0, nullable=False)
+    leave_sick_remaining: float = Field(default=3.0, nullable=False)
+    leave_balance_reset_year: int = Field(default=datetime.utcnow().year, nullable=False)
+
     # Relationships
     user_roles: List["UserRole"] = Relationship(back_populates="user")
 

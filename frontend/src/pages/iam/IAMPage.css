@@ -104,14 +104,15 @@
 }
 
 .iam-modal {
-    background: var(--bg-mantle, #1e2030);
-    border: 1px solid var(--border-color);
+    background: #ffffff;
+    border: 1px solid #dbe3ee;
     border-radius: 12px;
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+    color: #0f172a;
 }
 
 .iam-modal-lg {
@@ -123,20 +124,20 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .iam-modal-header h3 {
     font-size: 16px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #0f172a;
     margin: 0;
 }
 
 .iam-modal-header button {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: #64748b;
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
@@ -146,7 +147,7 @@
 }
 
 .iam-modal-header button:hover {
-    color: var(--text-primary);
+    color: #0f172a;
 }
 
 .iam-modal-body {
@@ -173,17 +174,17 @@
 .iam-form-group label {
     font-size: 13px;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: #334155;
 }
 
 .iam-form-group input,
 .iam-form-group select,
 .iam-form-group textarea {
-    background: var(--bg-base, #24273a);
-    border: 1px solid var(--border-color);
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 10px 12px;
-    color: var(--text-primary);
+    color: #0f172a;
     font-size: 14px;
     outline: none;
     transition: border-color 0.2s;
@@ -193,11 +194,12 @@
 
 .iam-form-group input:focus,
 .iam-form-group select:focus {
-    border-color: var(--primary-color);
+    border-color: #3b82f6;
 }
 
 .iam-form-group select option {
-    background: var(--bg-mantle, #1e2030);
+    background: #ffffff;
+    color: #0f172a;
 }
 
 .iam-form-row {

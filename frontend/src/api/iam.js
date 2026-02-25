@@ -21,6 +21,12 @@ export const iamApi = {
     updateUser: async (userId, userData) => {
         return client.patch(`/iam/users/${userId}`, userData);
     },
+    resetUserLeaveBalances: async (userId) => {
+        return client.post(`/iam/users/${userId}/reset-leave-balances`);
+    },
+    resetAllLeaveBalances: async () => {
+        return client.post('/iam/users/reset-leave-balances');
+    },
 
     // Job Titles
     listJobTitles: async () => {

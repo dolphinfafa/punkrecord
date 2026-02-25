@@ -13,9 +13,9 @@ from app.models.approval import (
     ApprovalObjectType, ApprovalStatus, ApprovalStepStatus
 )
 from app.models.todo import (
-    TodoItem, NotificationLog,
+    TodoItem, NotificationLog, LeaveRequest,
     TodoSourceType, TodoActionType, TodoPriority, TodoStatus,
-    NotificationChannel, NotificationStatus
+    NotificationChannel, NotificationStatus, LeaveType, LeaveStatus
 )
 from app.models.contract import (
     Counterparty, Contract, ContractPaymentPlan,
@@ -52,9 +52,9 @@ __all__ = [
     "ApprovalObjectType", "ApprovalStatus", "ApprovalStepStatus",
     
     # Todo
-    "TodoItem", "NotificationLog",
+    "TodoItem", "NotificationLog", "LeaveRequest",
     "TodoSourceType", "TodoActionType", "TodoPriority", "TodoStatus",
-    "NotificationChannel", "NotificationStatus",
+    "NotificationChannel", "NotificationStatus", "LeaveType", "LeaveStatus",
     
     # Contract
     "Counterparty", "Contract", "ContractPaymentPlan",
