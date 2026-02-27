@@ -312,3 +312,26 @@ curl http://localhost:8000/health
     - `GET /api/v1/project/projects`
 - UI 可用性修复：
   - 交易创建弹窗增加专用样式文件，输入框改为浅色高对比，修复黑底可读性问题。
+
+---
+
+## 9. 增量更新（2026-02-27 追加）
+
+- 交易明细业务语义升级：
+  - 新增交易类型 `txn_type`：`receipt` / `payment` / `reimbursement`。
+  - 报销类型统一按支出方向处理（`txn_direction=out`）。
+- 交易对象扩展：
+  - 报销场景新增 `employee_user_id`，交易对象改为选择员工（来自用户管理 `GET /api/v1/iam/users`）。
+  - 非报销场景仍使用对手方 `counterparty_id`。
+- 交易状态体系调整：
+  - 状态改为三档：`未完成(unreconciled)`、`已完成(completed)`、`已对账(reconciled)`。
+  - 新增接口：`PATCH /api/v1/finance/transactions/{txn_id}`，支持在交易明细列表中直接编辑状态。
+- 账户余额口径更新：
+  - 账户余额仅统计“已完成/已对账”交易；“未完成”交易不入账。
+- SQLite 兼容修复：
+  - 自动补齐 `finance_transaction.txn_type`、`finance_transaction.employee_user_id`。
+  - 启动时自动规范历史枚举值（`txn_type/reconcile_status`）到 ORM 可识别格式，修复交易列表 500。
+- 前端可用性修复：
+  - 报销员工下拉使用用户管理员工列表，修复空列表问题。
+  - 交易列表状态选择器改为浅色高对比样式，修复黑色不可读。
+  - 财务页 IAM 用户请求 `page_size` 调整为 100，修复 422。

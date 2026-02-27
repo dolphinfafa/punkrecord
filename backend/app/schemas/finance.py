@@ -56,16 +56,24 @@ class TransactionCreate(BaseModel):
     """Transaction creation schema"""
     our_entity_id: UUID
     account_id: UUID
+    txn_type: str = "payment"  # receipt / payment / reimbursement
     txn_direction: str  # in or out
     amount: Decimal
     currency: str = "CNY"
     txn_date: date
     counterparty_id: Optional[UUID] = None
+    employee_user_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     purpose: Optional[str] = None
     channel: Optional[str] = None
     reference_no: Optional[str] = None
     attachments: list = Field(default_factory=list)
+    reconcile_status: str = "unreconciled"
+
+
+class TransactionUpdate(BaseModel):
+    """Transaction update schema"""
+    reconcile_status: Optional[str] = None  # unreconciled / completed / reconciled
 
 
 class TransactionResponse(BaseModel):
@@ -73,11 +81,13 @@ class TransactionResponse(BaseModel):
     id: UUID
     our_entity_id: UUID
     account_id: UUID
+    txn_type: str
     txn_direction: str
     amount: Decimal
     currency: str
     txn_date: date
     counterparty_id: Optional[UUID] = None
+    employee_user_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     purpose: Optional[str] = None
     attachments: list = Field(default_factory=list)

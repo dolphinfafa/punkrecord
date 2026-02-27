@@ -29,9 +29,17 @@ class TransactionDirection(str, Enum):
     OUT = "out"
 
 
+class TransactionType(str, Enum):
+    """Transaction business type"""
+    RECEIPT = "receipt"
+    PAYMENT = "payment"
+    REIMBURSEMENT = "reimbursement"
+
+
 class ReconcileStatus(str, Enum):
     """Reconcile status"""
     UNRECONCILED = "unreconciled"
+    COMPLETED = "completed"
     RECONCILED = "reconciled"
 
 
@@ -104,12 +112,14 @@ class FinanceTransaction(BaseDBModel, table=True):
     our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)
     account_id: UUID = Field(foreign_key="finance_account.id", nullable=False, index=True)
     
+    txn_type: TransactionType = Field(default=TransactionType.PAYMENT, nullable=False, index=True)
     txn_direction: TransactionDirection = Field(nullable=False)
     amount: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
     currency: str = Field(default="CNY", nullable=False)
     txn_date: date = Field(nullable=False, index=True)
     
     counterparty_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id")
+    employee_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id", index=True)
     purpose: Optional[str] = None
     channel: Optional[str] = None

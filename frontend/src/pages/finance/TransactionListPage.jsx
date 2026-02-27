@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import financeApi from '@/api/finance';
 import { contractApi } from '@/api/contract';
+import iamApi from '@/api/iam';
 import CreateTransactionModal from './components/CreateTransactionModal';
 
-const STATUS_MAP = {
-    unreconciled: { label: '未对账', color: 'bg-yellow-500' },
-    reconciled: { label: '已对账', color: 'bg-green-500' }
+const TXN_TYPE_MAP = {
+    receipt: '收款',
+    payment: '付款',
+    reimbursement: '报销'
 };
 
 export default function TransactionListPage() {
@@ -15,6 +17,8 @@ export default function TransactionListPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [accountsMap, setAccountsMap] = useState({});
     const [contractsMap, setContractsMap] = useState({});
+    const [usersMap, setUsersMap] = useState({});
+    const [updatingStatusId, setUpdatingStatusId] = useState('');
 
     useEffect(() => {
         loadData();
@@ -23,10 +27,11 @@ export default function TransactionListPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [txnRes, accRes, contractRes] = await Promise.all([
+            const [txnRes, accRes, contractRes, usersRes] = await Promise.all([
                 financeApi.listTransactions({ page_size: 200 }),
                 financeApi.listAccounts(),
-                contractApi.listContracts({ page_size: 200 })
+                contractApi.listContracts({ page_size: 200 }),
+                iamApi.listUsers({ page_size: 100 })
             ]);
 
             setTransactions(txnRes.data?.items || []);
@@ -42,12 +47,33 @@ export default function TransactionListPage() {
                 contractMap[contract.id] = `${contract.contract_no} - ${contract.name}`;
             });
             setContractsMap(contractMap);
+
+            const employeeMap = {};
+            (usersRes.data?.items || []).forEach(user => {
+                employeeMap[user.id] = user.display_name;
+            });
+            setUsersMap(employeeMap);
             setError(null);
         } catch (err) {
             setError(err.message || '加载交易失败');
             console.error('Error loading transaction detail:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleStatusChange = async (txnId, nextStatus) => {
+        try {
+            setUpdatingStatusId(txnId);
+            await financeApi.updateTransaction(txnId, { reconcile_status: nextStatus });
+            setTransactions(prev => prev.map(item => (
+                item.id === txnId ? { ...item, reconcile_status: nextStatus } : item
+            )));
+        } catch (err) {
+            console.error('Failed to update transaction status', err);
+            alert('更新状态失败: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setUpdatingStatusId('');
         }
     };
 
@@ -67,8 +93,10 @@ export default function TransactionListPage() {
                     <thead>
                         <tr>
                             <th>日期</th>
+                            <th>交易类型</th>
                             <th>描述</th>
                             <th>账户</th>
+                            <th>交易对象</th>
                             <th>关联合同</th>
                             <th>发票附件</th>
                             <th className="text-right">金额</th>
@@ -78,7 +106,7 @@ export default function TransactionListPage() {
                     <tbody>
                         {transactions.length === 0 ? (
                             <tr>
-                                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
+                                <td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>
                                     暂无交易记录。点击“新增交易明细”创建。
                                 </td>
                             </tr>
@@ -86,8 +114,14 @@ export default function TransactionListPage() {
                             transactions.map(txn => (
                                 <tr key={txn.id}>
                                     <td>{txn.txn_date || '-'}</td>
+                                    <td>{TXN_TYPE_MAP[txn.txn_type] || (txn.txn_direction === 'in' ? '收款' : '付款')}</td>
                                     <td>{txn.purpose || '-'}</td>
                                     <td>{accountsMap[txn.account_id] || txn.account_id}</td>
+                                    <td>
+                                        {txn.txn_type === 'reimbursement'
+                                            ? (usersMap[txn.employee_user_id] || txn.employee_user_id || '-')
+                                            : '-'}
+                                    </td>
                                     <td>{txn.contract_id ? (contractsMap[txn.contract_id] || txn.contract_id) : '-'}</td>
                                     <td>{(txn.attachments || []).length > 0 ? `${txn.attachments.length} 份` : '未上传'}</td>
                                     <td className={`text-right ${txn.txn_direction === 'in' ? 'text-success' : 'text-danger'}`}>
@@ -95,9 +129,22 @@ export default function TransactionListPage() {
                                         {(txn.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                                     </td>
                                     <td>
-                                        <span className={`status-badge ${txn.reconcile_status || 'unreconciled'} ${STATUS_MAP[txn.reconcile_status]?.color || 'bg-yellow-500'}`}>
-                                            {STATUS_MAP[txn.reconcile_status]?.label || '未对账'}
-                                        </span>
+                                        <select
+                                            className="form-select"
+                                            value={txn.reconcile_status || 'unreconciled'}
+                                            disabled={updatingStatusId === txn.id}
+                                            onChange={(e) => handleStatusChange(txn.id, e.target.value)}
+                                            style={{
+                                                minWidth: 120,
+                                                backgroundColor: '#ffffff',
+                                                color: '#0f172a',
+                                                border: '1px solid #cbd5e1'
+                                            }}
+                                        >
+                                            <option value="unreconciled">未完成</option>
+                                            <option value="completed">已完成</option>
+                                            <option value="reconciled">已对账</option>
+                                        </select>
                                     </td>
                                 </tr>
                             ))

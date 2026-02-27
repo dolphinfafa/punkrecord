@@ -29,7 +29,7 @@ from app.models.project import (
 from app.models.finance import (
     FinanceAccount, FinanceTransaction, FinanceInvoice,
     InvoiceRequest, Reimbursement,
-    AccountCategory, AccountStatus, TransactionDirection,
+    AccountCategory, AccountStatus, TransactionDirection, TransactionType,
     ReconcileStatus, InvoiceKind, InvoiceMedium, OCRStatus,
     InvoiceRequestStatus, ReimbursementStatus
 )
@@ -68,7 +68,7 @@ __all__ = [
     # Finance
     "FinanceAccount", "FinanceTransaction", "FinanceInvoice",
     "InvoiceRequest", "Reimbursement",
-    "AccountCategory", "AccountStatus", "TransactionDirection",
+    "AccountCategory", "AccountStatus", "TransactionDirection", "TransactionType",
     "ReconcileStatus", "InvoiceKind", "InvoiceMedium", "OCRStatus",
     "InvoiceRequestStatus", "ReimbursementStatus",
     

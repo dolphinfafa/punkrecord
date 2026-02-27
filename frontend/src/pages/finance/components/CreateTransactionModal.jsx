@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from '@/components/common/Modal';
 import financeApi from '@/api/finance';
 import { contractApi } from '@/api/contract';
+import iamApi from '@/api/iam';
 import './CreateTransactionModal.css';
 
 function filesToAttachmentPayload(files) {
@@ -21,21 +22,31 @@ function filesToAttachmentPayload(files) {
     })));
 }
 
-export default function CreateTransactionModal({ isOpen, onClose, onSuccess, initialDirection = 'out' }) {
+const TXN_TYPE_OPTIONS = [
+    { value: 'receipt', label: '收款', direction: 'in' },
+    { value: 'payment', label: '付款', direction: 'out' },
+    { value: 'reimbursement', label: '报销', direction: 'out' }
+];
+
+export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
         account_id: '',
-        txn_direction: initialDirection, // in / out
+        txn_type: 'payment',
+        txn_direction: 'out',
         amount: '',
         currency: 'CNY',
         txn_date: new Date().toISOString().split('T')[0],
         purpose: '',
         counterparty_id: '',
+        employee_user_id: '',
         contract_id: '',
         our_entity_id: '', // Will be auto-filled based on account
-        attachments: []
+        attachments: [],
+        reconcile_status: 'unreconciled'
     });
     const [accounts, setAccounts] = useState([]);
     const [counterparties, setCounterparties] = useState([]);
+    const [users, setUsers] = useState([]);
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -44,29 +55,34 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
             loadDependencies();
             setFormData({
                 account_id: '',
-                txn_direction: initialDirection,
+                txn_type: 'payment',
+                txn_direction: 'out',
                 amount: '',
                 currency: 'CNY',
                 txn_date: new Date().toISOString().split('T')[0],
                 purpose: '',
                 counterparty_id: '',
+                employee_user_id: '',
                 contract_id: '',
                 our_entity_id: '',
-                attachments: []
+                attachments: [],
+                reconcile_status: 'unreconciled'
             });
         }
-    }, [isOpen, initialDirection]);
+    }, [isOpen]);
 
     const loadDependencies = async () => {
         try {
-            const [accRes, cpRes, contractRes] = await Promise.all([
+            const [accRes, cpRes, contractRes, userRes] = await Promise.all([
                 financeApi.listAccounts(),
                 contractApi.listCounterparties(),
-                contractApi.listContracts()
+                contractApi.listContracts(),
+                iamApi.listUsers({ page_size: 100 })
             ]);
             setAccounts(accRes.data || []);
             setCounterparties(cpRes.data || []);
             setContracts(contractRes.data?.items || []);
+            setUsers(userRes.data?.items || []);
         } catch (error) {
             console.error('Failed to load dependencies', error);
         }
@@ -82,6 +98,15 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
                 account_id: value,
                 our_entity_id: selectedAccount ? selectedAccount.entity_id : '',
                 currency: selectedAccount ? selectedAccount.currency : prev.currency
+            }));
+        } else if (name === 'txn_type') {
+            const selectedType = TXN_TYPE_OPTIONS.find(option => option.value === value);
+            setFormData(prev => ({
+                ...prev,
+                txn_type: value,
+                txn_direction: selectedType?.direction || prev.txn_direction,
+                counterparty_id: value === 'reimbursement' ? '' : prev.counterparty_id,
+                employee_user_id: value === 'reimbursement' ? prev.employee_user_id : ''
             }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
@@ -129,11 +154,16 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
                 alert('账户关联实体无效');
                 return;
             }
+            if (formData.txn_type === 'reimbursement' && !formData.employee_user_id) {
+                alert('报销交易请选择员工');
+                return;
+            }
 
             const payload = {
                 ...formData,
                 amount: Number(formData.amount),
-                counterparty_id: formData.counterparty_id || null,
+                counterparty_id: formData.txn_type === 'reimbursement' ? null : (formData.counterparty_id || null),
+                employee_user_id: formData.txn_type === 'reimbursement' ? (formData.employee_user_id || null) : null,
                 contract_id: formData.contract_id || null
             };
 
@@ -157,39 +187,35 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
         </>
     );
 
+    const modalTitleMap = {
+        receipt: '记录收款',
+        payment: '记录付款',
+        reimbursement: '记录报销'
+    };
+
     return (
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={formData.txn_direction === 'in' ? '记录收款' : '记录付款'}
+            title={modalTitleMap[formData.txn_type] || '新增交易明细'}
             footer={footer}
             className="finance-transaction-modal"
         >
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label>交易类型</label>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <label className="radio-label">
-                            <input
-                                type="radio"
-                                name="txn_direction"
-                                value="in"
-                                checked={formData.txn_direction === 'in'}
-                                onChange={handleChange}
-                            />
-                            收入
-                        </label>
-                        <label className="radio-label">
-                            <input
-                                type="radio"
-                                name="txn_direction"
-                                value="out"
-                                checked={formData.txn_direction === 'out'}
-                                onChange={handleChange}
-                            />
-                            支出
-                        </label>
-                    </div>
+                    <select
+                        name="txn_type"
+                        className="form-select"
+                        value={formData.txn_type}
+                        onChange={handleChange}
+                    >
+                        {TXN_TYPE_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="form-group">
@@ -237,18 +263,35 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
                 </div>
 
                 <div className="form-group">
-                    <label>交易对象 (可选)</label>
-                    <select
-                        name="counterparty_id"
-                        className="form-select"
-                        value={formData.counterparty_id}
-                        onChange={handleChange}
-                    >
-                        <option value="">无</option>
-                        {counterparties.map(cp => (
-                            <option key={cp.id} value={cp.id}>{cp.name}</option>
-                        ))}
-                    </select>
+                    <label>交易对象 {formData.txn_type === 'reimbursement' ? '' : '(可选)'}</label>
+                    {formData.txn_type === 'reimbursement' ? (
+                        <select
+                            name="employee_user_id"
+                            className="form-select"
+                            value={formData.employee_user_id}
+                            onChange={handleChange}
+                            required
+                        >
+                            <option value="">请选择员工</option>
+                            {users.map(user => (
+                                <option key={user.id} value={user.id}>
+                                    {user.display_name || user.username}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <select
+                            name="counterparty_id"
+                            className="form-select"
+                            value={formData.counterparty_id}
+                            onChange={handleChange}
+                        >
+                            <option value="">无</option>
+                            {counterparties.map(cp => (
+                                <option key={cp.id} value={cp.id}>{cp.name}</option>
+                            ))}
+                        </select>
+                    )}
                 </div>
 
                 <div className="form-group">
@@ -278,6 +321,20 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess, ini
                         onChange={handleChange}
                         placeholder="例如：采购付款、服务费..."
                     />
+                </div>
+
+                <div className="form-group">
+                    <label>状态</label>
+                    <select
+                        name="reconcile_status"
+                        className="form-select"
+                        value={formData.reconcile_status}
+                        onChange={handleChange}
+                    >
+                        <option value="unreconciled">未完成</option>
+                        <option value="completed">已完成</option>
+                        <option value="reconciled">已对账</option>
+                    </select>
                 </div>
 
                 <div className="form-group">

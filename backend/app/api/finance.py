@@ -13,13 +13,13 @@ from app.core.response import success_response
 from app.models.iam import User
 from app.models.finance import (
     FinanceAccount, FinanceTransaction, FinanceInvoice, Reimbursement,
-    AccountCategory, AccountStatus, TransactionDirection,
+    AccountCategory, AccountStatus, TransactionDirection, TransactionType,
     ReconcileStatus, InvoiceKind, InvoiceMedium, OCRStatus,
     ReimbursementStatus
 )
 from app.schemas.finance import (
     FinanceAccountCreate, FinanceAccountUpdate, FinanceAccountResponse,
-    TransactionCreate, TransactionResponse,
+    TransactionCreate, TransactionUpdate, TransactionResponse,
     InvoiceCreate, InvoiceResponse,
     ReimbursementCreate, ReimbursementResponse
 )
@@ -73,6 +73,8 @@ async def list_accounts(
         
         current_balance = account.initial_balance
         for txn in txns:
+            if txn.reconcile_status not in {ReconcileStatus.COMPLETED, ReconcileStatus.RECONCILED}:
+                continue
             if txn.txn_direction == TransactionDirection.IN:
                 current_balance += txn.amount
             else:
@@ -138,20 +140,29 @@ async def create_transaction(
     current_user: User = Depends(get_current_user)
 ):
     """Create transaction"""
+    txn_type = TransactionType(data.txn_type)
+    txn_direction = TransactionDirection(data.txn_direction)
+    if txn_type == TransactionType.RECEIPT:
+        txn_direction = TransactionDirection.IN
+    elif txn_type in {TransactionType.PAYMENT, TransactionType.REIMBURSEMENT}:
+        txn_direction = TransactionDirection.OUT
+
     transaction = FinanceTransaction(
         our_entity_id=data.our_entity_id,
         account_id=data.account_id,
-        txn_direction=TransactionDirection(data.txn_direction),
+        txn_type=txn_type,
+        txn_direction=txn_direction,
         amount=data.amount,
         currency=data.currency,
         txn_date=data.txn_date,
-        counterparty_id=data.counterparty_id,
+        counterparty_id=data.counterparty_id if txn_type != TransactionType.REIMBURSEMENT else None,
+        employee_user_id=data.employee_user_id if txn_type == TransactionType.REIMBURSEMENT else None,
         contract_id=data.contract_id,
         purpose=data.purpose,
         channel=data.channel,
         reference_no=data.reference_no,
         attachments=data.attachments,
-        reconcile_status=ReconcileStatus.UNRECONCILED,
+        reconcile_status=ReconcileStatus(data.reconcile_status),
         created_by_user_id=current_user.id
     )
     
@@ -169,14 +180,14 @@ async def create_transaction(
             # Purchase contract: expense decreases pending (our payment), income increases pending (supplier refund)
             
             if contract.contract_type == ContractType.SALES:
-                if data.txn_direction == 'in':
+                if txn_direction == TransactionDirection.IN:
                     # Customer payment - decrease pending amount
                     contract.pending_amount -= data.amount
                 else:  # 'out'
                     # Refund to customer - increase pending amount
                     contract.pending_amount += data.amount
             elif contract.contract_type == ContractType.PURCHASE:
-                if data.txn_direction == 'out':
+                if txn_direction == TransactionDirection.OUT:
                     # Our payment - decrease pending amount
                     contract.pending_amount -= data.amount
                 else:  # 'in'
@@ -187,6 +198,29 @@ async def create_transaction(
             session.add(contract)
             session.commit()
     
+    return success_response(TransactionResponse.model_validate(transaction))
+
+
+@router.patch("/transactions/{txn_id}", response_model=dict)
+async def update_transaction(
+    txn_id: UUID,
+    data: TransactionUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Update transaction status"""
+    transaction = session.get(FinanceTransaction, txn_id)
+    if not transaction:
+        raise NotFoundException("未找到交易")
+
+    if data.reconcile_status is not None:
+        transaction.reconcile_status = ReconcileStatus(data.reconcile_status)
+
+    transaction.updated_at = datetime.utcnow()
+    session.add(transaction)
+    session.commit()
+    session.refresh(transaction)
+
     return success_response(TransactionResponse.model_validate(transaction))
 
 

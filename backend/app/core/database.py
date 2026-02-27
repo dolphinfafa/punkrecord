@@ -77,6 +77,40 @@ def _ensure_legacy_columns():
             "UPDATE project_stage SET attachments = '[]' WHERE attachments IS NULL"
         )
 
+        transaction_columns = {
+            row[1] for row in conn.exec_driver_sql(
+                "PRAGMA table_info('finance_transaction')"
+            ).fetchall()
+        }
+        if "txn_type" not in transaction_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE finance_transaction ADD COLUMN txn_type VARCHAR(32) NOT NULL DEFAULT 'payment'"
+            )
+        if "employee_user_id" not in transaction_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE finance_transaction ADD COLUMN employee_user_id CHAR(32)"
+            )
+        conn.exec_driver_sql(
+            "UPDATE finance_transaction SET txn_type = CASE "
+            "WHEN LOWER(txn_direction) = 'in' OR txn_direction = 'IN' THEN 'RECEIPT' "
+            "ELSE 'PAYMENT' END "
+            "WHERE txn_type IS NULL OR txn_type = ''"
+        )
+        conn.exec_driver_sql(
+            "UPDATE finance_transaction SET txn_type = CASE "
+            "WHEN LOWER(txn_type) = 'receipt' THEN 'RECEIPT' "
+            "WHEN LOWER(txn_type) = 'payment' THEN 'PAYMENT' "
+            "WHEN LOWER(txn_type) = 'reimbursement' THEN 'REIMBURSEMENT' "
+            "ELSE txn_type END"
+        )
+        conn.exec_driver_sql(
+            "UPDATE finance_transaction SET reconcile_status = CASE "
+            "WHEN LOWER(reconcile_status) = 'unreconciled' THEN 'UNRECONCILED' "
+            "WHEN LOWER(reconcile_status) = 'completed' THEN 'COMPLETED' "
+            "WHEN LOWER(reconcile_status) = 'reconciled' THEN 'RECONCILED' "
+            "ELSE reconcile_status END"
+        )
+
 
 def get_session():
     """Get database session"""

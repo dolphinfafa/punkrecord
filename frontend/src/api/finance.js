@@ -30,6 +30,10 @@ export const financeApi = {
         return client.get(`/finance/transactions/${txnId}`);
     },
 
+    updateTransaction: async (txnId, data) => {
+        return client.patch(`/finance/transactions/${txnId}`, data);
+    },
+
     // Invoices
     listInvoices: async (params = {}) => {
         const { page = 1, page_size = 20, invoice_kind } = params;
