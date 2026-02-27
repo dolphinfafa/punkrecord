@@ -2,18 +2,37 @@ import React, { useState, useEffect } from 'react';
 import Modal from '@/components/common/Modal';
 import financeApi from '@/api/finance';
 import { contractApi } from '@/api/contract';
+import './CreateTransactionModal.css';
 
-export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
+function filesToAttachmentPayload(files) {
+    return Promise.all(files.map(file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            resolve({
+                name: file.name,
+                type: file.type || 'application/octet-stream',
+                size: file.size,
+                uploaded_at: new Date().toISOString(),
+                content: reader.result
+            });
+        };
+        reader.onerror = () => reject(new Error(`读取文件失败: ${file.name}`));
+        reader.readAsDataURL(file);
+    })));
+}
+
+export default function CreateTransactionModal({ isOpen, onClose, onSuccess, initialDirection = 'out' }) {
     const [formData, setFormData] = useState({
         account_id: '',
-        txn_direction: 'out', // in / out
+        txn_direction: initialDirection, // in / out
         amount: '',
         currency: 'CNY',
         txn_date: new Date().toISOString().split('T')[0],
         purpose: '',
         counterparty_id: '',
         contract_id: '',
-        our_entity_id: '' // Will be auto-filled based on account
+        our_entity_id: '', // Will be auto-filled based on account
+        attachments: []
     });
     const [accounts, setAccounts] = useState([]);
     const [counterparties, setCounterparties] = useState([]);
@@ -25,17 +44,18 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
             loadDependencies();
             setFormData({
                 account_id: '',
-                txn_direction: 'out',
+                txn_direction: initialDirection,
                 amount: '',
                 currency: 'CNY',
                 txn_date: new Date().toISOString().split('T')[0],
                 purpose: '',
                 counterparty_id: '',
                 contract_id: '',
-                our_entity_id: ''
+                our_entity_id: '',
+                attachments: []
             });
         }
-    }, [isOpen]);
+    }, [isOpen, initialDirection]);
 
     const loadDependencies = async () => {
         try {
@@ -66,6 +86,33 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
+    };
+
+    const handleInvoiceFilesChange = async (e) => {
+        const selectedFiles = Array.from(e.target.files || []);
+        if (selectedFiles.length === 0) {
+            return;
+        }
+
+        try {
+            const payloadFiles = await filesToAttachmentPayload(selectedFiles);
+            setFormData(prev => ({
+                ...prev,
+                attachments: [...prev.attachments, ...payloadFiles]
+            }));
+        } catch (error) {
+            console.error('Failed to process invoice files', error);
+            alert(error.message || '处理发票文件失败');
+        } finally {
+            e.target.value = '';
+        }
+    };
+
+    const removeInvoiceFile = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            attachments: prev.attachments.filter((_, i) => i !== index)
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -114,8 +161,9 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="记录交易"
+            title={formData.txn_direction === 'in' ? '记录收款' : '记录付款'}
             footer={footer}
+            className="finance-transaction-modal"
         >
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
@@ -230,6 +278,34 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
                         onChange={handleChange}
                         placeholder="例如：采购付款、服务费..."
                     />
+                </div>
+
+                <div className="form-group">
+                    <label>上传发票</label>
+                    <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.heic"
+                        className="form-input"
+                        onChange={handleInvoiceFilesChange}
+                    />
+                    {formData.attachments.length > 0 && (
+                        <div style={{ marginTop: '0.5rem', display: 'grid', gap: '0.4rem' }}>
+                            {formData.attachments.map((file, index) => (
+                                <div key={`${file.name}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                    <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.2rem 0.5rem' }}
+                                        onClick={() => removeInvoiceFile(index)}
+                                    >
+                                        删除
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </form>
         </Modal>

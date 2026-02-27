@@ -1,0 +1,20 @@
+.finance-transaction-modal .form-input,
+.finance-transaction-modal .form-select {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+}
+
+.finance-transaction-modal .form-input::placeholder {
+    color: #64748b;
+}
+
+.finance-transaction-modal .form-input:focus,
+.finance-transaction-modal .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.finance-transaction-modal input[type="file"].form-input {
+    padding: 0.45rem 0.6rem;
+}

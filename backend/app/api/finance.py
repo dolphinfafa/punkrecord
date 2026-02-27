@@ -150,6 +150,7 @@ async def create_transaction(
         purpose=data.purpose,
         channel=data.channel,
         reference_no=data.reference_no,
+        attachments=data.attachments,
         reconcile_status=ReconcileStatus.UNRECONCILED,
         created_by_user_id=current_user.id
     )
@@ -194,7 +195,7 @@ async def list_transactions(
     account_id: Optional[UUID] = Query(None),
     txn_direction: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -274,7 +275,7 @@ async def create_invoice(
 async def list_invoices(
     invoice_kind: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -333,7 +334,7 @@ async def create_reimbursement(
 async def list_reimbursements(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):

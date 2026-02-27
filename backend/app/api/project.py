@@ -205,7 +205,7 @@ async def list_projects(
     status: Optional[str] = Query(None),
     project_type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):

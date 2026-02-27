@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FinanceAccountCreate(BaseModel):
@@ -65,6 +65,7 @@ class TransactionCreate(BaseModel):
     purpose: Optional[str] = None
     channel: Optional[str] = None
     reference_no: Optional[str] = None
+    attachments: list = Field(default_factory=list)
 
 
 class TransactionResponse(BaseModel):
@@ -79,6 +80,7 @@ class TransactionResponse(BaseModel):
     counterparty_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     purpose: Optional[str] = None
+    attachments: list = Field(default_factory=list)
     reconcile_status: str
     related_object_type: Optional[str] = None
     related_object_id: Optional[UUID] = None
@@ -136,6 +138,7 @@ class ReimbursementResponse(BaseModel):
     project_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     total_amount: Decimal
+    expense_lines: list = Field(default_factory=list)
     status: str
     paid_txn_id: Optional[UUID] = None
     created_at: datetime

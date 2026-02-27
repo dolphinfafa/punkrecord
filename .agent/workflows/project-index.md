@@ -285,3 +285,30 @@ curl http://localhost:8000/health
   - B2B ��Ŀ `test`����ղ��ؽ� `64 -> 64`����Դ�׶Σ�������룩
   - B2C ��Ŀ `��Ϻ��`����ղ��ؽ� `30 -> 30`����Դ�׶Σ���Ŀ���
   - `project_member` �ս�ɫ���`3 -> 0`
+
+---
+
+## 8. 增量更新（2026-02-27）
+
+- 财务交易明细页面重构：
+  - 先实现“收款/付款/报销”三分区视图与分区数据加载；
+  - 后按业务确认改为单入口方案，仅保留“新增交易明细”按钮与统一交易列表。
+- 新增交易明细能力增强：
+  - 创建交易弹窗支持“上传发票”并随交易提交（`attachments`）。
+  - 交易列表新增“发票附件”列，显示附件数量。
+- 报销能力落地（首版）：
+  - 新增 `CreateReimbursementModal`，支持主体来源账户、关联合同/项目、费用明细与附件。
+  - 报销列表展示费用条目数、状态和金额。
+- 接口与数据结构补齐：
+  - 前端 `financeApi.listTransactions` 支持透传 `txn_direction/account_id` 查询。
+  - 后端交易创建接口支持接收并存储 `attachments` 字段。
+  - 报销返回结构补充 `expense_lines`。
+- 422 分页参数修复：
+  - 为兼容前端 `page_size=200`，将以下列表接口分页上限从 `100` 提升到 `200`：
+    - `GET /api/v1/finance/transactions`
+    - `GET /api/v1/finance/invoices`
+    - `GET /api/v1/finance/reimbursements`
+    - `GET /api/v1/contract/contracts`
+    - `GET /api/v1/project/projects`
+- UI 可用性修复：
+  - 交易创建弹窗增加专用样式文件，输入框改为浅色高对比，修复黑底可读性问题。
