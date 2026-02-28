@@ -27,6 +27,19 @@ export const iamApi = {
     resetAllLeaveBalances: async () => {
         return client.post('/iam/users/reset-leave-balances');
     },
+    // Beli rules
+    listBeliRules: async () => {
+        return client.get('/iam/beli-rules');
+    },
+    createBeliRule: async (data) => {
+        return client.post('/iam/beli-rules', data);
+    },
+    updateBeliRule: async (id, data) => {
+        return client.patch(`/iam/beli-rules/${id}`, data);
+    },
+    deleteBeliRule: async (id) => {
+        return client.delete(`/iam/beli-rules/${id}`);
+    },
 
     // Job Titles
     listJobTitles: async () => {

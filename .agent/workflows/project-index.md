@@ -365,3 +365,26 @@ curl http://localhost:8000/health
   - Todo 列表请求分页参数调整为 page_size=100（避免超限 422）；
   - 待办卡片与列表新增“项目”标签（优先 todo.link.project_name，兜底“项目任务”）。
 
+
+---
+
+## 11. Incremental Update (2026-02-28 Night, User Points)
+
+- Added user points management in IAM (unit: Beli).
+  - `User` now has `beili_balance` (default 0).
+  - User list includes a Beli balance column.
+  - L0 admin can manually adjust Beli balance in user edit.
+
+- Added Beli rule model and APIs.
+  - Fields: `name`, `enabled`, `early_days`, `reward_beili`, `late_days`, `penalty_beili`, `note`.
+  - Endpoints:
+    - `GET /api/v1/iam/beli-rules`
+    - `POST /api/v1/iam/beli-rules` (L0)
+    - `PATCH /api/v1/iam/beli-rules/{rule_id}` (L0)
+    - `DELETE /api/v1/iam/beli-rules/{rule_id}` (L0)
+
+- Linked todo completion with Beli settlement.
+  - Apply enabled rules based on due date vs done date.
+  - Reward for early completion, penalty for late completion.
+  - Idempotency via `todo.link.beli_applied`.
+  - Audit fields saved in `todo.link`: `beli_delta`, `beli_days_diff`, `beli_rule_hits`, `beli_applied_at`.

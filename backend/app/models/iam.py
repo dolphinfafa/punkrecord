@@ -99,6 +99,7 @@ class User(BaseDBModel, table=True):
     leave_personal_remaining: float = Field(default=3.0, nullable=False)
     leave_sick_remaining: float = Field(default=3.0, nullable=False)
     leave_balance_reset_year: int = Field(default=datetime.utcnow().year, nullable=False)
+    beili_balance: float = Field(default=0.0, nullable=False)
 
     # Relationships
     user_roles: List["UserRole"] = Relationship(back_populates="user")
@@ -164,3 +165,16 @@ class OrgMembership(BaseDBModel, table=True):
     org_unit_id: UUID = Field(foreign_key="org_unit.id", nullable=False)
     title: Optional[str] = None
     is_manager: bool = Field(default=False, nullable=False)
+
+
+class BeliRule(BaseDBModel, table=True):
+    """Reward/penalty rule for task completion timing."""
+    __tablename__ = "beli_rule"
+
+    name: str = Field(nullable=False, index=True)
+    enabled: bool = Field(default=True, nullable=False)
+    early_days: int = Field(default=0, nullable=False)  # complete >= N days early
+    reward_beili: float = Field(default=0.0, nullable=False)
+    late_days: int = Field(default=0, nullable=False)   # complete >= N days late
+    penalty_beili: float = Field(default=0.0, nullable=False)
+    note: Optional[str] = None

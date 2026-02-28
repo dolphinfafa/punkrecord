@@ -11,13 +11,14 @@ from app.core.auth import get_current_user
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit
+from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse,
     OurEntityCreate, OurEntityResponse,
     JobTitleCreate, JobTitleUpdate, JobTitleResponse,
     DepartmentCreate, DepartmentUpdate, DepartmentResponse,
     OrgChartNode,
+    BeliRuleCreate, BeliRuleUpdate, BeliRuleResponse,
 )
 
 router = APIRouter(prefix="/iam", tags=["IAM"])
@@ -40,6 +41,14 @@ def _compute_level(user: User, user_map: dict, max_depth: int = 20) -> int:
         current = parent
         level += 1
     return level
+
+
+def _require_l0(current_user: User, session: Session):
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    current_level = _compute_level(current_user, user_map)
+    if current_level != 0:
+        raise ForbiddenException("仅 L0 级别员工可操作")
 
 
 def _enrich_user(user: User, session: Session, user_map: dict = None) -> UserResponse:
@@ -88,6 +97,7 @@ def _enrich_user(user: User, session: Session, user_map: dict = None) -> UserRes
         leave_marriage_remaining=user.leave_marriage_remaining,
         leave_personal_remaining=user.leave_personal_remaining,
         leave_sick_remaining=user.leave_sick_remaining,
+        beili_balance=user.beili_balance,
         created_at=user.created_at,
     )
 
@@ -345,6 +355,102 @@ async def get_org_chart(
     return success_response(tree)
 
 
+# 鈹€鈹€鈹€ Beli Rule endpoints 鈹€鈹€鈹€
+
+@router.get("/beli-rules", response_model=dict)
+async def list_beli_rules(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    rules = session.exec(select(BeliRule).order_by(BeliRule.created_at.desc())).all()
+    return success_response([BeliRuleResponse.model_validate(r) for r in rules])
+
+
+@router.post("/beli-rules", response_model=dict)
+async def create_beli_rule(
+    data: BeliRuleCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    _require_l0(current_user, session)
+    if data.early_days < 0 or data.late_days < 0:
+        raise ValidationException("天数阈值不能小于 0")
+    if data.reward_beili < 0 or data.penalty_beili < 0:
+        raise ValidationException("贝利数值不能小于 0")
+    rule = BeliRule(
+        name=data.name.strip(),
+        enabled=data.enabled,
+        early_days=data.early_days,
+        reward_beili=float(data.reward_beili),
+        late_days=data.late_days,
+        penalty_beili=float(data.penalty_beili),
+        note=data.note,
+    )
+    if not rule.name:
+        raise ValidationException("规则名称不能为空")
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    return success_response(BeliRuleResponse.model_validate(rule))
+
+
+@router.patch("/beli-rules/{rule_id}", response_model=dict)
+async def update_beli_rule(
+    rule_id: UUID,
+    data: BeliRuleUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    _require_l0(current_user, session)
+    rule = session.get(BeliRule, rule_id)
+    if not rule:
+        raise NotFoundException("未找到贝利规则")
+    if data.name is not None:
+        name = data.name.strip()
+        if not name:
+            raise ValidationException("规则名称不能为空")
+        rule.name = name
+    if data.enabled is not None:
+        rule.enabled = data.enabled
+    if data.early_days is not None:
+        if data.early_days < 0:
+            raise ValidationException("提前天数不能小于 0")
+        rule.early_days = data.early_days
+    if data.reward_beili is not None:
+        if data.reward_beili < 0:
+            raise ValidationException("奖励贝利不能小于 0")
+        rule.reward_beili = float(data.reward_beili)
+    if data.late_days is not None:
+        if data.late_days < 0:
+            raise ValidationException("延迟天数不能小于 0")
+        rule.late_days = data.late_days
+    if data.penalty_beili is not None:
+        if data.penalty_beili < 0:
+            raise ValidationException("扣除贝利不能小于 0")
+        rule.penalty_beili = float(data.penalty_beili)
+    if data.note is not None:
+        rule.note = data.note
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    return success_response(BeliRuleResponse.model_validate(rule))
+
+
+@router.delete("/beli-rules/{rule_id}", response_model=dict)
+async def delete_beli_rule(
+    rule_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    _require_l0(current_user, session)
+    rule = session.get(BeliRule, rule_id)
+    if not rule:
+        raise NotFoundException("未找到贝利规则")
+    session.delete(rule)
+    session.commit()
+    return success_response({"message": "规则已删除"})
+
+
 # ─── User endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/users", response_model=dict)
@@ -459,17 +565,20 @@ async def update_user(
         ("leave_personal_remaining", user_data.leave_personal_remaining),
         ("leave_sick_remaining", user_data.leave_sick_remaining),
     ]
-    if any(value is not None for _, value in leave_fields):
+    beili_update_requested = user_data.beili_balance is not None
+    if any(value is not None for _, value in leave_fields) or beili_update_requested:
         all_users = session.exec(select(User)).all()
         user_map = {u.id: u for u in all_users}
         current_level = _compute_level(current_user, user_map)
         if current_level != 0:
-            raise ForbiddenException("仅 L0 级别员工可调整假期余额")
+            raise ForbiddenException("仅 L0 级别员工可调整假期余额和贝利")
         for field_name, field_value in leave_fields:
             if field_value is not None:
                 if field_value < 0:
                     raise ValidationException("假期余额不能小于 0")
                 setattr(user, field_name, float(field_value))
+        if beili_update_requested:
+            user.beili_balance = float(user_data.beili_balance)
     
     session.add(user)
     session.commit()

@@ -11,7 +11,7 @@ from app.core.database import get_session
 from app.core.auth import get_current_user
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity
+from app.models.iam import User, OurEntity, BeliRule
 from app.models.todo import (
     TodoItem, TodoStatus, TodoSourceType, TodoActionType,
     NotificationLog, NotificationChannel, NotificationStatus,
@@ -121,6 +121,51 @@ def _calc_leave_days(start_at: datetime, end_at: datetime) -> int:
     """Round up leave duration to whole days."""
     seconds = (end_at - start_at).total_seconds()
     return max(1, math.ceil(seconds / 86400))
+
+
+def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
+    """Apply active Beli rules once when a todo is completed."""
+    link = dict(todo.link or {})
+    if link.get("beli_applied"):
+        return
+
+    if not todo.due_at or not todo.done_at:
+        link["beli_applied"] = True
+        link["beli_delta"] = 0.0
+        link["beli_applied_at"] = datetime.utcnow().isoformat()
+        todo.link = link
+        session.add(todo)
+        return
+
+    assignee = session.get(User, todo.assignee_user_id)
+    if not assignee:
+        return
+
+    # positive => finished early; negative => finished late
+    days_diff = (todo.due_at.date() - todo.done_at.date()).days
+    rules = session.exec(select(BeliRule).where(BeliRule.enabled == True)).all()
+    delta = 0.0
+    hits = []
+    for rule in rules:
+        rule_delta = 0.0
+        if rule.early_days > 0 and rule.reward_beili > 0 and days_diff >= rule.early_days:
+            rule_delta += float(rule.reward_beili)
+        if rule.late_days > 0 and rule.penalty_beili > 0 and (-days_diff) >= rule.late_days:
+            rule_delta -= float(rule.penalty_beili)
+        if rule_delta != 0:
+            delta += rule_delta
+            hits.append({"rule_id": str(rule.id), "name": rule.name, "delta": rule_delta})
+
+    assignee.beili_balance = float(assignee.beili_balance or 0.0) + delta
+    session.add(assignee)
+
+    link["beli_applied"] = True
+    link["beli_delta"] = delta
+    link["beli_applied_at"] = datetime.utcnow().isoformat()
+    link["beli_days_diff"] = days_diff
+    link["beli_rule_hits"] = hits
+    todo.link = link
+    session.add(todo)
 
 
 # ─── Create ──────────────────────────────────────────────────────────────────
@@ -560,7 +605,8 @@ async def submit_todo(
         todo.done_by_user_id = current_user.id
         todo.reviewed_by_user_id = current_user.id  # Auto-approved
         todo.updated_at = datetime.utcnow()
-        
+        _apply_beli_rules_on_done(todo, session)
+
         session.add(todo)
         session.commit()
         session.refresh(todo)
@@ -626,6 +672,7 @@ async def approve_todo(
     todo.reviewed_by_user_id = current_user.id
     todo.review_comment = data.comment
     todo.updated_at = datetime.utcnow()
+    _apply_beli_rules_on_done(todo, session)
 
     session.add(todo)
     session.commit()
@@ -706,7 +753,8 @@ async def mark_todo_done(
         todo.done_by_user_id = current_user.id
         todo.reviewed_by_user_id = current_user.id
         todo.updated_at = datetime.utcnow()
-        
+        _apply_beli_rules_on_done(todo, session)
+
         session.add(todo)
         session.commit()
         session.refresh(todo)

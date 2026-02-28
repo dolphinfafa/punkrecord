@@ -38,6 +38,13 @@ def _ensure_legacy_columns():
             "leave_personal_remaining": 3.0,
             "leave_sick_remaining": 3.0,
         }
+        if "beili_balance" not in user_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE user ADD COLUMN beili_balance FLOAT NOT NULL DEFAULT 0"
+            )
+        conn.exec_driver_sql(
+            "UPDATE user SET beili_balance = 0 WHERE beili_balance IS NULL"
+        )
         current_year = datetime.utcnow().year
         if "leave_balance_reset_year" not in user_columns:
             conn.exec_driver_sql(

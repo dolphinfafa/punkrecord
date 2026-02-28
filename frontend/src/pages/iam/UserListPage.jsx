@@ -11,6 +11,7 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
         password: '', is_shareholder: false,
         manager_user_id: '', job_title_id: '', department_id: '', status: 'active',
         leave_annual_remaining: 5, leave_maternity_remaining: 15, leave_marriage_remaining: 3, leave_personal_remaining: 3, leave_sick_remaining: 3,
+        beili_balance: 0,
     });
     const [loading, setLoading] = useState(false);
     const isEdit = !!initialData;
@@ -33,9 +34,10 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                 leave_marriage_remaining: initialData.leave_marriage_remaining ?? 3,
                 leave_personal_remaining: initialData.leave_personal_remaining ?? 3,
                 leave_sick_remaining: initialData.leave_sick_remaining ?? 3,
+                beili_balance: initialData.beili_balance ?? 0,
             });
         } else {
-            setForm({ display_name: '', username: '', email: '', phone: '', password: '', is_shareholder: false, manager_user_id: '', job_title_id: '', department_id: '', status: 'active', leave_annual_remaining: 5, leave_maternity_remaining: 15, leave_marriage_remaining: 3, leave_personal_remaining: 3, leave_sick_remaining: 3 });
+            setForm({ display_name: '', username: '', email: '', phone: '', password: '', is_shareholder: false, manager_user_id: '', job_title_id: '', department_id: '', status: 'active', leave_annual_remaining: 5, leave_maternity_remaining: 15, leave_marriage_remaining: 3, leave_personal_remaining: 3, leave_sick_remaining: 3, beili_balance: 0 });
         }
     }, [initialData, isOpen]);
 
@@ -72,6 +74,7 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                 data.leave_marriage_remaining = Number(form.leave_marriage_remaining || 0);
                 data.leave_personal_remaining = Number(form.leave_personal_remaining || 0);
                 data.leave_sick_remaining = Number(form.leave_sick_remaining || 0);
+                data.beili_balance = Number(form.beili_balance || 0);
             }
             await onSubmit(data);
             onClose();
@@ -190,6 +193,14 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                             仅 L0 级别员工可修改假期余额
                         </div>
                     )}
+                    {isEdit && (
+                        <div className="iam-form-row">
+                            <div className="iam-form-group">
+                                <label>贝利余额</label>
+                                <input type="number" step="1" value={form.beili_balance} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, beili_balance: e.target.value }))} />
+                            </div>
+                        </div>
+                    )}
                     <div className="iam-modal-footer">
                         <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
                         <button type="submit" className="btn-primary" disabled={loading}>{loading ? '保存中...' : '保存'}</button>
@@ -244,8 +255,116 @@ function LeaveResetModal({ isOpen, onClose, onConfirm }) {
     );
 }
 
+function BeliRuleModal({ isOpen, onClose, onSubmit, initialData }) {
+    const [form, setForm] = useState({
+        name: '',
+        enabled: true,
+        early_days: 1,
+        reward_beili: 10,
+        late_days: 1,
+        penalty_beili: 5,
+        note: '',
+    });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (initialData) {
+            setForm({
+                name: initialData.name || '',
+                enabled: initialData.enabled ?? true,
+                early_days: initialData.early_days ?? 1,
+                reward_beili: initialData.reward_beili ?? 10,
+                late_days: initialData.late_days ?? 1,
+                penalty_beili: initialData.penalty_beili ?? 5,
+                note: initialData.note || '',
+            });
+        } else {
+            setForm({
+                name: '',
+                enabled: true,
+                early_days: 1,
+                reward_beili: 10,
+                late_days: 1,
+                penalty_beili: 5,
+                note: '',
+            });
+        }
+    }, [initialData, isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await onSubmit({
+                ...form,
+                early_days: Number(form.early_days || 0),
+                reward_beili: Number(form.reward_beili || 0),
+                late_days: Number(form.late_days || 0),
+                penalty_beili: Number(form.penalty_beili || 0),
+            });
+            onClose();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="iam-modal-overlay" onClick={onClose}>
+            <div className="iam-modal" onClick={e => e.stopPropagation()}>
+                <div className="iam-modal-header">
+                    <h3>{initialData ? '编辑贝利规则' : '新建贝利规则'}</h3>
+                    <button onClick={onClose}><X size={18} /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="iam-modal-body">
+                    <div className="iam-form-group">
+                        <label>规则名称 *</label>
+                        <input required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="例如：任务时效规则A" />
+                    </div>
+                    <div className="iam-form-row">
+                        <div className="iam-form-group">
+                            <label>提前天数阈值 X</label>
+                            <input type="number" min="0" value={form.early_days} onChange={e => setForm(p => ({ ...p, early_days: e.target.value }))} />
+                        </div>
+                        <div className="iam-form-group">
+                            <label>奖励贝利 A</label>
+                            <input type="number" min="0" value={form.reward_beili} onChange={e => setForm(p => ({ ...p, reward_beili: e.target.value }))} />
+                        </div>
+                    </div>
+                    <div className="iam-form-row">
+                        <div className="iam-form-group">
+                            <label>延迟天数阈值 X</label>
+                            <input type="number" min="0" value={form.late_days} onChange={e => setForm(p => ({ ...p, late_days: e.target.value }))} />
+                        </div>
+                        <div className="iam-form-group">
+                            <label>扣除贝利 B</label>
+                            <input type="number" min="0" value={form.penalty_beili} onChange={e => setForm(p => ({ ...p, penalty_beili: e.target.value }))} />
+                        </div>
+                    </div>
+                    <div className="iam-form-group">
+                        <label>备注</label>
+                        <textarea rows={2} value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} />
+                    </div>
+                    <div className="iam-form-group">
+                        <label className="iam-checkbox-label">
+                            <input type="checkbox" checked={form.enabled} onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))} />
+                            启用规则
+                        </label>
+                    </div>
+                    <div className="iam-modal-footer">
+                        <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
+                        <button type="submit" className="btn-primary" disabled={loading}>{loading ? '保存中...' : '保存'}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export default function UserListPage() {
     const [users, setUsers] = useState([]);
+    const [beliRules, setBeliRules] = useState([]);
     const [jobTitles, setJobTitles] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -255,6 +374,8 @@ export default function UserListPage() {
     const [search, setSearch] = useState('');
     const [currentUserLevel, setCurrentUserLevel] = useState(null);
     const [resetModalOpen, setResetModalOpen] = useState(false);
+    const [beliRuleModalOpen, setBeliRuleModalOpen] = useState(false);
+    const [editBeliRule, setEditBeliRule] = useState(null);
 
     const showNotification = (msg, type = 'success') => {
         setNotification({ msg, type });
@@ -275,6 +396,8 @@ export default function UserListPage() {
             setCurrentUserLevel(me?.level ?? null);
             setJobTitles(jtRes.data || []);
             setDepartments(deptRes.data || []);
+            const ruleRes = await iamApi.listBeliRules();
+            setBeliRules(ruleRes.data || []);
         } catch {
             showNotification('加载数据失败', 'error');
         } finally {
@@ -299,6 +422,25 @@ export default function UserListPage() {
     const handleResetLeaveBalances = async () => {
         await iamApi.resetAllLeaveBalances();
         showNotification('所有员工假期余额已重置为默认值');
+        load();
+    };
+
+    const handleCreateBeliRule = async (data) => {
+        await iamApi.createBeliRule(data);
+        showNotification('贝利规则创建成功');
+        load();
+    };
+
+    const handleEditBeliRule = async (data) => {
+        await iamApi.updateBeliRule(editBeliRule.id, data);
+        showNotification('贝利规则更新成功');
+        load();
+    };
+
+    const handleDeleteBeliRule = async (rule) => {
+        if (!window.confirm(`确认删除规则「${rule.name}」吗？`)) return;
+        await iamApi.deleteBeliRule(rule.id);
+        showNotification('贝利规则已删除');
         load();
     };
 
@@ -345,13 +487,14 @@ export default function UserListPage() {
                                 <th>职位</th>
                                 <th>直属上级</th>
                                 <th>级别</th>
+                                <th>贝利</th>
                                 <th>状态</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
+                                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
                             ) : filtered.map(user => (
                                 <tr key={user.id}>
                                     <td>
@@ -366,6 +509,11 @@ export default function UserListPage() {
                                     <td style={{ color: 'var(--text-secondary)' }}>{user.manager_name || '—'}</td>
                                     <td>
                                         <span className="badge" style={{ background: 'rgba(138,173,244,0.15)', color: 'var(--primary-color)' }}>L{user.level ?? 0}</span>
+                                    </td>
+                                    <td>
+                                        <span className="badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#047857' }}>
+                                            {Number(user.beili_balance || 0).toFixed(0)} 贝利
+                                        </span>
                                     </td>
                                     <td>
                                         <span className={`status-badge ${user.status}`}>
@@ -384,6 +532,54 @@ export default function UserListPage() {
                 </div>
             )}
 
+            <div className="card" style={{ marginTop: '1rem', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                    <h3 style={{ margin: 0 }}>贝利规则管理</h3>
+                    {currentUserLevel === 0 && (
+                        <button className="btn-primary" onClick={() => { setEditBeliRule(null); setBeliRuleModalOpen(true); }}>
+                            <Plus size={14} /> 新建规则
+                        </button>
+                    )}
+                </div>
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>规则名称</th>
+                            <th>提前奖励</th>
+                            <th>延迟扣减</th>
+                            <th>状态</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(beliRules || []).length === 0 ? (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1.2rem' }}>暂无规则</td></tr>
+                        ) : (beliRules || []).map(rule => (
+                            <tr key={rule.id}>
+                                <td>{rule.name}</td>
+                                <td>提前 {rule.early_days} 天 +{rule.reward_beili} 贝利</td>
+                                <td>延迟 {rule.late_days} 天 -{rule.penalty_beili} 贝利</td>
+                                <td>{rule.enabled ? '启用' : '停用'}</td>
+                                <td>{rule.note || '-'}</td>
+                                <td>
+                                    {currentUserLevel === 0 ? (
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <button className="btn-link" onClick={() => { setEditBeliRule(rule); setBeliRuleModalOpen(true); }}>
+                                                <Edit2 size={14} /> 编辑
+                                            </button>
+                                            <button className="btn-link" onClick={() => handleDeleteBeliRule(rule)}>
+                                                <X size={14} /> 删除
+                                            </button>
+                                        </div>
+                                    ) : '-'}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
             <UserModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
@@ -399,6 +595,13 @@ export default function UserListPage() {
                 isOpen={resetModalOpen}
                 onClose={() => setResetModalOpen(false)}
                 onConfirm={handleResetLeaveBalances}
+            />
+
+            <BeliRuleModal
+                isOpen={beliRuleModalOpen}
+                onClose={() => setBeliRuleModalOpen(false)}
+                onSubmit={editBeliRule ? handleEditBeliRule : handleCreateBeliRule}
+                initialData={editBeliRule}
             />
         </div>
     );

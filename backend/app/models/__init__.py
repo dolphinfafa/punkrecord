@@ -5,7 +5,7 @@ Import all models here for easy access
 from app.models.base import BaseDBModel, UUIDModel, TimestampModel
 from app.models.iam import (
     User, Role, Permission, RolePermission, UserRole,
-    OurEntity, OrgUnit, OrgMembership,
+    OurEntity, OrgUnit, OrgMembership, BeliRule,
     UserStatus, OurEntityType, OurEntityStatus, ScopeType
 )
 from app.models.approval import (
@@ -44,7 +44,7 @@ __all__ = [
     
     # IAM
     "User", "Role", "Permission", "RolePermission", "UserRole",
-    "OurEntity", "OrgUnit", "OrgMembership",
+    "OurEntity", "OrgUnit", "OrgMembership", "BeliRule",
     "UserStatus", "OurEntityType", "OurEntityStatus", "ScopeType",
     
     # Approval

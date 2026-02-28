@@ -110,6 +110,7 @@ class UserUpdate(BaseModel):
     leave_marriage_remaining: Optional[float] = None
     leave_personal_remaining: Optional[float] = None
     leave_sick_remaining: Optional[float] = None
+    beili_balance: Optional[float] = None
 
 
 class UserResponse(BaseModel):
@@ -133,6 +134,7 @@ class UserResponse(BaseModel):
     leave_marriage_remaining: float = 3.0
     leave_personal_remaining: float = 3.0
     leave_sick_remaining: float = 3.0
+    beili_balance: float = 0.0
     created_at: datetime
     
     class Config:
@@ -178,3 +180,39 @@ class OrgChartNode(BaseModel):
     children: List["OrgChartNode"] = []
 
 OrgChartNode.model_rebuild()
+
+
+class BeliRuleCreate(BaseModel):
+    name: str
+    enabled: bool = True
+    early_days: int = 0
+    reward_beili: float = 0.0
+    late_days: int = 0
+    penalty_beili: float = 0.0
+    note: Optional[str] = None
+
+
+class BeliRuleUpdate(BaseModel):
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    early_days: Optional[int] = None
+    reward_beili: Optional[float] = None
+    late_days: Optional[int] = None
+    penalty_beili: Optional[float] = None
+    note: Optional[str] = None
+
+
+class BeliRuleResponse(BaseModel):
+    id: UUID
+    name: str
+    enabled: bool
+    early_days: int
+    reward_beili: float
+    late_days: int
+    penalty_beili: float
+    note: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
