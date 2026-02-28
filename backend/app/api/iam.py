@@ -11,7 +11,7 @@ from app.core.auth import get_current_user
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule
+from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse,
     OurEntityCreate, OurEntityResponse,
@@ -22,6 +22,7 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/iam", tags=["IAM"])
+_BELI_RULE_TYPES = {item.value for item in BeliRuleType}
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -373,12 +374,16 @@ async def create_beli_rule(
     current_user: User = Depends(get_current_user)
 ):
     _require_l0(current_user, session)
+    rule_type = (data.rule_type or "").strip()
+    if rule_type not in _BELI_RULE_TYPES:
+        raise ValidationException("invalid rule_type")
     if data.early_days < 0 or data.late_days < 0:
         raise ValidationException("天数阈值不能小于 0")
     if data.reward_beili < 0 or data.penalty_beili < 0:
         raise ValidationException("贝利数值不能小于 0")
     rule = BeliRule(
         name=data.name.strip(),
+        rule_type=BeliRuleType(rule_type),
         enabled=data.enabled,
         early_days=data.early_days,
         reward_beili=float(data.reward_beili),
@@ -410,6 +415,11 @@ async def update_beli_rule(
         if not name:
             raise ValidationException("规则名称不能为空")
         rule.name = name
+    if data.rule_type is not None:
+        rule_type = data.rule_type.strip()
+        if rule_type not in _BELI_RULE_TYPES:
+            raise ValidationException("invalid rule_type")
+        rule.rule_type = BeliRuleType(rule_type)
     if data.enabled is not None:
         rule.enabled = data.enabled
     if data.early_days is not None:
@@ -565,8 +575,8 @@ async def update_user(
         ("leave_personal_remaining", user_data.leave_personal_remaining),
         ("leave_sick_remaining", user_data.leave_sick_remaining),
     ]
-    beili_update_requested = user_data.beili_balance is not None
-    if any(value is not None for _, value in leave_fields) or beili_update_requested:
+    beili_adjust_requested = user_data.beili_adjust_amount is not None or user_data.beili_adjust_action is not None
+    if any(value is not None for _, value in leave_fields) or beili_adjust_requested:
         all_users = session.exec(select(User)).all()
         user_map = {u.id: u for u in all_users}
         current_level = _compute_level(current_user, user_map)
@@ -577,8 +587,16 @@ async def update_user(
                 if field_value < 0:
                     raise ValidationException("假期余额不能小于 0")
                 setattr(user, field_name, float(field_value))
-        if beili_update_requested:
-            user.beili_balance = float(user_data.beili_balance)
+        if beili_adjust_requested:
+            if user_data.beili_adjust_action not in ("add", "subtract"):
+                raise ValidationException("beili_adjust_action must be add or subtract")
+            if user_data.beili_adjust_amount is None or float(user_data.beili_adjust_amount) <= 0:
+                raise ValidationException("beili_adjust_amount must be > 0")
+            adjust_amount = float(user_data.beili_adjust_amount)
+            if user_data.beili_adjust_action == "add":
+                user.beili_balance = float(user.beili_balance or 0.0) + adjust_amount
+            else:
+                user.beili_balance = float(user.beili_balance or 0.0) - adjust_amount
     
     session.add(user)
     session.commit()

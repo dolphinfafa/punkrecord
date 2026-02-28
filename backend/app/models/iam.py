@@ -37,6 +37,11 @@ class ScopeType(str, Enum):
     ALL_ENTITIES = "all_entities"
 
 
+class BeliRuleType(str, Enum):
+    """Beli rule type enumeration."""
+    TASK_TIMELINESS = "task_timeliness"
+
+
 # Models
 
 class OurEntity(BaseDBModel, table=True):
@@ -172,6 +177,7 @@ class BeliRule(BaseDBModel, table=True):
     __tablename__ = "beli_rule"
 
     name: str = Field(nullable=False, index=True)
+    rule_type: BeliRuleType = Field(default=BeliRuleType.TASK_TIMELINESS, nullable=False, index=True)
     enabled: bool = Field(default=True, nullable=False)
     early_days: int = Field(default=0, nullable=False)  # complete >= N days early
     reward_beili: float = Field(default=0.0, nullable=False)

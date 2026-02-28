@@ -388,3 +388,26 @@ curl http://localhost:8000/health
   - Reward for early completion, penalty for late completion.
   - Idempotency via `todo.link.beli_applied`.
   - Audit fields saved in `todo.link`: `beli_delta`, `beli_days_diff`, `beli_rule_hits`, `beli_applied_at`.
+
+---
+
+## 12. Incremental Update (2026-02-28 Late Night, Beli Rule Refinement)
+
+- Separated Beli rule management as an independent IAM module.
+  - New page: `/iam/beli-rules`.
+  - Navigation now shows it in parallel with Users / Departments / Job Titles.
+
+- Added rule type support for Beli rules.
+  - New field: `rule_type`.
+  - Current supported value: `task_timeliness` (task early/late completion).
+  - UI supports selecting rule type when creating/editing rules.
+
+- Updated settlement semantics to threshold-based one-time trigger.
+  - Not "every X days" accumulation.
+  - Once threshold is met, apply one reward/penalty hit.
+  - If multiple rules match in the same direction, choose the best threshold match only.
+
+- Changed admin employee Beli operation from absolute override to delta adjustment.
+  - New update payload: `beili_adjust_action` + `beili_adjust_amount`.
+  - Actions: `add` / `subtract`.
+  - User edit modal now displays current Beli balance before adjustment.

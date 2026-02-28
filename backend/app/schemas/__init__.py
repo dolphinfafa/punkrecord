@@ -110,7 +110,8 @@ class UserUpdate(BaseModel):
     leave_marriage_remaining: Optional[float] = None
     leave_personal_remaining: Optional[float] = None
     leave_sick_remaining: Optional[float] = None
-    beili_balance: Optional[float] = None
+    beili_adjust_action: Optional[str] = None  # add | subtract
+    beili_adjust_amount: Optional[float] = None
 
 
 class UserResponse(BaseModel):
@@ -184,6 +185,7 @@ OrgChartNode.model_rebuild()
 
 class BeliRuleCreate(BaseModel):
     name: str
+    rule_type: str = "task_timeliness"
     enabled: bool = True
     early_days: int = 0
     reward_beili: float = 0.0
@@ -194,6 +196,7 @@ class BeliRuleCreate(BaseModel):
 
 class BeliRuleUpdate(BaseModel):
     name: Optional[str] = None
+    rule_type: Optional[str] = None
     enabled: Optional[bool] = None
     early_days: Optional[int] = None
     reward_beili: Optional[float] = None
@@ -205,6 +208,7 @@ class BeliRuleUpdate(BaseModel):
 class BeliRuleResponse(BaseModel):
     id: UUID
     name: str
+    rule_type: str
     enabled: bool
     early_days: int
     reward_beili: float

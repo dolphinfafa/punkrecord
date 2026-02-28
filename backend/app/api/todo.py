@@ -11,7 +11,7 @@ from app.core.database import get_session
 from app.core.auth import get_current_user
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity, BeliRule
+from app.models.iam import User, OurEntity, BeliRule, BeliRuleType
 from app.models.todo import (
     TodoItem, TodoStatus, TodoSourceType, TodoActionType,
     NotificationLog, NotificationChannel, NotificationStatus,
@@ -143,18 +143,31 @@ def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
 
     # positive => finished early; negative => finished late
     days_diff = (todo.due_at.date() - todo.done_at.date()).days
-    rules = session.exec(select(BeliRule).where(BeliRule.enabled == True)).all()
+    rules = session.exec(
+        select(BeliRule).where(BeliRule.enabled == True).where(BeliRule.rule_type == BeliRuleType.TASK_TIMELINESS)
+    ).all()
     delta = 0.0
     hits = []
-    for rule in rules:
-        rule_delta = 0.0
-        if rule.early_days > 0 and rule.reward_beili > 0 and days_diff >= rule.early_days:
-            rule_delta += float(rule.reward_beili)
-        if rule.late_days > 0 and rule.penalty_beili > 0 and (-days_diff) >= rule.late_days:
-            rule_delta -= float(rule.penalty_beili)
-        if rule_delta != 0:
-            delta += rule_delta
-            hits.append({"rule_id": str(rule.id), "name": rule.name, "delta": rule_delta})
+
+    early_matches = [
+        rule for rule in rules
+        if rule.early_days > 0 and rule.reward_beili > 0 and days_diff >= rule.early_days
+    ]
+    if early_matches:
+        early_rule = max(early_matches, key=lambda item: (item.early_days, item.reward_beili))
+        early_delta = float(early_rule.reward_beili)
+        delta += early_delta
+        hits.append({"rule_id": str(early_rule.id), "name": early_rule.name, "delta": early_delta})
+
+    late_matches = [
+        rule for rule in rules
+        if rule.late_days > 0 and rule.penalty_beili > 0 and (-days_diff) >= rule.late_days
+    ]
+    if late_matches:
+        late_rule = max(late_matches, key=lambda item: (item.late_days, item.penalty_beili))
+        late_delta = -float(late_rule.penalty_beili)
+        delta += late_delta
+        hits.append({"rule_id": str(late_rule.id), "name": late_rule.name, "delta": late_delta})
 
     assignee.beili_balance = float(assignee.beili_balance or 0.0) + delta
     session.add(assignee)

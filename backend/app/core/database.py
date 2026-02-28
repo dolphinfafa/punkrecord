@@ -62,6 +62,20 @@ def _ensure_legacy_columns():
                 f"UPDATE user SET {col_name} = {default_val} WHERE {col_name} IS NULL"
             )
 
+        beli_rule_columns = {
+            row[1] for row in conn.exec_driver_sql(
+                "PRAGMA table_info('beli_rule')"
+            ).fetchall()
+        }
+        if beli_rule_columns and "rule_type" not in beli_rule_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE beli_rule ADD COLUMN rule_type VARCHAR(64) NOT NULL DEFAULT 'task_timeliness'"
+            )
+        if beli_rule_columns:
+            conn.exec_driver_sql(
+                "UPDATE beli_rule SET rule_type = 'task_timeliness' WHERE rule_type IS NULL OR rule_type = ''"
+            )
+
         project_columns = {
             row[1] for row in conn.exec_driver_sql(
                 "PRAGMA table_info('project')"

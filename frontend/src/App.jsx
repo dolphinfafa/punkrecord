@@ -14,6 +14,7 @@ import EntityListPage from '@/pages/iam/EntityListPage';
 import DepartmentPage from '@/pages/iam/DepartmentPage';
 import JobTitlePage from '@/pages/iam/JobTitlePage';
 import OrgChartPage from '@/pages/iam/OrgChartPage';
+import BeliRulePage from '@/pages/iam/BeliRulePage';
 import ContractLayout from '@/pages/contract/ContractLayout';
 import ContractListPage from '@/pages/contract/ContractListPage';
 import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
@@ -56,6 +57,7 @@ function App() {
               <Route path="entities" element={<EntityListPage />} />
               <Route path="departments" element={<DepartmentPage />} />
               <Route path="job-titles" element={<JobTitlePage />} />
+              <Route path="beli-rules" element={<BeliRulePage />} />
               <Route path="org-chart" element={<OrgChartPage />} />
             </Route>
             <Route path="contract" element={<ContractLayout />}>
