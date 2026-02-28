@@ -80,6 +80,9 @@ export const projectApi = {
     updateProjectTodoPlan: async (projectId, todoId, data) => {
         return client.post(`/project/projects/${projectId}/todos/${todoId}/plan`, data);
     },
+    deleteProjectTodo: async (projectId, todoId) => {
+        return client.delete(`/project/projects/${projectId}/todos/${todoId}`);
+    },
 
     // Dev Task Generation
     getProjectFeatureList: async (projectId) => {

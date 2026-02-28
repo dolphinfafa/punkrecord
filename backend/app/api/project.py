@@ -932,6 +932,36 @@ async def update_project_todo_plan(
     return success_response(resp)
 
 
+@router.delete("/projects/{project_id}/todos/{todo_id}", response_model=dict)
+async def delete_project_todo(
+    project_id: UUID,
+    todo_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a project task/bug todo.
+
+    Allowed: project PM, project owner, or todo creator.
+    """
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到任务")
+    if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
+        raise NotFoundException("任务不属于当前项目")
+
+    allowed_users = {project.pm_user_id, project.owner_user_id, todo.creator_user_id}
+    if current_user.id not in allowed_users:
+        raise ForbiddenException("仅项目经理/项目负责人或创建人可删除该任务")
+
+    session.delete(todo)
+    session.commit()
+    return success_response({"message": "任务已删除"})
+
+
 @router.post("/projects/{project_id}/sync-dev-tasks", response_model=dict)
 async def sync_dev_tasks_from_feature_list(
     project_id: UUID,

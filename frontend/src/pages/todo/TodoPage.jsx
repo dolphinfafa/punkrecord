@@ -17,6 +17,13 @@ const STATUS_LABELS = {
 };
 const PRIORITY_LABELS = { p0: 'P0', p1: 'P1', p2: 'P2', p3: 'P3' };
 
+const getProjectLabel = (todo) => {
+    const projectName = todo?.link?.project_name;
+    if (projectName) return projectName;
+    if (todo?.source_type === 'project_task') return '项目任务';
+    return null;
+};
+
 export default function TodoPage() {
     const { user } = useAuth();
     const [todos, setTodos] = useState([]);
@@ -65,10 +72,10 @@ export default function TodoPage() {
                 // We need DONE and PENDING_REVIEW too for the board.
                 // Let's use 'all' for board fetching and filter/group in client.
                 const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
-                response = await todoApi.listTeam({ status: statusParam });
+                response = await todoApi.listTeam({ status: statusParam, page_size: 100 });
             } else {
                 const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
-                response = await todoApi.list({ status: statusParam });
+                response = await todoApi.list({ status: statusParam, page_size: 100 });
             }
             // For board view, we might want to filter out dismissed or very old done tasks if not done by backend
             setTodos(response.data?.items || []);
@@ -382,6 +389,11 @@ export default function TodoPage() {
                                                     </div>
                                                     <div className="card-title">{todo.title}</div>
                                                     <div className="card-footer">
+                                                        {getProjectLabel(todo) && (
+                                                            <span className="meta-tag" style={{ marginRight: '6px' }}>
+                                                                项目: {getProjectLabel(todo)}
+                                                            </span>
+                                                        )}
                                                         {viewMode === 'team' && todo.assignee_name && (
                                                             <div className="avatar-circle" title={todo.assignee_name}>
                                                                 {todo.assignee_name[0]}
@@ -423,6 +435,11 @@ export default function TodoPage() {
                                                 <span className={clsx('status-mini', `status-${todo.status}`)}>
                                                     {STATUS_LABELS[todo.status]}
                                                 </span>
+                                                {getProjectLabel(todo) && (
+                                                    <span className="meta-tag">
+                                                        项目: {getProjectLabel(todo)}
+                                                    </span>
+                                                )}
                                                 {viewMode === 'team' && todo.assignee_name && (
                                                     <span className="meta-tag">
                                                         <User size={11} /> {todo.assignee_name}

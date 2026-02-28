@@ -9,6 +9,8 @@ import FeatureListModal from './components/FeatureListModal';
 import QuoteModal from './components/QuoteModal';
 import ContractCanvasModal from './components/ContractCanvasModal';
 import ProjectAttachmentsModal from './components/ProjectAttachmentsModal';
+import PrototypeConfirmModal from './components/PrototypeConfirmModal';
+import BugManagementModal from './components/BugManagementModal';
 import {
     Briefcase, FileText, Activity, Layers,
     Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, BarChart3, Paperclip
@@ -25,6 +27,8 @@ export default function ProjectDetailPage() {
     const [featureListStage, setFeatureListStage] = useState(null);
     const [quoteStage, setQuoteStage] = useState(null);
     const [contractCanvasStage, setContractCanvasStage] = useState(null);
+    const [prototypeConfirmStage, setPrototypeConfirmStage] = useState(null);
+    const [bugManageStage, setBugManageStage] = useState(null);
     const [showProjectAttachments, setShowProjectAttachments] = useState(false);
 
     useEffect(() => {
@@ -286,6 +290,15 @@ export default function ProjectDetailPage() {
                                                                     <PenTool size={14} /> AI生成合同
                                                                 </button>
                                                             )}
+                                                            {stage?.stage_code?.toLowerCase() === 'prototype_confirmed' && (
+                                                                <button
+                                                                    className="btn-link text-primary"
+                                                                    onClick={() => setPrototypeConfirmStage({ ...stage, project_name: project.name })}
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                >
+                                                                    <FileText size={14} /> 原型确认单
+                                                                </button>
+                                                            )}
                                                             {stage?.stage_code?.toLowerCase() === 'development' && (
                                                                 <button
                                                                     className="btn-link"
@@ -295,14 +308,27 @@ export default function ProjectDetailPage() {
                                                                     <BarChart3 size={14} /> 开发进度
                                                                 </button>
                                                             )}
+                                                            {stage?.stage_code?.toLowerCase() === 'testing' && (
+                                                                <button
+                                                                    className="btn-link text-primary"
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                    onClick={() => setBugManageStage({ ...stage, project_name: project.name })}
+                                                                >
+                                                                    <FileText size={14} /> Bug管理
+                                                                </button>
+                                                            )}
                                                             {project?.project_type?.toLowerCase() === 'b2c' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'project_initiation' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'testing' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                             {project?.project_type?.toLowerCase() === 'b2b' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'quotation' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
+                                                                stage?.stage_code?.toLowerCase() !== 'testing' &&
                                                                 stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                         </div>
                                                     </td>
@@ -376,6 +402,26 @@ export default function ProjectDetailPage() {
                         setContractCanvasStage(null);
                         loadData();
                     }}
+                />
+            )}
+
+            {prototypeConfirmStage && (
+                <PrototypeConfirmModal
+                    isOpen={!!prototypeConfirmStage}
+                    stage={prototypeConfirmStage}
+                    project={project}
+                    onClose={() => setPrototypeConfirmStage(null)}
+                    onSave={async () => {
+                        loadData();
+                    }}
+                />
+            )}
+
+            {bugManageStage && (
+                <BugManagementModal
+                    isOpen={!!bugManageStage}
+                    project={project}
+                    onClose={() => setBugManageStage(null)}
                 />
             )}
 
