@@ -21,6 +21,8 @@ from app.core.response import success_response
 from app.models.iam import User, OurEntity, JobTitle
 from app.models.project import Project, ProjectStage, ProjectMember, ProjectType, ProjectStatus, StageStatus
 from app.models.todo import TodoItem, TodoSourceType, TodoPriority
+from app.models.contract import Counterparty
+from app.services.docx_generator import generate_acceptance_report
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectStageResponse, StageStatusUpdate,
@@ -1843,3 +1845,64 @@ async def export_contract_docx(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
     )
+
+
+@router.get("/projects/{project_id}/acceptance-report/download")
+async def download_acceptance_report(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download project acceptance report as docx."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+        
+    feature_list, _ = _extract_feature_list_for_project(project_id, session)
+    
+    # Get Customer name
+    customer_name = ""
+    if project.customer_id:
+        customer = session.get(Counterparty, project.customer_id)
+        if customer:
+            customer_name = customer.name
+            
+    # Get Our Entity name
+    our_entity_name = ""
+    if project.our_entity_id:
+        entity = session.get(OurEntity, project.our_entity_id)
+        if entity:
+            our_entity_name = entity.name
+            
+    # Get Members
+    members = []
+    project_members = session.exec(
+        select(ProjectMember).where(ProjectMember.project_id == project_id)
+    ).all()
+    
+    for pm in project_members:
+        user = session.get(User, pm.user_id)
+        if user:
+            members.append({
+                "role_in_project": pm.role_in_project or "",
+                "user_name": user.display_name or ""
+            })
+            
+    doc_io = generate_acceptance_report(
+        project_name=project.name,
+        project_no=project.project_no,
+        start_date=project.start_at.strftime("%Y-%m-%d") if project.start_at else "",
+        due_date=project.due_at.strftime("%Y-%m-%d") if project.due_at else "",
+        customer_name=customer_name,
+        our_entity_name=our_entity_name,
+        members=members,
+        feature_list=feature_list
+    )
+    
+    encoded_filename = urllib.parse.quote(f"{project.name}_验收报告.docx")
+    return StreamingResponse(
+        doc_io,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
+    )
+

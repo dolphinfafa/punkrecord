@@ -77,6 +77,24 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleDownloadAcceptanceReport = async () => {
+        try {
+            const response = await projectApi.downloadAcceptanceReport(id);
+            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${project.name}_验收报告.docx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download acceptance report:', err);
+            alert('下载验收报告失败，请重试');
+        }
+    };
+
     if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
     if (error) return <div className="page-content"><div className="error">错误: {error}</div></div>;
     if (!project) return <div className="page-content"><div className="error">未找到项目</div></div>;
@@ -207,131 +225,141 @@ export default function ProjectDetailPage() {
                                                     <tr key={stage.id}>
                                                         <td className="col-seq">{stage.sequence_no}</td>
                                                         <td className="col-name">{stage.stage_name}</td>
-                                                    <td>
-                                                        <select
-                                                            value={stage.status}
-                                                            onChange={(e) => handleUpdateStage(stage.id, 'status', e.target.value)}
-                                                            disabled={!isEditable}
-                                                            style={{
-                                                                padding: '4px 8px',
-                                                                borderRadius: '4px',
-                                                                border: '1px solid #e2e8f0',
-                                                                fontSize: '0.875rem',
-                                                                backgroundColor: !isEditable ? '#f1f5f9' : 'white',
-                                                                color: !isEditable ? '#94a3b8' : 'inherit'
-                                                            }}
-                                                        >
-                                                            <option value="not_started">未开始</option>
-                                                            <option value="in_progress">进行中</option>
-                                                            <option value="done">已完成</option>
-                                                            <option value="blocked">已阻塞</option>
-                                                            <option value="skipped">已跳过</option>
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <input
-                                                            type="date"
-                                                            value={stage.planned_end_at || ''}
-                                                            onChange={(e) => handleUpdateStage(stage.id, 'planned_end_at', e.target.value)}
-                                                            style={{
-                                                                padding: '4px 8px',
-                                                                border: '1px solid #e2e8f0',
-                                                                borderRadius: '4px',
-                                                                width: '130px'
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="col-note">
-                                                        <input
-                                                            type="text"
-                                                            value={stage.deliverables || ''}
-                                                            placeholder="备注或交付物链接..."
-                                                            onChange={(e) => setStages(prev => prev.map(s => s.id === stage.id ? { ...s, deliverables: e.target.value } : s))}
-                                                            onBlur={(e) => handleUpdateStage(stage.id, 'deliverables', e.target.value)}
-                                                            style={{
-                                                                width: '100%',
-                                                                padding: '4px 8px',
-                                                                border: 'none',
-                                                                borderBottom: '1px dashed #cbd5e1',
-                                                                backgroundColor: 'transparent',
-                                                                outline: 'none'
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="col-action">
-                                                        <div className="stage-action-wrap" style={{ display: 'flex', gap: '10px' }}>
-                                                            {(
-                                                                (project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'requirement_alignment') ||
-                                                                (project?.project_type?.toLowerCase() === 'b2c' && stage?.stage_code?.toLowerCase() === 'project_initiation')
-                                                            ) && (
-                                                                <button
-                                                                    className="btn-link text-success"
-                                                                    onClick={() => setFeatureListStage({ ...stage, project_name: project.name })}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                >
-                                                                    <List size={14} /> 功能清单
-                                                                </button>
-                                                            )}
-                                                            {project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'quotation' && (
-                                                                <button
-                                                                    className="btn-link text-primary"
-                                                                    onClick={() => setQuoteStage({ ...stage, project_name: project.name })}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                >
-                                                                    <FileText size={14} /> 报价单
-                                                                </button>
-                                                            )}
-                                                            {stage?.stage_code?.toLowerCase() === 'contract_signed' && (
-                                                                <button
-                                                                    className="btn-link text-primary"
-                                                                    onClick={() => setContractCanvasStage({ ...stage, project_name: project.name })}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                >
-                                                                    <PenTool size={14} /> AI生成合同
-                                                                </button>
-                                                            )}
-                                                            {stage?.stage_code?.toLowerCase() === 'prototype_confirmed' && (
-                                                                <button
-                                                                    className="btn-link text-primary"
-                                                                    onClick={() => setPrototypeConfirmStage({ ...stage, project_name: project.name })}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                >
-                                                                    <FileText size={14} /> 原型确认单
-                                                                </button>
-                                                            )}
-                                                            {stage?.stage_code?.toLowerCase() === 'development' && (
-                                                                <button
-                                                                    className="btn-link"
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#0369a1' }}
-                                                                    onClick={() => navigate(`/project/${project.id}/dev-progress`)}
-                                                                >
-                                                                    <BarChart3 size={14} /> 开发进度
-                                                                </button>
-                                                            )}
-                                                            {stage?.stage_code?.toLowerCase() === 'testing' && (
-                                                                <button
-                                                                    className="btn-link text-primary"
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                    onClick={() => setBugManageStage({ ...stage, project_name: project.name })}
-                                                                >
-                                                                    <FileText size={14} /> Bug管理
-                                                                </button>
-                                                            )}
-                                                            {project?.project_type?.toLowerCase() === 'b2c' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'project_initiation' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'testing' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'development' && '-'}
-                                                            {project?.project_type?.toLowerCase() === 'b2b' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'quotation' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'testing' &&
-                                                                stage?.stage_code?.toLowerCase() !== 'development' && '-'}
-                                                        </div>
-                                                    </td>
+                                                        <td>
+                                                            <select
+                                                                value={stage.status}
+                                                                onChange={(e) => handleUpdateStage(stage.id, 'status', e.target.value)}
+                                                                disabled={!isEditable}
+                                                                style={{
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '4px',
+                                                                    border: '1px solid #e2e8f0',
+                                                                    fontSize: '0.875rem',
+                                                                    backgroundColor: !isEditable ? '#f1f5f9' : 'white',
+                                                                    color: !isEditable ? '#94a3b8' : 'inherit'
+                                                                }}
+                                                            >
+                                                                <option value="not_started">未开始</option>
+                                                                <option value="in_progress">进行中</option>
+                                                                <option value="done">已完成</option>
+                                                                <option value="blocked">已阻塞</option>
+                                                                <option value="skipped">已跳过</option>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="date"
+                                                                value={stage.planned_end_at || ''}
+                                                                onChange={(e) => handleUpdateStage(stage.id, 'planned_end_at', e.target.value)}
+                                                                style={{
+                                                                    padding: '4px 8px',
+                                                                    border: '1px solid #e2e8f0',
+                                                                    borderRadius: '4px',
+                                                                    width: '130px'
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="col-note">
+                                                            <input
+                                                                type="text"
+                                                                value={stage.deliverables || ''}
+                                                                placeholder="备注或交付物链接..."
+                                                                onChange={(e) => setStages(prev => prev.map(s => s.id === stage.id ? { ...s, deliverables: e.target.value } : s))}
+                                                                onBlur={(e) => handleUpdateStage(stage.id, 'deliverables', e.target.value)}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '4px 8px',
+                                                                    border: 'none',
+                                                                    borderBottom: '1px dashed #cbd5e1',
+                                                                    backgroundColor: 'transparent',
+                                                                    outline: 'none'
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="col-action">
+                                                            <div className="stage-action-wrap" style={{ display: 'flex', gap: '10px' }}>
+                                                                {(
+                                                                    (project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'requirement_alignment') ||
+                                                                    (project?.project_type?.toLowerCase() === 'b2c' && stage?.stage_code?.toLowerCase() === 'project_initiation')
+                                                                ) && (
+                                                                        <button
+                                                                            className="btn-link text-success"
+                                                                            onClick={() => setFeatureListStage({ ...stage, project_name: project.name })}
+                                                                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                        >
+                                                                            <List size={14} /> 功能清单
+                                                                        </button>
+                                                                    )}
+                                                                {project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'quotation' && (
+                                                                    <button
+                                                                        className="btn-link text-primary"
+                                                                        onClick={() => setQuoteStage({ ...stage, project_name: project.name })}
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                    >
+                                                                        <FileText size={14} /> 报价单
+                                                                    </button>
+                                                                )}
+                                                                {stage?.stage_code?.toLowerCase() === 'contract_signed' && (
+                                                                    <button
+                                                                        className="btn-link text-primary"
+                                                                        onClick={() => setContractCanvasStage({ ...stage, project_name: project.name })}
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                    >
+                                                                        <PenTool size={14} /> AI生成合同
+                                                                    </button>
+                                                                )}
+                                                                {stage?.stage_code?.toLowerCase() === 'prototype_confirmed' && (
+                                                                    <button
+                                                                        className="btn-link text-primary"
+                                                                        onClick={() => setPrototypeConfirmStage({ ...stage, project_name: project.name })}
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                    >
+                                                                        <FileText size={14} /> 原型确认单
+                                                                    </button>
+                                                                )}
+                                                                {stage?.stage_code?.toLowerCase() === 'development' && (
+                                                                    <button
+                                                                        className="btn-link"
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#0369a1' }}
+                                                                        onClick={() => navigate(`/project/${project.id}/dev-progress`)}
+                                                                    >
+                                                                        <BarChart3 size={14} /> 开发进度
+                                                                    </button>
+                                                                )}
+                                                                {stage?.stage_code?.toLowerCase() === 'testing' && (
+                                                                    <button
+                                                                        className="btn-link text-primary"
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                        onClick={() => setBugManageStage({ ...stage, project_name: project.name })}
+                                                                    >
+                                                                        <FileText size={14} /> Bug管理
+                                                                    </button>
+                                                                )}
+                                                                {stage?.stage_code?.toLowerCase() === 'delivery' && (
+                                                                    <button
+                                                                        className="btn-link text-primary"
+                                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                        onClick={handleDownloadAcceptanceReport}
+                                                                    >
+                                                                        <FileText size={14} /> 验收报告
+                                                                    </button>
+                                                                )}
+                                                                {project?.project_type?.toLowerCase() === 'b2c' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'project_initiation' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'testing' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'development' && '-'}
+                                                                {project?.project_type?.toLowerCase() === 'b2b' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'requirement_alignment' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'quotation' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'testing' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'delivery' &&
+                                                                    stage?.stage_code?.toLowerCase() !== 'development' && '-'}
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}

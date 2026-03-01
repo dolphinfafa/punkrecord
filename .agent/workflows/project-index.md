@@ -1,97 +1,97 @@
 ---
-description: 工程索引 �?PunkRecord 企业管理系统（供 Agent 快速定位代码结构，每次工作后须更新�?
+description: 宸ョ▼绱㈠紩 鈥?PunkRecord 浼佷笟绠＄悊绯荤粺锛堜緵 Agent 蹇�€熷畾浣嶄唬鐮佺粨鏋勶紝姣忔�宸ヤ綔鍚庨』鏇存柊锛?
 ---
 
-> **Agent 注意**：每次开始任务前必须先阅读本文件，完成任务后若有结构性变更须更新对应章节�?
+> **Agent 娉ㄦ剰**锛氭瘡娆″紑濮嬩换鍔″墠蹇呴』鍏堥槄璇绘湰鏂囦欢锛屽畬鎴愪换鍔″悗鑻ユ湁缁撴瀯鎬у彉鏇撮』鏇存柊瀵瑰簲绔犺妭銆?
 
 ---
 
-## 1. 目录结构�? 层）
+## 1. 鐩�綍缁撴瀯锛? 灞傦級
 
 ```
 punkrecord/
-├── backend/                  # Python FastAPI 后端
-�?  ├── app/
-�?  �?  ├── api/              # 路由层：auth, iam, todo, contract, project, finance, ai
-�?  �?  ├── core/             # 基础设施：config, database, auth, security, response, exceptions, init_db
-�?  �?  ├── models/           # SQLModel ORM 表：base, iam, todo, contract, project, finance, shared, approval
-�?  �?  ├── schemas/          # Pydantic DTO：todo, contract, project, finance
-�?  �?  ├── services/         # 服务层（当前较薄�?
-�?  �?  └── utils/
-�?  ├── migrations/           # Alembic 迁移脚本
-�?  ├── tests/                # 验证脚本
-�?  └── requirements.txt
-├── frontend/                 # React + Vite 前端
-�?  └── src/
-�?      ├── api/              # Axios 请求封装（按模块�?
-�?      ├── components/
-�?      �?  ├── common/       # Modal 等通用组件
-�?      �?  ├── layout/       # Layout, Sidebar
-�?      �?  └── todo/         # TodoModal, TodoDetailModal
-�?      ├── contexts/         # AuthContext（全局认证状态）
-�?      ├── hooks/            # 自定�?Hook
-�?      ├── pages/            # 页面：auth, dashboard, finance, iam, contract, project, todo
-�?      └── utils/
-├── apps/api/                 # NestJS API（新技术栈探索，使�?Prisma�?
-├── prd/                      # 产品需求文档（00~80 编号�?
-├── milestone/                # 按日期记录的里程�?
-└── .agent/workflows/         # Agent 工作�?& 本索引文�?
+鈹溾攢鈹€ backend/                  # Python FastAPI 鍚庣�
+鈹?  鈹溾攢鈹€ app/
+鈹?  鈹?  鈹溾攢鈹€ api/              # 璺�敱灞傦細auth, iam, todo, contract, project, finance, ai
+鈹?  鈹?  鈹溾攢鈹€ core/             # 鍩虹�璁炬柦锛歝onfig, database, auth, security, response, exceptions, init_db
+鈹?  鈹?  鈹溾攢鈹€ models/           # SQLModel ORM 琛�細base, iam, todo, contract, project, finance, shared, approval
+鈹?  鈹?  鈹溾攢鈹€ schemas/          # Pydantic DTO锛歵odo, contract, project, finance
+鈹?  鈹?  鈹溾攢鈹€ services/         # 鏈嶅姟灞傦紙濡?docx_generator.py 绛夛級
+鈹?  鈹?  鈹斺攢鈹€ utils/
+鈹?  鈹溾攢鈹€ db_migrations/        # Alembic migration scripts
+鈹?  鈹溾攢鈹€ tests/                # 楠岃瘉鑴氭湰
+鈹?  鈹斺攢鈹€ requirements.txt
+鈹溾攢鈹€ frontend/                 # React + Vite 鍓嶇�
+鈹?  鈹斺攢鈹€ src/
+鈹?      鈹溾攢鈹€ api/              # Axios 璇锋眰灏佽�锛堟寜妯″潡锛?
+鈹?      鈹溾攢鈹€ components/
+鈹?      鈹?  鈹溾攢鈹€ common/       # Modal 绛夐€氱敤缁勪欢
+鈹?      鈹?  鈹溾攢鈹€ layout/       # Layout, Sidebar
+鈹?      鈹?  鈹斺攢鈹€ todo/         # TodoModal, TodoDetailModal
+鈹?      鈹溾攢鈹€ contexts/         # AuthContext锛堝叏灞€璁よ瘉鐘舵€侊級
+鈹?      鈹溾攢鈹€ hooks/            # 鑷�畾涔?Hook
+鈹?      鈹溾攢鈹€ pages/            # 椤甸潰锛歛uth, dashboard, finance, iam, contract, project, todo
+鈹?      鈹斺攢鈹€ utils/
+鈹溾攢鈹€ apps/api/                 # NestJS API锛堟柊鎶€鏈�爤鎺㈢储锛屼娇鐢?Prisma锛?
+鈹溾攢鈹€ prd/                      # 浜у搧闇€姹傛枃妗ｏ紙00~80 缂栧彿锛?
+鈹溾攢鈹€ milestone/                # 鎸夋棩鏈熻�褰曠殑閲岀▼纰?
+鈹斺攢鈹€ .agent/workflows/         # Agent 宸ヤ綔娴?& 鏈�储寮曟枃浠?
 ```
 
 ---
 
-## 2. 关键模块职责
+## 2. 鍏抽敭妯″潡鑱岃矗
 
-| 模块 | 后端路由前缀 | 职责 |
+| 妯″潡 | 鍚庣�璺�敱鍓嶇紑 | 鑱岃矗 |
 |------|------------|------|
-| **auth** | `/api/v1` | 登录(`/login`)、登�?`/logout`)、当前用�?`/me`)；JWT Bearer Token |
-| **iam** | `/api/v1` | 用户、部�?OrgUnit)、职�?JobTitle)、法人主�?OurEntity)、角色权限、组织架构图 |
-| **todo** | `/api/v1/todo` | 待办全生命周期：创建→开始→提交→审批→完成/拒绝/阻塞/忽略；请假申请创建与查询 |
-| **contract** | `/api/v1` | 合同、对手方(Counterparty)、付款计�?PaymentPlan)、合同提交审�?|
-| **project** | `/api/v1` | 项目、阶�?Stage)、成员、待办关联、报价单导出Excel、功能清单、AI生成开发任务、合同画布、合同Word导出 |
-| **finance** | `/api/v1` | 账户(FinanceAccount)、收支流�?Transaction)、发�?Invoice)、报销(Reimbursement) |
-| **ai** | `/api/v1/ai` | AI 对话(`/chat`)、流式对�?`/chat-stream`) |
+| **auth** | `/api/v1` | 鐧诲綍(`/login`)銆佺櫥鍑?`/logout`)銆佸綋鍓嶇敤鎴?`/me`)锛汮WT Bearer Token |
+| **iam** | `/api/v1` | 鐢ㄦ埛銆侀儴闂?OrgUnit)銆佽亴浣?JobTitle)銆佹硶浜轰富浣?OurEntity)銆佽�鑹叉潈闄愩€佺粍缁囨灦鏋勫浘 |
+| **todo** | `/api/v1/todo` | 寰呭姙鍏ㄧ敓鍛藉懆鏈燂細鍒涘缓鈫掑紑濮嬧啋鎻愪氦鈫掑�鎵光啋瀹屾垚/鎷掔粷/闃诲�/蹇界暐锛涜�鍋囩敵璇峰垱寤轰笌鏌ヨ� |
+| **contract** | `/api/v1` | 鍚堝悓銆佸�鎵嬫柟(Counterparty)銆佷粯娆捐�鍒?PaymentPlan)銆佸悎鍚屾彁浜ゅ�鎵?|
+| **project** | `/api/v1` | 椤圭洰銆侀樁娈?Stage)銆佹垚鍛樸€佸緟鍔炲叧鑱斻€佹姤浠峰崟瀵煎嚭Excel銆佸姛鑳芥竻鍗曘€丄I鐢熸垚寮€鍙戜换鍔°€佸悎鍚岀敾甯冦€佸悎鍚學ord瀵煎嚭 |
+| **finance** | `/api/v1` | 璐︽埛(FinanceAccount)銆佹敹鏀�祦姘?Transaction)銆佸彂绁?Invoice)銆佹姤閿€(Reimbursement) |
+| **ai** | `/api/v1/ai` | AI 瀵硅瘽(`/chat`)銆佹祦寮忓�璇?`/chat-stream`) |
 
-**前端模块**
+**鍓嶇�妯″潡**
 
-| 目录 | 职责 |
+| 鐩�綍 | 鑱岃矗 |
 |------|------|
-| `pages/auth` | 登录�?|
-| `pages/dashboard` | 仪表�?|
-| `pages/project` | 项目列表/详情页，含多�?Modal 子组�?|
-| `pages/finance` | 账户列表、流水列�?|
-| `pages/iam` | 用户列表、部门、职位、法人主体、组织架构图 |
-| `pages/contract` | 合同列表、对手方列表 |
-| `pages/todo` | 待办页（�?TodoModal、TodoDetailModal�?|
-| `contexts/AuthContext` | 全局用户状态、token 管理、自动刷�?|
+| `pages/auth` | 鐧诲綍椤?|
+| `pages/dashboard` | 浠�〃鐩?|
+| `pages/project` | 椤圭洰鍒楄〃/璇︽儏椤碉紝鍚��涓?Modal 瀛愮粍浠?|
+| `pages/finance` | 璐︽埛鍒楄〃銆佹祦姘村垪琛?|
+| `pages/iam` | 鐢ㄦ埛鍒楄〃銆侀儴闂ㄣ€佽亴浣嶃€佹硶浜轰富浣撱€佺粍缁囨灦鏋勫浘 |
+| `pages/contract` | 鍚堝悓鍒楄〃銆佸�鎵嬫柟鍒楄〃 |
+| `pages/todo` | 寰呭姙椤碉紙鍚?TodoModal銆乀odoDetailModal锛?|
+| `contexts/AuthContext` | 鍏ㄥ眬鐢ㄦ埛鐘舵€併€乼oken 绠＄悊銆佽嚜鍔ㄥ埛鏂?|
 
 ---
 
-## 3. 核心数据模型（简写）
+## 3. 鏍稿績鏁版嵁妯″瀷锛堢畝鍐欙級
 
-所有表继承 `BaseDBModel`（含 `id: UUID`, `created_at`, `updated_at`）�?
+鎵€鏈夎〃缁ф壙 `BaseDBModel`锛堝惈 `id: UUID`, `created_at`, `updated_at`锛夈€?
 
 ```
 # IAM
-User: username, hashed_password, real_name, email, phone, status(active/inactive), entity_id→OurEntity
+User: username, hashed_password, real_name, email, phone, status(active/inactive), entity_id鈫扥urEntity
 OurEntity: name, type(company/branch/subsidiary), status
-OrgUnit (部门): name, parent_id(self-ref), entity_id, manager_id→User
+OrgUnit (閮ㄩ棬): name, parent_id(self-ref), entity_id, manager_id鈫扷ser
 JobTitle: name, entity_id
 OrgMembership: user_id, org_unit_id, job_title_id, is_primary
 
 # Todo
 TodoItem: title, description, source_type(manual/project_task), action_type, priority(low/medium/high/urgent),
           status(pending/in_progress/submitted/approved/rejected/done/blocked/dismissed),
-          assignee_id→User, reporter_id→User, project_id→Project, due_date, started_at, completed_at
-LeaveRequest: applicant_user_id→User, leave_type(annual/maternity/marriage/personal/sick),
+          assignee_id鈫扷ser, reporter_id鈫扷ser, project_id鈫扨roject, due_date, started_at, completed_at
+LeaveRequest: applicant_user_id鈫扷ser, leave_type(annual/maternity/marriage/personal/sick),
               status(pending/approved/rejected/cancelled), start_at, end_at, reason
-User(假期余额): leave_annual_remaining(5), leave_maternity_remaining(15),
+User(鍋囨湡浣欓�): leave_annual_remaining(5), leave_maternity_remaining(15),
               leave_marriage_remaining(3), leave_personal_remaining(3), leave_sick_remaining(3),
-              leave_balance_reset_year(最近重置年份标�?
+              leave_balance_reset_year(鏈€杩戦噸缃�勾浠芥爣璁?
 
 # Project
 Project: name, type(internal/client), status(planning/active/on_hold/completed/cancelled),
-         entity_id→OurEntity, contract_id→Contract, budget, attachments(JSON)
+         entity_id鈫扥urEntity, contract_id鈫扖ontract, budget, attachments(JSON)
 ProjectStage: project_id, name, status(pending/active/done), order, description, attachments(JSON)
 ProjectMember: project_id, user_id, role
 
@@ -110,260 +110,267 @@ FinanceInvoice: transaction_id, kind(vat_special/vat_normal/receipt/other), medi
 
 ---
 
-## 4. 关键流程
+## 4. 鍏抽敭娴佺▼
 
-### 认证流程
-1. `POST /api/v1/login` �?返回 `access_token`(JWT)
-2. 前端存入 `localStorage`，后续请�?Header：`Authorization: Bearer <token>`
-3. Token 有效�?1440 分钟（`AuthContext` 自动在过期前刷新�?
+### 璁よ瘉娴佺▼
+1. `POST /api/v1/login` 鈫?杩斿洖 `access_token`(JWT)
+2. 鍓嶇�瀛樺叆 `localStorage`锛屽悗缁��姹?Header锛歚Authorization: Bearer <token>`
+3. Token 鏈夋晥鏈?1440 鍒嗛挓锛坄AuthContext` 鑷�姩鍦ㄨ繃鏈熷墠鍒锋柊锛?
 
-### Todo 生命周期
+### Todo 鐢熷懡鍛ㄦ湡
 ```
-pending �?[start] �?in_progress �?[submit] �?submitted
-    �?[approve] �?done
-    �?[reject]  �?rejected
-in_progress / submitted �?[block]   �?blocked
-Any �?[dismiss] �?dismissed
+pending 鈫?[start] 鈫?in_progress 鈫?[submit] 鈫?submitted
+    鈫?[approve] 鈫?done
+    鈫?[reject]  鈫?rejected
+in_progress / submitted 鈫?[block]   鈫?blocked
+Any 鈫?[dismiss] 鈫?dismissed
 ```
 
-### 工作台请假流�?
-1. L0 员工（无直属上级）不可提交请假，L0 以下员工可提�?
-2. 提交请假后：
-   - 创建 `LeaveRequest`（状�?`pending`�?
-   - 在“待我审批”请假列表中由直属主管处�?
-3. 直属主管审批通过后：
-   - `LeaveRequest` 变更�?`approved`
-   - 按请假类型扣减申请人的假期余�?
-4. 驳回后：
-   - `LeaveRequest` 变更�?`rejected`
+### 宸ヤ綔鍙拌�鍋囨祦绋?
+1. L0 鍛樺伐锛堟棤鐩村睘涓婄骇锛変笉鍙�彁浜よ�鍋囷紝L0 浠ヤ笅鍛樺伐鍙�彁浜?
+2. 鎻愪氦璇峰亣鍚庯細
+   - 鍒涘缓 `LeaveRequest`锛堢姸鎬?`pending`锛?
+   - 鍦ㄢ€滃緟鎴戝�鎵光€濊�鍋囧垪琛ㄤ腑鐢辩洿灞炰富绠″�鐞?
+3. 鐩村睘涓荤�瀹℃壒閫氳繃鍚庯細
+   - 鍦ㄢ€滃緟鎴戝鎵光€濊鍋囧垪琛ㄤ腑鐢辩洿灞炰富绠″鐞?
+3. 鐩村睘涓荤瀹℃壒閫氳繃鍚庯細
+   - `LeaveRequest` 鍙樻洿涓?`approved`
+   - 鎸夎鍋囩被鍨嬫墸鍑忕敵璇蜂汉鐨勫亣鏈熶綑棰?
+4. 椹冲洖鍚庯細
+   - `LeaveRequest` 鍙樻洿涓?`rejected`
 
-### 项目 �?Todo 关联
-`project.py` `POST /projects/{id}/generate-dev-tasks` 调用 AI 生成 `TodoItem`（source_type=project_task），绑定 project_id �?stage 信息�?
+### 椤圭洰 鈫?Todo 鍏宠仈
+- `GET /projects` 项目列表
+- `POST /projects` 创建项目（附带初始阶段生成）
+- `GET /projects/{id}/acceptance-report/download` 下载验收报告 (docx)
 
-### 合同 �?项目关联
-`Project.contract_id` FK 指向 `Contract`；`/projects/{id}/contract-context` 聚合合同信息用于 AI 画布�?
+#### 里程碑 & 待办 (Todos)
+`project.py` `POST /projects/{id}/generate-dev-tasks` 璋冪敤 AI 鐢熸垚 `TodoItem`锛坰ource_type=project_task锛夛紝缁戝畾 project_id 鍜?stage 淇℃伅銆?
+
+### 鍚堝悓 鈫?椤圭洰鍏宠仈
+`Project.contract_id` FK 鎸囧悜 `Contract`锛沗/projects/{id}/contract-context` 鑱氬悎鍚堝悓淇℃伅鐢ㄤ簬 AI 鐢诲竷銆?
 
 ---
 
-## 5. 常用命令
+## 5. 甯哥敤鍛戒护
 
 ```bash
-# 后端（在 backend/ 目录�?
-source ../punkrecord/bin/activate          # 激�?venv（Python 3.9�?
-uvicorn app.main:app --reload --port 8000  # 启动开发服务器
-alembic upgrade head                        # 运行迁移
-alembic revision --autogenerate -m "desc"  # 生成迁移
-python create_admin.py                      # 创建管理员账�?
-python init_database.py                     # 初始化基础数据
+# 鍚庣锛堝湪 backend/ 鐩綍锛?
+source ../punkrecord/bin/activate          # 婵€娲?venv锛圥ython 3.9锛?
+uvicorn app.main:app --reload --port 8000  # 鍚姩寮€鍙戞湇鍔″櫒
+alembic upgrade head                        # 杩愯杩佺Щ
+alembic revision --autogenerate -m "desc"  # 鐢熸垚杩佺Щ
+python create_admin.py                      # 鍒涘缓绠＄悊鍛樿处鍙?
+python init_database.py                     # 鍒濆鍖栧熀纭€鏁版嵁
 
-# 前端（在 frontend/ 目录�?
-npm run dev          # 启动开发服务器（端�?5173�?
-npm run build        # 构建生产�?
-npm run lint         # ESLint 检�?
-npm run preview      # 预览生产�?
+# 鍓嶇锛堝湪 frontend/ 鐩綍锛?
+npm run dev          # 鍚姩寮€鍙戞湇鍔″櫒锛堢鍙?5173锛?
+npm run build        # 鏋勫缓鐢熶骇鍖?
+npm run lint         # ESLint 妫€鏌?
+npm run preview      # 棰勮鐢熶骇鍖?
 
-# 健康检�?
+# 鍋ュ悍妫€鏌?
 curl http://localhost:8000/health
 ```
 
 ---
 
-## 6. 约定
+## 6. 绾﹀畾
 
-### 命名
-- **后端文件**：snake_case�?*前端文件**：PascalCase（组件）/ camelCase（工具、hooks�?
-- **API 路由**：kebab-case，例�?`/payment-plans`, `/our-entities`
-- **数据库列**：snake_case�?*前端变量**：camelCase
+### 鍛藉悕
+- **鍚庣鏂囦欢**锛歴nake_case锛?*鍓嶇鏂囦欢**锛歅ascalCase锛堢粍浠讹級/ camelCase锛堝伐鍏枫€乭ooks锛?
+- **API 璺敱**锛歬ebab-case锛屼緥濡?`/payment-plans`, `/our-entities`
+- **鏁版嵁搴撳垪**锛歴nake_case锛?*鍓嶇鍙橀噺**锛歝amelCase
 
-### API 响应格式
+### API 鍝嶅簲鏍煎紡
 ```json
-// 成功
+// 鎴愬姛
 { "data": {...}, "message": "ok" }
-// 错误（AtlasException�?
-{ "code": 400, "message": "具体错误信息" }
+// 閿欒锛圓tlasException锛?
+{ "code": 400, "message": "鍏蜂綋閿欒淇℃伅" }
 ```
 
-### 环境变量（`backend/.env`�?
-- `DB_TYPE=sqlite`（开发）/ `mysql`（生产）
+### 鐜鍙橀噺锛坄backend/.env`锛?
+- `DB_TYPE=sqlite`锛堝紑鍙诧級/ `mysql`锛堢敓浜э級
 - `SQLITE_DB_PATH=./atlas.db`
-- `SECRET_KEY=...`（JWT 签名密钥�?
+- `SECRET_KEY=...`锛圝WT 绛惧悕瀵嗛挜锛?
 - `BACKEND_CORS_ORIGINS=["http://localhost:5173"]`
 - `ACCESS_TOKEN_EXPIRE_MINUTES=1440`
 
-### 数据�?
-- **开�?*：SQLite（atlas.db，已加入 .gitignore，不提交�?
-- **生产**：MySQL，通过 `DB_TYPE=mysql` 切换
-- ORM：SQLModel（SQLAlchemy + Pydantic）；迁移工具：Alembic
+### 鏁版嵁搴?
+- **寮€鍙?*锛歋QLite锛坅tlas.db锛屽凡鍔犲叆 .gitignore锛屼笉鎻愪氦锛?
+- **鐢熶骇**锛歁ySQL锛岄€氳繃 `DB_TYPE=mysql` 鍒囨崲
+- ORM锛歋QLModel锛圫QLAlchemy + Pydantic锛夛紱杩佺Щ宸ュ叿锛欰lembic
 
-### 错误�?
-- `400` 参数错误 / 业务逻辑错误
-- `401` 未认�?
-- `403` 无权�?
-- `404` 资源不存�?
-- `500` 服务器内部错�?
+### 閿欒鐮?
+- `400` 鍙傛暟閿欒 / 涓氬姟閫昏緫閿欒
+- `401` 鏈璇?
+- `403` 鏃犳潈闄?
+- `404` 璧勬簮涓嶅瓨鍦?
+- `500` 鏈嶅姟鍣ㄥ唴閮ㄩ敊璇?
 
-### 日志格式（main.py 中间件）
+### 鏃ュ織鏍煎紡锛坢ain.py 涓棿浠讹級
 ```
-📥 Incoming request: {METHOD} {path}
-📤 Response status: {status_code}
-�?Request failed: {ExceptionType}: {message}
+馃摜 Incoming request: {METHOD} {path}
+馃摛 Response status: {status_code}
+鉂?Request failed: {ExceptionType}: {message}
 ```
 
 ---
 
-## 7. 增量更新�?026-02-24 ~ 2026-02-25�?
+## 7. 澧為噺鏇存柊锛?026-02-24 ~ 2026-03-01锛?
 
-- 新增页面：`frontend/src/pages/project/DevelopmentProgressPage.jsx` + `frontend/src/pages/project/DevelopmentProgressPage.css`
-- 新增路由：`/project/:id/dev-progress`（项目开发进度管理页�?
-- 项目详情“development”阶段入口文案由“生成开发任务”改为“开发进度�?
-- 新增接口：`POST /api/v1/project/projects/{project_id}/todos/{todo_id}/assign`（仅项目经理可改指派�?
-- 新增接口：`POST /api/v1/project/projects/{project_id}/todos/{todo_id}/plan`
-  - 支持开发任务计划字段更新：`assignee_user_id`、`due_at`、`priority`
-- 开发进度页能力增强�?
-  - 支持负责人、截止日期、优先级在线修改
-  - 支持按类型分组排序与折叠（前�?后端/UI/产品�?
-  - 支持表格视图与甘特视图切�?
-- 功能清单（FeatureListModal）增强：
-  - 支持“下载模板�?
-  - 支持“上传导入（Excel/CSV）并自动识别表头导入�?
-  - 功能清单导出改为前端本地 `xlsx` 导出
-- 开发任务生成规则更新：`generate-dev-tasks` 生成�?Todo 统一使用
+- 鏂板椤甸潰锛歚frontend/src/pages/project/DevelopmentProgressPage.jsx` + `frontend/src/pages/project/DevelopmentProgressPage.css`
+- 鏂板璺敱锛歚/project/:id/dev-progress`锛堥」鐩紑鍙戝繝搴︾鐞嗛〉锛?
+- 椤圭洰璇︽儏鈥渄evelopment鈥濋樁娈靛叆鍙ｆ枃妗堢敱鈥滅敓鎴愬紑鍙戜换鍔♀€濇敼涓衡€滃紑鍙戣繘搴︹€?
+- 鏂板鎺ュ彛锛歚POST /api/v1/project/projects/{project_id}/todos/{todo_id}/assign`锛堜粎椤圭洰缁忕悊鍙敼鎸囨淳锛?
+- 鏂板鎺ュ彛锛歚POST /api/v1/project/projects/{project_id}/todos/{todo_id}/plan`
+  - 鏀寔寮€鍙戜换鍔¤鍒掑瓧娈垫洿鏂帮細`assignee_user_id`銆乣due_at`銆乣priority`
+- 寮€鍙戣繘搴﹂〉鑳藉姏澧炲己锛?
+  - 鏀寔璐熻矗浜恒€佹埅姝㈡棩鏈熴€佷紭鍏堢骇鍦ㄧ嚎淇敼
+  - 鏀寔鎸夌被鍨嬪垎缁勬帓搴忎笌鎶樺彔锛堝墠绔?鍚庣/UI/浜у搧锛?
+  - 鏀寔琛ㄦ牸瑙嗗浘涓庣敇鐗硅鍥惧垏鎹?
+- 鍔熻兘娓呭崟锛團eatureListModal锛夊寮猴細
+  - 鏀寔鈥滀笅杞芥ā鏉库€?
+  - 鏀寔鈥滀笂浼犲鍏ワ紙Excel/CSV锛夊苟鑷姩璇嗗埆琛ㄥご瀵煎叆鈥?
+  - 鍔熻兘娓呭崟瀵煎嚭鏀逛负鍓嶇鏈湴 `xlsx` 瀵煎嚭
+- 寮€鍙戜换鍔＄敓鎴愯鍒欐洿鏂帮細`generate-dev-tasks` 鐢熸垚鐨?Todo 缁熶竴浣跨敤
   - `source_type=project_task`
-  - `source_id={project_id}`（确保可被项目任务列表和进度统计正确检索）
-  - `creator_user_id=project.pm_user_id`（统一由项目经理作为审核员�?
-- 认证读取顺序更新（`backend/app/core/auth.py`）：
-  - 优先使用 `Authorization: Bearer` token
-  - �?Bearer 时再回退读取 cookie，避免多账号切换时身份错�?
-- 附件管理改为“项目级”入口（位于项目详情页“阶段”模块右上角“附件”按钮）�?
-  - 支持上传、下载、删除并查看本项目相关附件（合同、原型确认单等）
-  - 新增接口：`GET /api/v1/project/projects/{project_id}/attachments`
-  - 新增接口：`POST /api/v1/project/projects/{project_id}/attachments`
-  - 新增接口：`GET /api/v1/project/projects/{project_id}/attachments/{attachment_id}/download`
-  - 新增接口：`DELETE /api/v1/project/projects/{project_id}/attachments/{attachment_id}`
-  - `Project` 新增字段：`attachments`（JSON，存项目附件元数据）
-  - SQLite 启动时自动补�?`project.attachments` 列并修复空值（兼容旧库�?
-- 工作台新增“请假功能”：
-  - 新增工作台请假申请表单、剩余假期展示、最近请假记�?
-  - 新增“待我审批”列表（直属主管审批入口�?
-  - 规则：L0 员工无需请假；L0 以下由直属主管审�?
-  - 新增接口：`POST /api/v1/todo/leaves`
-  - 新增接口：`GET /api/v1/todo/leaves/my`
-  - 新增接口：`GET /api/v1/todo/leaves/team/pending`
-  - 新增接口：`POST /api/v1/todo/leaves/{leave_id}/approve`
-  - 新增接口：`POST /api/v1/todo/leaves/{leave_id}/reject`
-  - 新增模型：`LeaveRequest`
-  - 用户模型新增假期余额字段（L0 可在用户管理中编辑）
-  - 取消自动重置；改�?L0 手动重置
-  - 员工管理调整：重置入口从“编辑员工弹窗”迁移至“员工管理主页面统一入口”，支持一键重置所有员�?
-  - 新增 IAM 接口：`POST /api/v1/iam/users/reset-leave-balances`（L0 触发全员重置�?
+  - `source_id={project_id}`锛堢‘淇濆彲琚」鐩換鍔″垪琛ㄥ拰杩涘害缁熻姝ｇ‘妫€绱級
+  - `creator_user_id=project.pm_user_id`锛堢粺涓€鐢遍」鐩粡鐞嗕綔涓哄鏍稿憳锛?
+- 璁よ瘉璇诲彇椤哄簭鏇存柊锛坄backend/app/core/auth.py`锛夛細
+  - 浼樺厛浣跨敤 `Authorization: Bearer` token
+  - 鏃?Bearer 鏃跺啀鍥為€€璇诲彇 cookie锛岄伩鍏嶅璐﹀彿鍒囨崲鏃惰韩浠介敊浣?
+- 闄勪欢绠＄悊鏀逛负鈥滈」鐩骇鈥濆叆鍙ｏ紙浣嶄簬椤圭洰璇︽儏椤碘€滈樁娈碘€濇ā鍧楀彸涓婅鈥滈檮浠垛€濇寜閽級锛?
+  - 鏀寔涓婁紶銆佷笅杞姐€佸垹闄ゅ苟鏌ョ湅鏈」鐩浉鍏抽檮浠讹紙鍚堝悓銆佸師鍨嬬‘璁ゅ崟绛夛級
+  - 鏂板鎺ュ彛锛歚GET /api/v1/project/projects/{project_id}/attachments`
+  - 鏂板鎺ュ彛锛歚POST /api/v1/project/projects/{project_id}/attachments`
+  - 鏂板鎺ュ彛锛歚GET /api/v1/project/projects/{project_id}/attachments/{attachment_id}/download`
+  - 鏂板鎺ュ彛锛歚DELETE /api/v1/project/projects/{project_id}/attachments/{attachment_id}`
+  - `Project` 鏂板瀛楁锛歚attachments`锛圝SON锛屽瓨椤圭洰闄勪欢鍏冩暟鎹級
+  - SQLite 鍚姩鏃惰嚜鍔ㄨˉ榻?`project.attachments` 鍒楀苟淇绌哄€硷紙鍏煎鏃у簱锛?
+- 宸ヤ綔鍙版柊澧炩€滆鍋囧姛鑳解€濓細
+  - 鏂板宸ヤ綔鍙拌鍋囩敵璇疯〃鍗曘€佸墿浣欏亣鏈熷睍绀恒€佹渶杩戣鍋囪褰?
+  - 鏂板鈥滃緟鎴戝鎵光€濆垪琛紙鐩村睘涓荤瀹℃壒鍏ュ彛锛?
+  - 瑙勫垯锛歀0 鍛樺伐鏃犻渶璇峰亣锛汱0 浠ヤ笅鐢辩洿灞炰富绠″鎵?
+  - 鏂板鎺ュ彛锛歚POST /api/v1/todo/leaves`
+  - 鏂板鎺ュ彛锛歚GET /api/v1/todo/leaves/my`
+  - 鏂板鎺ュ彛锛歚GET /api/v1/todo/leaves/team/pending`
+  - 鏂板鎺ュ彛锛歚POST /api/v1/todo/leaves/{leave_id}/approve`
+  - 鏂板鎺ュ彛锛歚POST /api/v1/todo/leaves/{leave_id}/reject`
+  - 鏂板妯″瀷锛歚LeaveRequest`
+  - 鐢ㄦ埛妯″瀷鏂板鍋囨湡浣欓瀛楁锛圠0 鍙湪鐢ㄦ埛绠＄悊涓紪杈戯級
+  - 鍙栨秷鑷姩閲嶇疆锛涙敼涓?L0 鎵嬪姩閲嶇疆
+  - 鍛樺伐绠＄悊璋冩暣锛氶噸缃叆鍙ｄ粠鈥滅紪杈戝憳宸ュ脊绐椻€濊縼绉昏嚦鈥滃憳宸ョ鐞嗕富椤甸潰缁熶竴鍏ュ彛鈥濓紝鏀寔涓€閿噸缃墍鏈夊憳宸?
+  - 鏂板 IAM 鎺ュ彛锛歚POST /api/v1/iam/users/reset-leave-balances`锛圠0 瑙﹀彂鍏ㄥ憳閲嶇疆锛?
 
 ---
 
-*最后更新：2026-02-25 | 如有结构性变更请同步更新本文�?
+*鏈€鍚庢洿鏂帮細2026-03-01 | 濡傛湁缁撴瀯鎬у彉鏇磋鍚屾鏇存柊鏈枃浠?
 
-## 8. �������£�2026-02-25 ����׷�ӣ�
+## 8. 增量更新（2026-03-01 晚间追加）
 
-- ���������������ϸ�ͬ�������嵥����������
-  - �½ӿڣ�`POST /api/v1/project/projects/{project_id}/sync-dev-tasks`
-  - ��Ϊ������ո���Ŀ `PROJECT_TASK` �ٰ������嵥�ؽ���ȷ�������б��빦���嵥�ϸ�һ�¡�
-  - ͬ������ͳ�ƣ�`created`��`deleted`��`feature_total`��`source_stage`��
-- �����������ӳ���޸���
-  - ͳһΪ `[���] / [ǰ��] / [UI] / [��Ʒ]` ǰ׺�����ٳ��� `[??]`��
-- Ȩ�޲��Ե������������ȹ�������
-  - ԭ������Ŀ��������չΪ����Ŀ��������Ŀ�����ˣ�owner������
-  - ���ǽӿڣ�`/todos/{todo_id}/assign`��`/todos/{todo_id}/plan`��`/sync-dev-tasks`��
-  - ǰ�� `DevelopmentProgressPage` ͬ������ `pm || owner` �ж������� id ��׼���Ƚϣ������������ַ� UUID����
-- ��������ҳ���������룺
-  - �������½����񡱡��༭���񡱵���������
-  - �༭֧���ֶΣ����⡢�����������ˡ����ȼ�����ֹ���ڡ��������͡�
-  - ��Ӧ��� `ProjectTaskPlanUpdateRequest` ���ӣ�`title`��`description`��`dev_type`��
-- ��Ŀ��Ա��ɫͬ���޸���
-  - ������Աʱ��δ�� `role_in_project`���Զ������û���λ����`JobTitle.name`�����޸�λ�����Ŀ��Ա����
-  - ��Ա�б��ӿ����Ӷ���չʾ���ս�ɫʱ����λ��/Ĭ��ֵ���أ���
+- 开发进度新增“严格同步功能清单任务”能力：
+  - 新接口：`POST /api/v1/project/projects/{project_id}/sync-dev-tasks`
+  - 行为：先清空该项目 `PROJECT_TASK` 再按功能清单重建，确保任务列表与功能清单严格一致。
+  - 同步返回统计：`created`、`deleted`、`feature_total`、`source_stage`。
+- 开发任务标题映射修复：
+  - 统一为 `[后端] / [前端] / [UI] / [产品]` 前缀，不再出现 `[??]`。
+- 权限策略调整（开发进度管理）：
+  - 原“仅项目经理”扩展为“项目经理或项目负责人（owner）”。
+  - 覆盖接口：`/todos/{todo_id}/assign`、`/todos/{todo_id}/plan`、`/sync-dev-tasks`。
+  - 前端 `DevelopmentProgressPage` 同步采用 `pm || owner` 判定，并做 id 标准化比较（兼容有无连字符 UUID）。
+- 开发进度页面能力补齐：
+  - 新增“新建任务”“编辑任务”弹窗能力。
+  - 编辑支持字段：标题、描述、负责人、优先级、截止日期、开发类型。
+  - 对应后端 `ProjectTaskPlanUpdateRequest` 增加：`title`、`description`、`dev_type`。
+- 项目成员角色同步修复：
+  - 新增成员时若未传 `role_in_project`，自动回填用户岗位名（`JobTitle.name`），无岗位则填“项目成员”。
+  - 成员列表接口增加兜底展示（空角色时按岗位名/默认值返回）。
 
-- ���ݿ�ִ�м�¼��atlas.db��2026-02-25����
-  - B2B ��Ŀ `test`����ղ��ؽ� `64 -> 64`����Դ�׶Σ�������룩
-  - B2C ��Ŀ `��Ϻ��`����ղ��ؽ� `30 -> 30`����Դ�׶Σ���Ŀ���
-  - `project_member` �ս�ɫ���`3 -> 0`
+- 数据库执行记录（atlas.db，2026-03-01）：
+  - B2B 项目 `test`：清空并重建 `64 -> 64`（来源阶段：需求对齐）
+  - B2C 项目 `龙虾派`：清空并重建 `30 -> 30`（来源阶段：项目立项）
+  - `project_member` 空角色回填：`3 -> 0`
 
 ---
 
-## 8. 增量更新�?026-02-27�?
+## 8. 澧為噺鏇存柊锛?026-02-27锛?
 
-- 财务交易明细页面重构�?
-  - 先实现“收�?付款/报销”三分区视图与分区数据加载；
-  - 后按业务确认改为单入口方案，仅保留“新增交易明细”按钮与统一交易列表�?
-- 新增交易明细能力增强�?
-  - 创建交易弹窗支持“上传发票”并随交易提交（`attachments`）�?
-  - 交易列表新增“发票附件”列，显示附件数量�?
-- 报销能力落地（首版）�?
-  - 新增 `CreateReimbursementModal`，支持主体来源账户、关联合�?项目、费用明细与附件�?
-  - 报销列表展示费用条目数、状态和金额�?
-- 接口与数据结构补齐：
-  - 前端 `financeApi.listTransactions` 支持透传 `txn_direction/account_id` 查询�?
-  - 后端交易创建接口支持接收并存�?`attachments` 字段�?
-  - 报销返回结构补充 `expense_lines`�?
-- 422 分页参数修复�?
-  - 为兼容前�?`page_size=200`，将以下列表接口分页上限�?`100` 提升�?`200`�?
+- 璐㈠姟浜ゆ槗鏄庣粏椤甸潰閲嶆瀯锛?
+  - 鍏堝疄鐜扳€滄敹娆?浠樻/鎶ラ攢鈥濅笁鍒嗗尯瑙嗗浘涓庡垎鍖烘暟鎹姞杞斤紱
+  - 鍚庢寜涓氬姟纭鏀逛负鍗曞叆鍙ｆ柟妗堬紝浠呬繚鐣欌€滄柊澧炰氦鏄撴槑缁嗏€濇寜閽笌缁熶竴浜ゆ槗鍒楄〃銆?
+- 鏂板浜ゆ槗鏄庣粏鑳藉姏澧炲己锛?
+  - 鍒涘缓浜ゆ槗寮圭獥鏀寔鈥滀笂浼犲彂绁ㄢ€濆苟闅忎氦鏄撴彁浜わ紙`attachments`锛夈€?
+  - 浜ゆ槗鍒楄〃鏂板鈥滃彂绁ㄩ檮浠垛€濆垪锛屾樉绀洪檮浠舵暟閲忋€?
+- 鎶ラ攢鑳藉姏钀藉湴锛堥鐗堬級锛?
+  - 鏂板 `CreateReimbursementModal`锛屾敮鎸佷富浣撴潵婧愯处鎴枫€佸叧鑱斿悎鍚?椤圭洰銆佽垂鐢ㄦ槑缁嗕笌闄勪欢銆?
+  - 鎶ラ攢鍒楄〃灞曠ず璐圭敤鏉＄洰鏁般€佺姸鎬佸拰閲戦銆?
+- 鎺ュ彛涓庢暟鎹粨鏋勮ˉ榻愶細
+  - 鍓嶇 `financeApi.listTransactions` 鏀寔閫忎紶 `txn_direction/account_id` 鏌ヨ銆?
+  - 鍚庣浜ゆ槗鍒涘缓鎺ュ彛鏀寔鎺ユ敹骞跺瓨鍌?`attachments` 瀛楁銆?
+  - 鎶ラ攢杩斿洖缁撴瀯琛ュ厖 `expense_lines`銆?
+- 422 鍒嗛〉鍙傛暟淇锛?
+  - 涓哄吋瀹瑰墠绔?`page_size=200`锛屽皢浠ヤ笅鍒楄〃鎺ュ彛鍒嗛〉涓婇檺浠?`100` 鎻愬崌鍒?`200`锛?
     - `GET /api/v1/finance/transactions`
     - `GET /api/v1/finance/invoices`
     - `GET /api/v1/finance/reimbursements`
     - `GET /api/v1/contract/contracts`
     - `GET /api/v1/project/projects`
-- UI 可用性修复：
-  - 交易创建弹窗增加专用样式文件，输入框改为浅色高对比，修复黑底可读性问题�?
+- UI 鍙敤鎬т慨澶嶏細
+  - 浜ゆ槗鍒涘缓寮圭獥澧炲姞涓撶敤鏍峰紡鏂囦欢锛岃緭鍏ユ鏀逛负娴呰壊楂樺姣旓紝淇榛戝簳鍙鎬ч棶棰橀€?
 
 ---
 
-## 9. 增量更新�?026-02-27 追加�?
+## 9. 澧為噺鏇存柊锛?026-02-27 杩藉姞锛?
 
-- 交易明细业务语义升级�?
-  - 新增交易类型 `txn_type`：`receipt` / `payment` / `reimbursement`�?
-  - 报销类型统一按支出方向处理（`txn_direction=out`）�?
-- 交易对象扩展�?
-  - 报销场景新增 `employee_user_id`，交易对象改为选择员工（来自用户管�?`GET /api/v1/iam/users`）�?
-  - 非报销场景仍使用对手方 `counterparty_id`�?
-- 交易状态体系调整：
-  - 状态改为三档：`未完�?unreconciled)`、`已完�?completed)`、`已对�?reconciled)`�?
-  - 新增接口：`PATCH /api/v1/finance/transactions/{txn_id}`，支持在交易明细列表中直接编辑状态�?
-- 账户余额口径更新�?
-  - 账户余额仅统计“已完成/已对账”交易；“未完成”交易不入账�?
-- SQLite 兼容修复�?
-  - 自动补齐 `finance_transaction.txn_type`、`finance_transaction.employee_user_id`�?
-  - 启动时自动规范历史枚举值（`txn_type/reconcile_status`）到 ORM 可识别格式，修复交易列表 500�?
-- 前端可用性修复：
-  - 报销员工下拉使用用户管理员工列表，修复空列表问题�?
-  - 交易列表状态选择器改为浅色高对比样式，修复黑色不可读�?
-  - 财务�?IAM 用户请求 `page_size` 调整�?100，修�?422�?
+- 浜ゆ槗鏄庣粏涓氬姟璇箟鍗囩骇锛?
+  - 鏂板浜ゆ槗绫诲瀷 `txn_type`锛歚receipt` / `payment` / `reimbursement`銆?
+  - 鎶ラ攢绫诲瀷缁熶竴鎸夋敮鍑烘柟鍚戝鐞嗭紙`txn_direction=out`锛夈€?
+- 浜ゆ槗瀵硅薄鎵╁睍锛?
+  - 鎶ラ攢鍦烘櫙鏂板 `employee_user_id`锛屼氦鏄撳璞℃敼涓洪€夋嫨鍛樺伐锛堟潵鑷敤鎴风鐞?`GET /api/v1/iam/users`锛夈€?
+  - 闈炴姤閿€鍦烘櫙浠嶄娇鐢ㄥ鎵嬫柟 `counterparty_id`銆?
+- 浜ゆ槗鐘舵€佷綋绯昏皟鏁达細
+  - 鐘舵€佹敼涓轰笁妗ｏ細`鏈畬鎴?unreconciled)`銆乣宸插畬鎴?completed)`銆乣宸插璐?reconciled)`銆?
+  - 鏂板鎺ュ彛锛歚PATCH /api/v1/finance/transactions/{txn_id}`锛屾敮鎸佸湪浜ゆ槗鏄庣粏鍒楄〃涓洿鎺ョ紪杈戠姸鎬併€?
+- 璐︽埛浣欓鍙ｅ緞鏇存柊锛?
+  - 璐︽埛浣欓浠呯粺璁♀€滃凡瀹屾垚/宸插璐︹€濅氦鏄擄紱鈥滄湭瀹屾垚鈥濅氦鏄撲笉鍏ヨ处銆?
+- SQLite 鍏煎淇锛?
+  - 鑷姩琛ラ綈 `finance_transaction.txn_type`銆乣finance_transaction.employee_user_id`銆?
+  - 鍚姩鏃惰嚜鍔ㄨ鑼冨巻鍙叉灇涓惧€间簬`txn_type/reconcile_status`锛夊埌 ORM 鍙瘑鍒牸寮忥紝淇浜ゆ槗鍒楄〃 500銆?
+- 鍓嶇鍙敤鎬т慨澶嶏細
+  - 鎶ラ攢鍛樺伐涓嬫媺浣跨敤鐢ㄦ埛绠＄悊鍛樺伐鍒楄〃锛屼慨澶嶇┖鍒楄〃闂銆?
+  - 浜ゆ槗鍒楄〃鐘舵€侀€夋嫨鍣ㄦ敼涓烘祬鑹插繝瀵规瘮鏍峰紡锛屼慨澶嶉粦鑹蹭笉鍙銆?
+  - 璐㈠姟椤?IAM 鐢ㄦ埛璇锋眰 `page_size` 璋冩暣涓?100锛屼慨澶?422銆?
 
 ---
 
-## 10. �������£�2026-02-28��
+## 10. 增量更新（2026-02-28）
 
-- ��Ŀ����������ԭ��ȷ�ϵ���������ԭ��ȷ�Ͻ׶Σ���
-  - ����ǰ�������frontend/src/pages/project/components/PrototypeConfirmModal.jsx
-  - ��Ŀ������д��ԭ�͵�ַ/��Ƶ�ַ����ɱ��沢���� Word��
-  - ģ�����ȷ��˵������Χ�߽硢ǩ������ͳһ�ĵ���ʽ��
+- 项目管理新增“原型确认单”能力（原型确认阶段）：
+  - 新增前端组件：frontend/src/pages/project/components/PrototypeConfirmModal.jsx
+  - 项目经理填写“原型地址/设计地址”后可保存并导出 Word；
+  - 模板包含确认说明、范围边界、签署栏，统一文档样式。
 
-- ��Ŀ�������Խ׶�������Bug ��������������������ͨ��
-  - ����ǰ�������frontend/src/pages/project/components/BugManagementModal.jsx
-  - ��Ŀ���� testing �׶�������ڡ�Bug��������
-  - Bug ��Ϊ��Ŀ�������׷�٣�source_type=project_task + tags=bug/testing����
-  - �½� Bug ʱͬʱ���񴴽�һ��������Ա custom ���죬ȷ���ڡ��ҵ����񡱿ɼ���
-  - �½���������������Ա��������/����ˣ�+ ������Ա����������ˣ�����
-  - Լ��������ѡ����Ա���˿ɴ�������֤�������������Ϊ����Ա����
+- 项目管理测试阶段新增“Bug 管理”能力，并与待办打通：
+  - 新增前端组件：frontend/src/pages/project/components/BugManagementModal.jsx
+  - 项目详情 testing 阶段新增入口“Bug管理”；
+  - Bug 作为项目任务进行追踪（source_type=project_task + tags=bug/testing）；
+  - 新建 Bug 时同时镜像创建一条开发人员 custom 待办，确保在“我的任务”可见；
+  - 新建表单新增“测试员（创建人/审核人）+ 开发人员（待办接收人）”；
+  - 约束：仅所选测试员本人可创建（保证创建人与审核人为测试员）。
 
-- Bug ������ǿ��
-  - �������ύ���պ����ͨ������ť��pending_review -> done������ todoApi.approve����
-  - ������ɾ�� Bug����ť��������ȷ�ϣ���
+- Bug 管理增强：
+  - 新增“提交验收后审核通过”按钮（pending_review -> done，调用 todoApi.approve）；
+  - 新增“删除 Bug”按钮（带二次确认）。
 
-- ���������Ŀ����ɾ���ӿڣ��� Bug ɾ�����ã���
+- 后端新增项目任务删除接口（供 Bug 删除复用）：
   - DELETE /api/v1/project/projects/{project_id}/todos/{todo_id}
-  - Ȩ�ޣ���Ŀ���� / ��Ŀ������ / ���񴴽��ˡ�
+  - 权限：项目经理 / 项目负责人 / 任务创建人。
 
-- ����ҳ��ɼ�������Ϣ��ǿ��
-  - Todo �б������ҳ��������Ϊ page_size=100�����ⳬ�� 422����
-  - ���쿨Ƭ���б���������Ŀ����ǩ������ todo.link.project_name�����ס���Ŀ���񡱣���
+- 待办页面可见性与信息增强：
+  - Todo 列表请求分页参数调整为 page_size=100（避免超限 422）；
+  - 待办卡片与列表新增“项目”标签（优先 todo.link.project_name，兜底“项目任务”）。
 
 
 ---
@@ -410,4 +417,22 @@ curl http://localhost:8000/health
 - Changed admin employee Beli operation from absolute override to delta adjustment.
   - New update payload: `beili_adjust_action` + `beili_adjust_amount`.
   - Actions: `add` / `subtract`.
-  - User edit modal now displays current Beli balance before adjustment.
+
+## 14. Incremental Update (2026-03-01, Alembic Startup Migration)
+
+- Refactored backend startup DB compatibility flow from inline SQL backfill to Alembic migration execution.
+- Updated backend/app/core/database.py:
+  - Removed _ensure_legacy_columns runtime backfill path.
+  - Added run_migrations() and executed alembic upgrade head during startup init.
+- Added Alembic config: backend/alembic.ini.
+- Added migration script directory: backend/db_migrations/ (env.py + versions/).
+- Added migration script: backend/db_migrations/versions/20260301_0001_legacy_compatibility_fixes.py.
+- Migration script covers legacy schema/data compatibility for: user, beli_rule, project, project_stage, finance_transaction.
+
+---
+
+## 15. Incremental Update (2026-03-01, Acceptance Report)
+- Added Acceptance Report endpoint for B2B Project Delivery Stage using `python-docx`
+  - `GET /projects/{project_id}/acceptance-report/download`
+  - `backend/app/services/docx_generator.py` service
+  - Frontend: `projectApi.downloadAcceptanceReport`

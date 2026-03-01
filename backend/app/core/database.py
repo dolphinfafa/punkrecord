@@ -1,7 +1,7 @@
 """
 Database connection and session management
 """
-from datetime import datetime
+from pathlib import Path
 from sqlmodel import create_engine, Session, SQLModel
 from app.core.config import settings
 
@@ -17,120 +17,24 @@ engine = create_engine(
 def create_db_and_tables():
     """Create database tables"""
     SQLModel.metadata.create_all(engine)
-    _ensure_legacy_columns()
+    run_migrations()
 
 
-def _ensure_legacy_columns():
-    """Backfill newly added columns in existing SQLite databases."""
-    if not settings.DATABASE_URL.startswith("sqlite"):
-        return
+def run_migrations():
+    """Apply Alembic migrations to head."""
+    try:
+        from alembic import command
+        from alembic.config import Config
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Alembic is required to run DB migrations. Install dependencies with: pip install -r requirements.txt"
+        ) from exc
 
-    with engine.begin() as conn:
-        user_columns = {
-            row[1] for row in conn.exec_driver_sql(
-                "PRAGMA table_info('user')"
-            ).fetchall()
-        }
-        user_leave_defaults = {
-            "leave_annual_remaining": 5.0,
-            "leave_maternity_remaining": 15.0,
-            "leave_marriage_remaining": 3.0,
-            "leave_personal_remaining": 3.0,
-            "leave_sick_remaining": 3.0,
-        }
-        if "beili_balance" not in user_columns:
-            conn.exec_driver_sql(
-                "ALTER TABLE user ADD COLUMN beili_balance FLOAT NOT NULL DEFAULT 0"
-            )
-        conn.exec_driver_sql(
-            "UPDATE user SET beili_balance = 0 WHERE beili_balance IS NULL"
-        )
-        current_year = datetime.utcnow().year
-        if "leave_balance_reset_year" not in user_columns:
-            conn.exec_driver_sql(
-                f"ALTER TABLE user ADD COLUMN leave_balance_reset_year INTEGER NOT NULL DEFAULT {current_year}"
-            )
-        conn.exec_driver_sql(
-            f"UPDATE user SET leave_balance_reset_year = {current_year} WHERE leave_balance_reset_year IS NULL"
-        )
-        for col_name, default_val in user_leave_defaults.items():
-            if col_name not in user_columns:
-                conn.exec_driver_sql(
-                    f"ALTER TABLE user ADD COLUMN {col_name} FLOAT NOT NULL DEFAULT {default_val}"
-                )
-            conn.exec_driver_sql(
-                f"UPDATE user SET {col_name} = {default_val} WHERE {col_name} IS NULL"
-            )
-
-        beli_rule_columns = {
-            row[1] for row in conn.exec_driver_sql(
-                "PRAGMA table_info('beli_rule')"
-            ).fetchall()
-        }
-        if beli_rule_columns and "rule_type" not in beli_rule_columns:
-            conn.exec_driver_sql(
-                "ALTER TABLE beli_rule ADD COLUMN rule_type VARCHAR(64) NOT NULL DEFAULT 'task_timeliness'"
-            )
-        if beli_rule_columns:
-            conn.exec_driver_sql(
-                "UPDATE beli_rule SET rule_type = 'task_timeliness' WHERE rule_type IS NULL OR rule_type = ''"
-            )
-
-        project_columns = {
-            row[1] for row in conn.exec_driver_sql(
-                "PRAGMA table_info('project')"
-            ).fetchall()
-        }
-        if "attachments" not in project_columns:
-            conn.exec_driver_sql("ALTER TABLE project ADD COLUMN attachments JSON")
-        conn.exec_driver_sql(
-            "UPDATE project SET attachments = '[]' WHERE attachments IS NULL"
-        )
-
-        stage_columns = {
-            row[1] for row in conn.exec_driver_sql(
-                "PRAGMA table_info('project_stage')"
-            ).fetchall()
-        }
-        if "attachments" not in stage_columns:
-            conn.exec_driver_sql("ALTER TABLE project_stage ADD COLUMN attachments JSON")
-        conn.exec_driver_sql(
-            "UPDATE project_stage SET attachments = '[]' WHERE attachments IS NULL"
-        )
-
-        transaction_columns = {
-            row[1] for row in conn.exec_driver_sql(
-                "PRAGMA table_info('finance_transaction')"
-            ).fetchall()
-        }
-        if "txn_type" not in transaction_columns:
-            conn.exec_driver_sql(
-                "ALTER TABLE finance_transaction ADD COLUMN txn_type VARCHAR(32) NOT NULL DEFAULT 'payment'"
-            )
-        if "employee_user_id" not in transaction_columns:
-            conn.exec_driver_sql(
-                "ALTER TABLE finance_transaction ADD COLUMN employee_user_id CHAR(32)"
-            )
-        conn.exec_driver_sql(
-            "UPDATE finance_transaction SET txn_type = CASE "
-            "WHEN LOWER(txn_direction) = 'in' OR txn_direction = 'IN' THEN 'RECEIPT' "
-            "ELSE 'PAYMENT' END "
-            "WHERE txn_type IS NULL OR txn_type = ''"
-        )
-        conn.exec_driver_sql(
-            "UPDATE finance_transaction SET txn_type = CASE "
-            "WHEN LOWER(txn_type) = 'receipt' THEN 'RECEIPT' "
-            "WHEN LOWER(txn_type) = 'payment' THEN 'PAYMENT' "
-            "WHEN LOWER(txn_type) = 'reimbursement' THEN 'REIMBURSEMENT' "
-            "ELSE txn_type END"
-        )
-        conn.exec_driver_sql(
-            "UPDATE finance_transaction SET reconcile_status = CASE "
-            "WHEN LOWER(reconcile_status) = 'unreconciled' THEN 'UNRECONCILED' "
-            "WHEN LOWER(reconcile_status) = 'completed' THEN 'COMPLETED' "
-            "WHEN LOWER(reconcile_status) = 'reconciled' THEN 'RECONCILED' "
-            "ELSE reconcile_status END"
-        )
+    backend_dir = Path(__file__).resolve().parents[2]
+    alembic_cfg = Config(str(backend_dir / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(backend_dir / "db_migrations"))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    command.upgrade(alembic_cfg, "head")
 
 
 def get_session():

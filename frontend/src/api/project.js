@@ -100,6 +100,15 @@ export const projectApi = {
     getProjectContractContext: async (projectId) => {
         return client.get(`/project/projects/${projectId}/contract-context`);
     },
+    downloadAcceptanceReport: async (projectId) => {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        return axios.get(`/api/v1/project/projects/${projectId}/acceptance-report/download`, {
+            responseType: 'blob',
+            withCredentials: true,
+            headers,
+        });
+    },
 };
 
 export default projectApi;
