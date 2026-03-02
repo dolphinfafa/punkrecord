@@ -40,6 +40,13 @@ punkrecord/
 |     |- hooks/
 |     |- pages/               # route pages by business domain
 |     `- utils/
+|- miniprogram/
+|  |- pages/                  # WeChat Mini Program pages (mobile-first)
+|  |- services/               # API service wrappers for mini program
+|  |- utils/                  # request/session helpers
+|  |- app.{js,json,wxss}
+|  |- project.config.json
+|  `- project.private.config.json
 |- apps/api/                  # experimental NestJS API area
 |- prd/                       # product requirement docs
 |- milestone/                 # dated milestone records
@@ -157,6 +164,23 @@ Layout and state:
 - Auth state: `contexts/AuthContext`
 - Domain pages: `src/pages/{auth,dashboard,iam,contract,project,finance,todo}`
 
+Mini program client (`miniprogram/`):
+- Native WeChat mini program structure (`app.js`, `app.json`, `app.wxss`).
+- Mobile-first pages:
+  - `pages/login`
+  - `pages/home`
+  - `pages/todo`
+  - `pages/project`
+  - `pages/finance`
+  - `pages/mine`
+  - `pages/contract`
+  - `pages/iam`
+- Shared request/session utilities:
+  - `utils/request.js`
+  - `utils/storage.js`
+- API service mapping mirrors web domains:
+  - `services/{auth,todo,project,finance,contract,iam}.js`
+
 ## 6. Key Workflows to Understand
 
 1. Authentication flow
@@ -199,6 +223,18 @@ npm run lint
 npm run preview
 ```
 
+Mini program (from `miniprogram/`):
+```bash
+# Import this directory into WeChat DevTools:
+# Project path: <repo>/miniprogram
+# Use appid from your WeChat mini program settings
+```
+
+Mini program compile note:
+- If DevTools reports missing base library (for example `2.31.0` not found),
+  update `miniprogram/project.private.config.json` -> `libVersion` to an available version
+  (current project baseline: `3.6.3`), then clear DevTools cache and recompile.
+
 Quick checks:
 ```bash
 curl http://localhost:8000/health
@@ -216,6 +252,8 @@ Naming:
 - Frontend components: `PascalCase`
 - JS variables/functions: `camelCase`
 - API paths: kebab-case style where applicable
+- Mini program pages follow `pages/<module>/index.*` convention
+- Mini program styles use `rpx` for responsive mobile layout
 
 Response shape convention:
 - Success: `{ "data": ..., "message": "ok" }`

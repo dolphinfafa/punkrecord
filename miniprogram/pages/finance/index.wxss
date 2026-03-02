@@ -1,0 +1,6 @@
+.mini { font-size: 28rpx; margin-bottom: 10rpx; }
+.row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8rpx; }
+.name { font-size: 26rpx; max-width: 500rpx; }
+.amt { font-size: 26rpx; font-weight: 700; color: #0f172a; }
+.txn { padding: 10rpx 0; border-bottom: 1rpx solid #f1f5f9; }
+.txn:last-child { border-bottom: none; }

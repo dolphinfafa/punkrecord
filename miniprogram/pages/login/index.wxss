@@ -1,0 +1,23 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #c7d2fe, #eef2ff 45%, #f8fafc 80%);
+}
+
+.hero { margin-bottom: 32rpx; }
+.brand { font-size: 54rpx; font-weight: 800; color: #0f172a; }
+.subtitle { margin-top: 10rpx; color: #475569; font-size: 26rpx; }
+.login-card { border-radius: 28rpx; }
+.field { margin-bottom: 20rpx; }
+.label { display: block; margin-bottom: 10rpx; color: #334155; font-size: 24rpx; }
+.input {
+  height: 84rpx;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  padding: 0 22rpx;
+  background: #ffffff;
+  font-size: 28rpx;
+}
+.primary-btn { margin-top: 10rpx; }

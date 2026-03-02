@@ -1,0 +1,13 @@
+<view class="container">
+  <view class="card profile">
+    <view class="avatar">{{initial}}</view>
+    <view>
+      <view class="name">{{name || 'Guest'}}</view>
+      <view class="muted">{{username || 'Not logged in'}}</view>
+    </view>
+  </view>
+
+  <view class="card menu" bindtap="goContract">Contract Module</view>
+  <view class="card menu" bindtap="goIAM">IAM Module</view>
+  <button class="primary-btn" bindtap="logout">Sign Out</button>
+</view>

@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="card">
+    <view class="title">Projects</view>
+    <view class="muted">Mobile-adapted list view</view>
+  </view>
+
+  <block wx:if="{{projects.length}}">
+    <view class="card" wx:for="{{projects}}" wx:key="id">
+      <view class="row">
+        <text class="name">{{item.name || 'Untitled Project'}}</text>
+        <text class="status">{{item.status || 'unknown'}}</text>
+      </view>
+      <view class="muted">Type: {{item.type || item.project_type || 'n/a'}}</view>
+      <view class="muted">Budget: {{item.budget || 'n/a'}}</view>
+    </view>
+  </block>
+
+  <view class="card" wx:else><view class="muted">No projects found.</view></view>
+</view>

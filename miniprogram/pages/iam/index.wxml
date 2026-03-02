@@ -1,0 +1,16 @@
+<view class="container">
+  <view class="card">
+    <view class="title">Users</view>
+    <view class="muted">IAM mobile snapshot</view>
+  </view>
+  <block wx:if="{{users.length}}">
+    <view class="card" wx:for="{{users}}" wx:key="id">
+      <view class="row">
+        <text class="name">{{item.real_name || item.username}}</text>
+        <text class="status">{{item.status || 'n/a'}}</text>
+      </view>
+      <view class="muted">{{item.email || 'No email'}}</view>
+    </view>
+  </block>
+  <view class="card" wx:else><view class="muted">No users found.</view></view>
+</view>

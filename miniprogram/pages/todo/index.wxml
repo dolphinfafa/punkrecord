@@ -1,0 +1,21 @@
+<view class="container">
+  <view class="card">
+    <view class="title">My Todos</view>
+    <view class="muted">Pulled from /api/v1/todo/my</view>
+  </view>
+
+  <block wx:if="{{todos.length}}">
+    <view class="card todo-item" wx:for="{{todos}}" wx:key="id">
+      <view class="todo-row">
+        <text class="todo-title">{{item.title || 'Untitled Todo'}}</text>
+        <text class="badge {{item.status}}">{{item.status || 'unknown'}}</text>
+      </view>
+      <view class="muted">Priority: {{item.priority || 'n/a'}}</view>
+      <view class="muted">Due: {{item.due_at || item.due_date || 'n/a'}}</view>
+    </view>
+  </block>
+
+  <view class="card" wx:else>
+    <view class="muted">No todos found.</view>
+  </view>
+</view>

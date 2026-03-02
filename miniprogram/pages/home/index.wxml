@@ -1,0 +1,37 @@
+<view class="container">
+  <view class="card header">
+    <view class="title">Welcome{{userName ? ', ' + userName : ''}}</view>
+    <view class="muted">Mobile workspace synced with existing web backend.</view>
+  </view>
+
+  <view class="metrics-grid">
+    <view class="card metric">
+      <view class="metric-num">{{todoCount}}</view>
+      <view class="metric-label">My Todos</view>
+    </view>
+    <view class="card metric">
+      <view class="metric-num">{{projectCount}}</view>
+      <view class="metric-label">Projects</view>
+    </view>
+    <view class="card metric">
+      <view class="metric-num">{{txnCount}}</view>
+      <view class="metric-label">Transactions</view>
+    </view>
+    <view class="card metric">
+      <view class="metric-num">{{pendingLeaveCount}}</view>
+      <view class="metric-label">Pending Leaves</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="title section-title">Quick Access</view>
+    <view class="quick-grid">
+      <view class="quick-item" bindtap="goTodo">Todo</view>
+      <view class="quick-item" bindtap="goProject">Project</view>
+      <view class="quick-item" bindtap="goFinance">Finance</view>
+      <view class="quick-item" bindtap="goContract">Contract</view>
+      <view class="quick-item" bindtap="goIAM">IAM</view>
+      <view class="quick-item" bindtap="goMine">Profile</view>
+    </view>
+  </view>
+</view>

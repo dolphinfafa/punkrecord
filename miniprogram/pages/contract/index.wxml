@@ -1,0 +1,16 @@
+<view class="container">
+  <view class="card">
+    <view class="title">Contracts</view>
+    <view class="muted">Read-only mobile list for now</view>
+  </view>
+  <block wx:if="{{contracts.length}}">
+    <view class="card" wx:for="{{contracts}}" wx:key="id">
+      <view class="row">
+        <text class="name">{{item.title || 'Untitled Contract'}}</text>
+        <text class="status">{{item.status || 'unknown'}}</text>
+      </view>
+      <view class="muted">Amount: {{item.amount || 'n/a'}}</view>
+    </view>
+  </block>
+  <view class="card" wx:else><view class="muted">No contracts found.</view></view>
+</view>

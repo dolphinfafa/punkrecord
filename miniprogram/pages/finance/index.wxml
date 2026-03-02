@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="card">
+    <view class="title">Finance Overview</view>
+    <view class="muted">Accounts and recent transactions</view>
+  </view>
+
+  <view class="card">
+    <view class="title mini">Accounts ({{accounts.length}})</view>
+    <block wx:if="{{accounts.length}}">
+      <view class="row" wx:for="{{accounts}}" wx:key="id">
+        <text class="name">{{item.name}}</text>
+        <text class="amt">{{item.balance || 0}}</text>
+      </view>
+    </block>
+    <view class="muted" wx:else>No accounts found.</view>
+  </view>
+
+  <view class="card">
+    <view class="title mini">Transactions ({{transactions.length}})</view>
+    <block wx:if="{{transactions.length}}">
+      <view class="txn" wx:for="{{transactions}}" wx:key="id">
+        <view class="row">
+          <text class="name">{{item.description || 'No description'}}</text>
+          <text class="amt">{{item.amount || 0}}</text>
+        </view>
+        <view class="muted">{{item.txn_date || 'n/a'}} · {{item.direction || item.txn_direction || 'n/a'}}</view>
+      </view>
+    </block>
+    <view class="muted" wx:else>No transactions found.</view>
+  </view>
+</view>

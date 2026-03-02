@@ -1,0 +1,18 @@
+<view class="container login-page">
+  <view class="hero">
+    <view class="brand">PunkRecord</view>
+    <view class="subtitle">Mini Program Workspace</view>
+  </view>
+
+  <view class="card login-card">
+    <view class="field">
+      <text class="label">Username</text>
+      <input class="input" placeholder="Enter username" value="{{username}}" bindinput="onUsernameChange" />
+    </view>
+    <view class="field">
+      <text class="label">Password</text>
+      <input class="input" password placeholder="Enter password" value="{{password}}" bindinput="onPasswordChange" />
+    </view>
+    <button class="primary-btn" loading="{{loading}}" bindtap="onLogin">Sign In</button>
+  </view>
+</view>

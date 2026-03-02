@@ -1,0 +1,24 @@
+.header { margin-top: 6rpx; }
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+}
+.metric { text-align: center; }
+.metric-num { font-size: 48rpx; font-weight: 700; color: #1e293b; }
+.metric-label { color: #64748b; font-size: 22rpx; margin-top: 8rpx; }
+.section-title { margin-bottom: 12rpx; font-size: 30rpx; }
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+}
+.quick-item {
+  background: linear-gradient(135deg, #0f172a, #334155);
+  color: #fff;
+  border-radius: 14rpx;
+  text-align: center;
+  padding: 18rpx 10rpx;
+  font-size: 24rpx;
+}

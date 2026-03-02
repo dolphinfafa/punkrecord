@@ -1,0 +1,14 @@
+.todo-item { margin-bottom: 14rpx; }
+.todo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8rpx; }
+.todo-title { font-size: 30rpx; font-weight: 600; max-width: 500rpx; }
+.badge {
+  font-size: 20rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
+  color: #334155;
+}
+.badge.in_progress { background: #dbeafe; color: #1d4ed8; }
+.badge.submitted { background: #fef3c7; color: #a16207; }
+.badge.done { background: #dcfce7; color: #166534; }
+.badge.blocked { background: #fee2e2; color: #991b1b; }
