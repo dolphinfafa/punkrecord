@@ -1,40 +1,26 @@
 ---
-description: 工程索引使用规范 — Agent 每次任务开始前读取索引，完成后更新索引
+description: Rules for using and maintaining project-index.md during task execution.
 ---
 
-# 工程索引使用规范
+# Use Project Index
 
-本工作流规定了 Agent 在此项目中工作时，如何使用和维护 `project-index.md`。
+## Before Starting Any Task (Required)
+1. Read `.agent/workflows/project-index.md` fully.
+2. Use it to locate modules, files, and routes first.
+3. Only scan directories when index details are insufficient.
 
----
+## After Task Completion (When Changes Exist)
+Update only impacted sections in `project-index.md`:
+- Directory changes -> `Directory Map`
+- Module responsibility changes -> `Core Modules`
+- Data model changes -> `Key Models`
+- Workflow changes -> `Critical Flows`
+- Command changes -> `Common Commands`
+- Convention changes -> `Conventions`
 
-## 任务开始前（必须执行）
+Also update `Last updated` date.
 
-1. 使用 `view_file` 读取 `.agent/workflows/project-index.md` 的完整内容
-2. 根据索引快速定位相关模块、文件路径、API 路由，**避免重复扫描整个目录树**
-3. 仅当索引不足以定位时，才对具体文件使用 `view_file` 或 `grep_search` 补充细节
-
----
-
-## 任务完成后（有变更时执行）
-
-如果本次任务涉及以下任意变更，**须同步更新 `project-index.md` 的对应章节**：
-
-| 变更类型 | 需更新的章节 |
-|---------|------------|
-| 新增/删除文件或目录 | §1 目录结构 |
-| 新增/修改模块职责 | §2 关键模块职责 |
-| 新增/修改数据表字段 | §3 核心数据模型 |
-| 新增/修改关键业务流程 | §4 关键流程 |
-| 新增/修改启动命令或脚本 | §5 常用命令 |
-| 新增/修改命名约定、错误码、响应格式 | §6 约定 |
-
-更新时只修改受影响的章节，**不要重写整个文件**。同时更新文件底部的"最后更新"日期。
-
----
-
-## 使用原则
-
-- **索引优先**：先查索引，再查代码，减少不必要的文件读取
-- **最小更新**：只更新有实质变化的内容，保持索引简洁
-- **不写实现细节**：索引只记录"在哪"和"是什么"，不记录具体实现逻辑
+## Principles
+- Index first, code second.
+- Minimal updates only.
+- Record what/where, not implementation internals.

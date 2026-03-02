@@ -1,95 +1,19 @@
 ---
-description: List all available agent skills — both global and project-local.
+description: Workflow for discovering and listing available Codex skills in the current environment.
 ---
 
-# List Available Skills
+# List Skills Workflow
 
-## Global Skills Directory
+## Goal
+Provide a concise list of usable skills with name, purpose, and file path.
 
-> **全局 Skills 路径（按操作系统）**
-> - **Windows**: `C:\Users\YZ\.antigravity\skills\`
-> - **macOS**: `/Users/yangzhe/.antigravity/skills/`
+## Procedure
+1. Read skill index provided in session instructions.
+2. Confirm each skill path exists.
+3. Return a compact table with practical usage hints.
 
-### 1. Check Anthropic Skills
-
-// turbo
-**Windows (PowerShell):**
-```powershell
-Get-ChildItem "C:\Users\YZ\.antigravity\skills\skills\skills" -Directory | Select-Object Name
-```
-**macOS:**
-```bash
-ls /Users/yangzhe/.antigravity/skills/
-```
-
-### 2. Check UI UX Pro Max Skill
-
-// turbo
-**Windows (PowerShell):**
-```powershell
-Get-ChildItem "C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\src\ui-ux-pro-max" -Directory | Select-Object Name
-```
-**macOS:**
-```bash
-ls /Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/
-```
-
-
-
-## Known Skills Summary
-
-### Global — Anthropic Skills
-
-| Platform | Skills 根目录 |
-|----------|-------------|
-| **Windows** | `C:\Users\YZ\.antigravity\skills\skills\skills\` |
-| **macOS** | `/Users/yangzhe/.antigravity/skills/` |
-
-| Skill | Description |
-|-------|-------------|
-| `algorithmic-art` | Generative art and creative coding |
-| `brand-guidelines` | Brand consistency and style guides |
-| `canvas-design` | Canvas-based graphics and drawing |
-| `doc-coauthoring` | Collaborative document editing |
-| `docx` | Word document creation |
-| `frontend-design` | Distinctive UI/UX interfaces |
-| `internal-comms` | Internal communication documents |
-| `mcp-builder` | MCP server construction |
-| `pdf` | PDF generation and processing |
-| `pptx` | PowerPoint presentation creation |
-| `skill-creator` | Creating new custom skills |
-| `slack-gif-creator` | GIF creation for Slack |
-| `theme-factory` | Design system and theme generation |
-| `web-artifacts-builder` | Web app and component building |
-| `webapp-testing` | Automated web app testing |
-| `xlsx` | Excel spreadsheet processing |
-
-### Global — UI UX Pro Max
-
-| Platform | 根目录 |
-|----------|------|
-| **Windows** | `C:\Users\YZ\.antigravity\skills\ui-ux-pro-max-skill\` |
-| **macOS** | `/Users/yangzhe/.antigravity/skills/ui-ux-pro-max-skill/` |
-
-| Resource | Path |
-|----------|------|
-| Search script | `src\ui-ux-pro-max\scripts\search.py` |
-| Data files | `src\ui-ux-pro-max\data\` |
-| Templates | `src\ui-ux-pro-max\templates\` |
-
-### Project-Local
-
-本项目当前没有项目专属 skill（`.agent/skills/` 目录已移除）。
-
-## How to Use a Skill
-
-Reference the SKILL.md file path when asking the AI to use a specific skill:
-
-**Windows:**
-```
-请使用 C:\Users\YZ\.antigravity\skills\skills\skills\frontend-design\SKILL.md 中的 skill 来设计这个组件
-```
-**macOS:**
-```
-请使用 /Users/yangzhe/.antigravity/skills/frontend-design/SKILL.md 中的 skill 来设计这个组件
-```
+## Output Format
+- `name`
+- `description`
+- `path`
+- `when_to_use`

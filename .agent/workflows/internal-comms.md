@@ -1,56 +1,22 @@
 ---
-description: Write internal communications including 3P updates, newsletters, FAQs, and status reports
+description: Workflow for drafting internal communication with clear decisions and ownership.
 ---
 
-# Internal Comms Skill
+# Internal Communications Workflow
 
-This workflow uses the globally installed `internal-comms` skill.
+## Output Types
+- Announcements
+- Status updates
+- Decision memos
 
-> **Skill 路径（按操作系统）**
-> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms`
-> - **macOS**: `/Users/yangzhe/.antigravity/skills/internal-comms`
+## Structure
+1. Context
+2. Decision or update
+3. Impact by team
+4. Actions and owners
+5. Timeline
 
-Read the full skill instructions before proceeding:
-
-**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md`
-**macOS:** `view_file /Users/yangzhe/.antigravity/skills/internal-comms/SKILL.md`
-
-## When to Use
-
-Use this skill when writing:
-- **3P Updates**: Third-party or project progress updates
-- **Newsletters**: Internal team or company newsletters
-- **FAQs**: Frequently asked questions documents
-- **Status Reports**: Project or team status summaries
-- **Announcements**: Internal announcements or memos
-
-## Workflow
-
-### 1. Read the Skill
-
-**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\internal-comms\SKILL.md`
-**macOS:** `view_file /Users/yangzhe/.antigravity/skills/internal-comms/SKILL.md`
-
-### 2. Identify the Communication Type
-
-The skill provides specific guideline files for each type. Load the appropriate one from the skill's `examples/` directory based on what you need to write.
-
-### 3. Gather Context
-
-- **Audience**: Who will read this? (team, department, whole company)
-- **Purpose**: Inform, request action, celebrate, update?
-- **Tone**: Formal, casual, urgent?
-- **Key information**: What are the main points to communicate?
-
-### 4. Draft and Refine
-
-- Follow the guidelines from the relevant example file
-- Keep it concise and scannable
-- Use headers and bullet points for readability
-- Include a clear call-to-action if needed
-
-### 5. Review
-
-- Is the tone appropriate for the audience?
-- Are all key points covered?
-- Is the length appropriate?
+## Quality Standard
+- Use concrete dates and owners.
+- Keep messages short and actionable.
+- Avoid unclear or open-ended language.

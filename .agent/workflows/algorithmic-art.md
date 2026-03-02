@@ -1,64 +1,24 @@
 ---
-description: Generate algorithmic art using p5.js with seeded randomness and Anthropic brand guidelines
+description: Workflow for generating algorithmic art assets with clear constraints and reproducible outputs.
 ---
 
-# Algorithmic Art Skill
+# Algorithmic Art Workflow
 
-This workflow uses the globally installed `algorithmic-art` skill.
+## Goal
+Create visual assets from algorithmic rules with predictable style and export settings.
 
-> **Skill 路径（按操作系统）**
-> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art`
-> - **macOS**: `/Users/yangzhe/.antigravity/skills/algorithmic-art`
+## Inputs
+- Visual brief (theme, mood, palette)
+- Target format and resolution
+- Constraints (brand, legibility, safe area)
 
-Read the full skill instructions before proceeding:
+## Process
+1. Define composition and color rules.
+2. Generate 3-5 candidate directions.
+3. Select one and iterate for clarity and contrast.
+4. Export final artifact and source parameters.
 
-**Windows:**
-```
-view_file C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md
-```
-**macOS:**
-```
-view_file /Users/yangzhe/.antigravity/skills/algorithmic-art/SKILL.md
-```
-
-## When to Use
-
-Use this skill when the user asks to:
-- Generate algorithmic or generative art
-- Create visual patterns, fractals, or procedural graphics
-- Build p5.js sketches or creative coding artifacts
-
-## Workflow
-
-### 1. Read the Skill
-
-Always read the SKILL.md before starting:
-
-**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\algorithmic-art\SKILL.md`
-**macOS:** `view_file /Users/yangzhe/.antigravity/skills/algorithmic-art/SKILL.md`
-
-### 2. Understand the Request
-
-- Identify the visual concept or theme
-- Determine color palette (default to Anthropic brand colors if unspecified)
-- Plan the algorithm: what parameters will drive the art?
-
-### 3. Implement with p5.js
-
-- Use seeded randomness for reproducibility
-- Expose key parameters (seed, color, density, etc.)
-- Output as a self-contained HTML artifact with p5.js CDN
-
-### 4. Key Principles
-
-- **Seeded randomness**: Use `randomSeed()` so results are reproducible
-- **Parameter tuning**: Expose meaningful parameters for variation
-- **Brand alignment**: Use Anthropic colors unless user specifies otherwise
-- **Performance**: Keep frame rate smooth; avoid heavy computation in `draw()`
-
-## Example Prompts
-
-- "Create a flowing particle system"
-- "Generate a Voronoi diagram with Anthropic colors"
-- "Make a recursive tree fractal"
-- "Build a noise-based landscape generator"
+## Output Checklist
+- Naming is consistent and searchable.
+- Resolution matches target platform.
+- Contrast and typography are readable.

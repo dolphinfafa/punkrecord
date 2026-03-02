@@ -1,66 +1,18 @@
 ---
-description: Build elaborate multi-component HTML artifacts using React, Tailwind CSS, and shadcn/ui, bundled into a single self-contained HTML file
+description: Workflow for creating web-ready artifacts (HTML/CSS/JS assets and exports).
 ---
 
-# Web Artifacts Builder Skill
+# Web Artifacts Builder Workflow
 
-This workflow uses the globally installed `web-artifacts-builder` skill.
+## Goal
+Produce deployable artifacts with consistent structure and naming.
 
-> **Skill 路径（按操作系统）**
-> - **Windows**: `C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder`
-> - **macOS**: `/Users/yangzhe/.antigravity/skills/web-artifacts-builder`
+## Steps
+1. Define artifact types and target runtime.
+2. Build with deterministic folder structure.
+3. Validate links, assets, and responsive behavior.
+4. Export with checksums or version tags if needed.
 
-Read the full skill instructions before proceeding:
-
-**Windows:** `view_file C:\Users\YZ\.antigravity\skills\skills\skills\web-artifacts-builder\SKILL.md`
-**macOS:** `view_file /Users/yangzhe/.antigravity/skills/web-artifacts-builder/SKILL.md`
-
-## When to Use
-
-Use this skill for **complex** claude.ai HTML artifacts that need:
-- State management or routing
-- shadcn/ui components
-- Multiple React components
-
-**Do NOT use** for simple single-file HTML/JSX artifacts.
-
-## Stack
-
-React 18 + TypeScript + Vite + Parcel (bundling) + Tailwind CSS + shadcn/ui
-
-## Workflow
-
-### Step 1: Initialize Project
-
-```bash
-bash scripts/init-artifact.sh <project-name>
-cd <project-name>
-```
-
-Creates a fully configured project with React, TypeScript, Tailwind CSS, 40+ shadcn/ui components, and Parcel bundling.
-
-### Step 2: Develop the Artifact
-
-Edit the generated files. Key design rules:
-- **Avoid**: Excessive centered layouts, purple gradients, uniform rounded corners, Inter font
-- **Use**: Distinctive typography, cohesive color palettes, intentional layouts
-
-### Step 3: Bundle to Single HTML
-
-```bash
-bash scripts/bundle-artifact.sh
-```
-
-Creates `bundle.html` — a self-contained artifact with all JS, CSS, and dependencies inlined.
-
-### Step 4: Share with User
-
-Share the `bundle.html` file in conversation as an artifact.
-
-### Step 5: Test (Optional)
-
-Only test if issues arise or user requests it. Use Playwright or the `webapp-testing` skill.
-
-## Reference
-
-- shadcn/ui components: https://ui.shadcn.com/docs/components
+## Output
+- Clean artifact bundle
+- Short README with run/open instructions

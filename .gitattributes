@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+# Enforce UTF-8/LF for workflow markdown files
+.agent/workflows/*.md text working-tree-encoding=UTF-8 eol=lf
+
+# Common source files
+*.py text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
