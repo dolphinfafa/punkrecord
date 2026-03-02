@@ -11,22 +11,22 @@
   ],
   "window": {
     "navigationBarTitleText": "PunkRecord",
-    "navigationBarBackgroundColor": "#0f172a",
+    "navigationBarBackgroundColor": "#6366f1",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f4f6fb",
+    "backgroundColor": "#f8fafc",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "color": "#64748b",
-    "selectedColor": "#0f172a",
+    "selectedColor": "#6366f1",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/home/index", "text": "Home" },
-      { "pagePath": "pages/todo/index", "text": "Todo" },
-      { "pagePath": "pages/project/index", "text": "Project" },
-      { "pagePath": "pages/finance/index", "text": "Finance" },
-      { "pagePath": "pages/mine/index", "text": "Mine" }
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/todo/index", "text": "待办" },
+      { "pagePath": "pages/project/index", "text": "项目" },
+      { "pagePath": "pages/finance/index", "text": "财务" },
+      { "pagePath": "pages/mine/index", "text": "我的" }
     ]
   },
   "style": "v2",

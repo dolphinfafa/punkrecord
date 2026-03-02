@@ -1,37 +1,62 @@
 <view class="container">
-  <view class="card header">
-    <view class="title">Welcome{{userName ? ', ' + userName : ''}}</view>
-    <view class="muted">Mobile workspace synced with existing web backend.</view>
+  <view class="card header-card">
+    <view class="hero-title">你好{{userName ? '，' + userName : ''}}</view>
+    <view class="muted">移动端工作台已与 Web 端保持同步。</view>
+    <view class="hero-foot">
+      <text class="muted">更新时间 {{refreshedAt || '--:--'}}</text>
+      <text class="muted" wx:if="{{loading}}">加载中...</text>
+    </view>
   </view>
 
-  <view class="metrics-grid">
-    <view class="card metric">
+  <view class="metrics-grid section-gap">
+    <view class="card metric metric-todo">
       <view class="metric-num">{{todoCount}}</view>
-      <view class="metric-label">My Todos</view>
+      <view class="metric-label">我的待办</view>
     </view>
-    <view class="card metric">
+    <view class="card metric metric-project">
       <view class="metric-num">{{projectCount}}</view>
-      <view class="metric-label">Projects</view>
+      <view class="metric-label">项目数量</view>
     </view>
-    <view class="card metric">
+    <view class="card metric metric-txn">
       <view class="metric-num">{{txnCount}}</view>
-      <view class="metric-label">Transactions</view>
+      <view class="metric-label">交易数量</view>
     </view>
-    <view class="card metric">
+    <view class="card metric metric-leave">
       <view class="metric-num">{{pendingLeaveCount}}</view>
-      <view class="metric-label">Pending Leaves</view>
+      <view class="metric-label">待审批请假</view>
     </view>
   </view>
 
+  <view class="section-head">
+    <text class="section-title">快捷入口</text>
+    <text class="section-subtitle">点击进入核心业务模块</text>
+  </view>
   <view class="card">
-    <view class="title section-title">Quick Access</view>
     <view class="quick-grid">
-      <view class="quick-item" bindtap="goTodo">Todo</view>
-      <view class="quick-item" bindtap="goProject">Project</view>
-      <view class="quick-item" bindtap="goFinance">Finance</view>
-      <view class="quick-item" bindtap="goContract">Contract</view>
-      <view class="quick-item" bindtap="goIAM">IAM</view>
-      <view class="quick-item" bindtap="goMine">Profile</view>
+      <view class="quick-item" bindtap="goTodo">
+        <view class="quick-title">待办</view>
+        <view class="quick-desc">任务处理与状态更新</view>
+      </view>
+      <view class="quick-item" bindtap="goProject">
+        <view class="quick-title">项目</view>
+        <view class="quick-desc">查看项目进展节奏</view>
+      </view>
+      <view class="quick-item" bindtap="goFinance">
+        <view class="quick-title">财务</view>
+        <view class="quick-desc">账户与交易概览</view>
+      </view>
+      <view class="quick-item" bindtap="goContract">
+        <view class="quick-title">合同</view>
+        <view class="quick-desc">合同与相对方信息</view>
+      </view>
+      <view class="quick-item" bindtap="goIAM">
+        <view class="quick-title">组织</view>
+        <view class="quick-desc">组织成员与结构</view>
+      </view>
+      <view class="quick-item" bindtap="goMine">
+        <view class="quick-title">我的</view>
+        <view class="quick-desc">账号信息与设置</view>
+      </view>
     </view>
   </view>
 </view>

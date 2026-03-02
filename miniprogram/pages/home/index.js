@@ -18,13 +18,19 @@ Page({
     projectCount: 0,
     txnCount: 0,
     pendingLeaveCount: 0,
+    loading: false,
+    refreshedAt: '',
   },
   onShow() {
     const user = getUser();
     this.setData({ userName: user && (user.real_name || user.username) ? (user.real_name || user.username) : '' });
-    this.loadSummary();
+    this.loadSummary(false);
   },
-  async loadSummary() {
+  onPullDownRefresh() {
+    this.loadSummary(true).finally(() => wx.stopPullDownRefresh());
+  },
+  async loadSummary(isRefresh) {
+    if (!isRefresh) this.setData({ loading: true });
     try {
       const [todos, projects, txns, leaves] = await Promise.all([
         listMyTodos(1, 5),
@@ -37,10 +43,18 @@ Page({
         projectCount: listItems(projects).length,
         txnCount: listItems(txns).length,
         pendingLeaveCount: listItems(leaves).length,
+        refreshedAt: this.formatTime(new Date()),
       });
     } catch (e) {
       // Request layer already shows error toast.
+    } finally {
+      this.setData({ loading: false });
     }
+  },
+  formatTime(date) {
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
   },
   goTodo() { wx.switchTab({ url: '/pages/todo/index' }); },
   goProject() { wx.switchTab({ url: '/pages/project/index' }); },

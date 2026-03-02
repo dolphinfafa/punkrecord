@@ -1,31 +1,64 @@
 <view class="container">
-  <view class="card">
-    <view class="title">Finance Overview</view>
-    <view class="muted">Accounts and recent transactions</view>
+  <view class="card summary-card">
+    <view class="title">财务总览</view>
+    <view class="muted">集中查看账户情况和交易流水。</view>
+    <view class="summary-grid section-gap">
+      <view class="summary-item">
+        <view class="summary-num">{{totalBalance.toFixed(2)}}</view>
+        <view class="muted">账户总余额</view>
+      </view>
+      <view class="summary-item">
+        <view class="summary-num income">+{{incomingTotal.toFixed(2)}}</view>
+        <view class="muted">收入总额</view>
+      </view>
+      <view class="summary-item">
+        <view class="summary-num expense">-{{outgoingTotal.toFixed(2)}}</view>
+        <view class="muted">支出总额</view>
+      </view>
+    </view>
   </view>
 
-  <view class="card">
-    <view class="title mini">Accounts ({{accounts.length}})</view>
+  <view class="card tab-card">
+    <view class="tab-row">
+      <view
+        class="tab-item {{activeTab === 'transactions' ? 'tab-item-active' : ''}}"
+        data-tab="transactions"
+        bindtap="onTabTap"
+      >交易流水</view>
+      <view
+        class="tab-item {{activeTab === 'accounts' ? 'tab-item-active' : ''}}"
+        data-tab="accounts"
+        bindtap="onTabTap"
+      >账户列表</view>
+    </view>
+  </view>
+
+  <view class="card loading-card" wx:if="{{loading}}">
+    <view class="muted">正在加载财务数据...</view>
+  </view>
+
+  <view class="card" wx:if="{{activeTab === 'accounts'}}">
+    <view class="title mini">账户列表（{{accounts.length}}）</view>
     <block wx:if="{{accounts.length}}">
       <view class="row" wx:for="{{accounts}}" wx:key="id">
-        <text class="name">{{item.name}}</text>
-        <text class="amt">{{item.balance || 0}}</text>
+        <text class="name">{{item.nameText}}</text>
+        <text class="amt">{{item.balanceText.toFixed(2)}}</text>
       </view>
     </block>
-    <view class="muted" wx:else>No accounts found.</view>
+    <view class="muted" wx:else>暂无账户数据。</view>
   </view>
 
-  <view class="card">
-    <view class="title mini">Transactions ({{transactions.length}})</view>
+  <view class="card" wx:if="{{activeTab === 'transactions'}}">
+    <view class="title mini">交易流水（{{transactions.length}}）</view>
     <block wx:if="{{transactions.length}}">
       <view class="txn" wx:for="{{transactions}}" wx:key="id">
         <view class="row">
-          <text class="name">{{item.description || 'No description'}}</text>
-          <text class="amt">{{item.amount || 0}}</text>
+          <text class="name">{{item.titleText}}</text>
+          <text class="amt {{item.directionClass}}">{{item.amountText}}</text>
         </view>
-        <view class="muted">{{item.txn_date || 'n/a'}} · {{item.direction || item.txn_direction || 'n/a'}}</view>
+        <view class="muted">{{item.dateText}} | {{item.directionLabel}}</view>
       </view>
     </block>
-    <view class="muted" wx:else>No transactions found.</view>
+    <view class="muted" wx:else>暂无交易记录。</view>
   </view>
 </view>

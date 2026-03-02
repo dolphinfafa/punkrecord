@@ -175,6 +175,9 @@ Mini program client (`miniprogram/`):
   - `pages/mine`
   - `pages/contract`
   - `pages/iam`
+- UI direction:
+  - Prefer the same visual language as the web app (`frontend/src/pages/*`), especially card hierarchy, status badges, and primary action styling.
+  - Current mini program theme is aligned to a light `slate + indigo` style for consistency with core web business pages.
 - Shared request/session utilities:
   - `utils/request.js`
   - `utils/storage.js`
@@ -254,6 +257,7 @@ Naming:
 - API paths: kebab-case style where applicable
 - Mini program pages follow `pages/<module>/index.*` convention
 - Mini program styles use `rpx` for responsive mobile layout
+- Mini program user-facing labels should be Chinese by default; keep backend enum/raw values in JS logic and map them to Chinese only for display.
 
 Response shape convention:
 - Success: `{ "data": ..., "message": "ok" }`

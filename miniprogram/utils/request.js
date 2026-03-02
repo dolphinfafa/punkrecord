@@ -18,7 +18,7 @@ function request({ url, method = 'GET', data = {}, header = {} }) {
         const body = res.data || {};
         if (statusCode === 401) {
           clearSession();
-          wx.showToast({ title: 'Session expired', icon: 'none' });
+          wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
           wx.reLaunch({ url: '/pages/login/index' });
           reject(new Error('Unauthorized'));
           return;
@@ -27,12 +27,12 @@ function request({ url, method = 'GET', data = {}, header = {} }) {
           resolve(body.data !== undefined ? body.data : body);
           return;
         }
-        const message = body.message || 'Request failed';
+        const message = body.message || '请求失败';
         wx.showToast({ title: message, icon: 'none' });
         reject(new Error(message));
       },
       fail(err) {
-        wx.showToast({ title: 'Network error', icon: 'none' });
+        wx.showToast({ title: '网络异常，请稍后重试', icon: 'none' });
         reject(err);
       },
     });

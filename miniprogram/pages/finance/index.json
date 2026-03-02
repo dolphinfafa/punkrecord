@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "Finance"
+  "navigationBarTitleText": "财务",
+  "enablePullDownRefresh": true
 }

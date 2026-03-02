@@ -16,7 +16,14 @@ Page({
   goContract() { wx.navigateTo({ url: '/pages/contract/index' }); },
   goIAM() { wx.navigateTo({ url: '/pages/iam/index' }); },
   logout() {
-    clearSession();
-    wx.reLaunch({ url: '/pages/login/index' });
+    wx.showModal({
+      title: '确认退出',
+      content: '确定要退出当前账号吗？',
+      success: (res) => {
+        if (!res.confirm) return;
+        clearSession();
+        wx.reLaunch({ url: '/pages/login/index' });
+      },
+    });
   },
 });

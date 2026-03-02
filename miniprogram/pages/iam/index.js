@@ -14,7 +14,22 @@ Page({
   async load() {
     try {
       const payload = await listUsers(1, 50);
-      this.setData({ users: listItems(payload) });
+      const users = listItems(payload).map((item) => ({
+        ...item,
+        nameText: item.real_name || item.username || '未命名用户',
+        statusText: this.formatStatus(item.status),
+        emailText: item.email || '未填写邮箱',
+      }));
+      this.setData({ users });
     } catch (e) {}
+  },
+  formatStatus(status) {
+    const map = {
+      active: '在职',
+      inactive: '停用',
+      suspended: '冻结',
+      pending: '待激活',
+    };
+    return map[String(status || '').toLowerCase()] || '未知';
   },
 });

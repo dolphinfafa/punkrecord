@@ -14,7 +14,25 @@ Page({
   async load() {
     try {
       const payload = await listContracts(1, 50);
-      this.setData({ contracts: listItems(payload) });
+      const contracts = listItems(payload).map((item) => ({
+        ...item,
+        titleText: item.title || '未命名合同',
+        statusText: this.formatStatus(item.status),
+        amountText: item.amount === undefined || item.amount === null ? '未设置' : item.amount,
+      }));
+      this.setData({ contracts });
     } catch (e) {}
+  },
+  formatStatus(status) {
+    const map = {
+      draft: '草稿',
+      submitted: '已提交',
+      approved: '已批准',
+      rejected: '已驳回',
+      active: '履行中',
+      completed: '已完成',
+      cancelled: '已取消',
+    };
+    return map[String(status || '').toLowerCase()] || '未知';
   },
 });

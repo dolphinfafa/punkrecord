@@ -1,3 +1,31 @@
-.row { display: flex; justify-content: space-between; margin-bottom: 8rpx; }
-.name { font-size: 30rpx; font-weight: 700; max-width: 500rpx; }
-.status { color: #475569; font-size: 22rpx; }
+.tab-scroll { white-space: nowrap; }
+.tab-row {
+  display: flex;
+  gap: 12rpx;
+}
+.project-item {
+  margin-bottom: 14rpx;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+  align-items: flex-start;
+}
+.name {
+  font-size: 30rpx;
+  font-weight: 700;
+  max-width: 470rpx;
+  line-height: 1.35;
+}
+.badge {
+  font-size: 20rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
+  color: #334155;
+}
+.badge.in_progress { background: #dbeafe; color: #1d4ed8; }
+.badge.done { background: #dcfce7; color: #166534; }
+.badge.paused { background: #fee2e2; color: #b91c1c; }
+.badge.planning { background: #ede9fe; color: #6d28d9; }

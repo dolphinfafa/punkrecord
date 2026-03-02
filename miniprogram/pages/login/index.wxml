@@ -1,18 +1,18 @@
 <view class="container login-page">
   <view class="hero">
     <view class="brand">PunkRecord</view>
-    <view class="subtitle">Mini Program Workspace</view>
+    <view class="subtitle">企业工作台小程序</view>
   </view>
 
   <view class="card login-card">
     <view class="field">
-      <text class="label">Username</text>
-      <input class="input" placeholder="Enter username" value="{{username}}" bindinput="onUsernameChange" />
+      <text class="label">用户名</text>
+      <input class="input" placeholder="请输入用户名" value="{{username}}" bindinput="onUsernameChange" />
     </view>
     <view class="field">
-      <text class="label">Password</text>
-      <input class="input" password placeholder="Enter password" value="{{password}}" bindinput="onPasswordChange" />
+      <text class="label">密码</text>
+      <input class="input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordChange" />
     </view>
-    <button class="primary-btn" loading="{{loading}}" bindtap="onLogin">Sign In</button>
+    <button class="primary-btn" loading="{{loading}}" bindtap="onLogin">登录</button>
   </view>
 </view>

@@ -1,21 +1,66 @@
 <view class="container">
   <view class="card">
-    <view class="title">My Todos</view>
-    <view class="muted">Pulled from /api/v1/todo/my</view>
+    <view class="title">我的待办</view>
+    <view class="muted">按状态筛选，并快速推进任务流程。</view>
   </view>
 
-  <block wx:if="{{todos.length}}">
-    <view class="card todo-item" wx:for="{{todos}}" wx:key="id">
+  <scroll-view class="tab-scroll section-gap" scroll-x enable-flex>
+    <view class="tab-row">
+      <view
+        class="chip {{activeStatus === item.key ? 'chip-active' : ''}}"
+        wx:for="{{statusTabs}}"
+        wx:key="key"
+        data-status="{{item.key}}"
+        bindtap="onStatusTabTap"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="card search-card">
+    <input
+      class="search-input"
+      placeholder="搜索待办标题或描述"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+    />
+    <text class="search-clear" wx:if="{{keyword}}" bindtap="clearKeyword">清空</text>
+  </view>
+
+  <view class="card loading-card" wx:if="{{loading}}">
+    <view class="muted">正在加载待办...</view>
+  </view>
+
+  <block wx:if="{{displayTodos.length}}">
+    <view class="card todo-item" wx:for="{{displayTodos}}" wx:key="id">
       <view class="todo-row">
-        <text class="todo-title">{{item.title || 'Untitled Todo'}}</text>
-        <text class="badge {{item.status}}">{{item.status || 'unknown'}}</text>
+        <text class="todo-title">{{item.titleText}}</text>
+        <text class="badge {{item.status}}">{{item.statusLabel}}</text>
       </view>
-      <view class="muted">Priority: {{item.priority || 'n/a'}}</view>
-      <view class="muted">Due: {{item.due_at || item.due_date || 'n/a'}}</view>
+      <view class="muted">优先级：{{item.priorityText}}</view>
+      <view class="muted">截止时间：{{item.dueText}}</view>
+      <view class="todo-desc" wx:if="{{item.descriptionText}}">{{item.descriptionText}}</view>
+      <view class="actions">
+        <button
+          wx:if="{{item.canStart}}"
+          class="action-btn"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onStartTap"
+        >开始</button>
+        <button
+          wx:if="{{item.canDone}}"
+          class="action-btn action-btn-main"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onDoneTap"
+        >完成</button>
+      </view>
     </view>
   </block>
 
   <view class="card" wx:else>
-    <view class="muted">No todos found.</view>
+    <view class="muted">当前筛选条件下暂无待办。</view>
   </view>
 </view>

@@ -1,16 +1,16 @@
 <view class="container">
   <view class="card">
-    <view class="title">Contracts</view>
-    <view class="muted">Read-only mobile list for now</view>
+    <view class="title">合同列表</view>
+    <view class="muted">当前为移动端只读视图。</view>
   </view>
   <block wx:if="{{contracts.length}}">
     <view class="card" wx:for="{{contracts}}" wx:key="id">
       <view class="row">
-        <text class="name">{{item.title || 'Untitled Contract'}}</text>
-        <text class="status">{{item.status || 'unknown'}}</text>
+        <text class="name">{{item.titleText}}</text>
+        <text class="status">{{item.statusText}}</text>
       </view>
-      <view class="muted">Amount: {{item.amount || 'n/a'}}</view>
+      <view class="muted">金额：{{item.amountText}}</view>
     </view>
   </block>
-  <view class="card" wx:else><view class="muted">No contracts found.</view></view>
+  <view class="card" wx:else><view class="muted">暂无合同数据。</view></view>
 </view>

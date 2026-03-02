@@ -2,12 +2,12 @@
   <view class="card profile">
     <view class="avatar">{{initial}}</view>
     <view>
-      <view class="name">{{name || 'Guest'}}</view>
-      <view class="muted">{{username || 'Not logged in'}}</view>
+      <view class="name">{{name || '访客'}}</view>
+      <view class="muted">{{username || '未登录'}}</view>
     </view>
   </view>
 
-  <view class="card menu" bindtap="goContract">Contract Module</view>
-  <view class="card menu" bindtap="goIAM">IAM Module</view>
-  <button class="primary-btn" bindtap="logout">Sign Out</button>
+  <view class="card menu" bindtap="goContract">合同模块</view>
+  <view class="card menu" bindtap="goIAM">组织成员模块</view>
+  <button class="primary-btn" bindtap="logout">退出登录</button>
 </view>

@@ -1,19 +1,36 @@
 <view class="container">
   <view class="card">
-    <view class="title">Projects</view>
-    <view class="muted">Mobile-adapted list view</view>
+    <view class="title">项目列表</view>
+    <view class="muted">按项目状态查看，快速掌握推进情况。</view>
+    <view class="muted section-gap">共 {{projects.length}} 条项目</view>
   </view>
 
-  <block wx:if="{{projects.length}}">
-    <view class="card" wx:for="{{projects}}" wx:key="id">
+  <scroll-view class="tab-scroll section-gap" scroll-x enable-flex>
+    <view class="tab-row">
+      <view
+        class="chip {{activeStatus === item.key ? 'chip-active' : ''}}"
+        wx:for="{{statusTabs}}"
+        wx:key="key"
+        data-status="{{item.key}}"
+        bindtap="onStatusTabTap"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="card loading-card" wx:if="{{loading}}">
+    <view class="muted">正在加载项目...</view>
+  </view>
+
+  <block wx:if="{{displayProjects.length}}">
+    <view class="card project-item" wx:for="{{displayProjects}}" wx:key="id">
       <view class="row">
-        <text class="name">{{item.name || 'Untitled Project'}}</text>
-        <text class="status">{{item.status || 'unknown'}}</text>
+        <text class="name">{{item.nameText}}</text>
+        <text class="badge {{item.status}}">{{item.statusLabel}}</text>
       </view>
-      <view class="muted">Type: {{item.type || item.project_type || 'n/a'}}</view>
-      <view class="muted">Budget: {{item.budget || 'n/a'}}</view>
+      <view class="muted">类型：{{item.typeText}}</view>
+      <view class="muted">预算：{{item.budgetText}}</view>
     </view>
   </block>
 
-  <view class="card" wx:else><view class="muted">No projects found.</view></view>
+  <view class="card" wx:else><view class="muted">当前状态下暂无项目。</view></view>
 </view>
