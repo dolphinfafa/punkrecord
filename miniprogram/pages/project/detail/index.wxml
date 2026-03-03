@@ -1,0 +1,149 @@
+<view class="container">
+  <view class="card loading-card" wx:if="{{loading}}">
+    <view class="muted">正在加载项目详情...</view>
+  </view>
+
+  <block wx:if="{{project}}">
+    <view class="card">
+      <view class="row">
+        <text class="title">{{project.nameText}}</text>
+        <text class="badge">{{project.statusLabel}}</text>
+      </view>
+      <view class="muted">项目编号：{{project.projectNoText}}</view>
+      <view class="muted">类型：{{project.typeText}} · PM：{{project.pmText}}</view>
+      <view class="muted">起止：{{project.startText}} ~ {{project.dueText}}</view>
+      <view class="progress-wrap section-gap">
+        <view class="progress-track">
+          <view class="progress-inner" style="width: {{project.progressWidth}};"></view>
+        </view>
+        <text class="progress-text">{{project.progressText}}</text>
+      </view>
+      <view class="desc section-gap">{{project.descText}}</view>
+    </view>
+
+    <scroll-view class="tab-scroll section-gap" scroll-x enable-flex>
+      <view class="tab-row">
+        <view
+          class="chip {{activeTab === item.key ? 'chip-active' : ''}}"
+          wx:for="{{tabs}}"
+          wx:key="key"
+          data-tab="{{item.key}}"
+          bindtap="onTabTap"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <view class="card" wx:if="{{activeTab === 'overview'}}">
+      <view class="summary-grid">
+        <view class="summary-item">
+          <view class="summary-num">{{stages.length}}</view>
+          <view class="muted">项目阶段</view>
+        </view>
+        <view class="summary-item">
+          <view class="summary-num">{{members.length}}</view>
+          <view class="muted">项目成员</view>
+        </view>
+        <view class="summary-item">
+          <view class="summary-num">{{todos.length}}</view>
+          <view class="muted">关联任务</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{activeTab === 'stages'}}">
+      <view class="section-row">
+        <view class="mini-title">阶段列表（{{stages.length}}）</view>
+        <button class="action-btn" size="mini" bindtap="toggleStageAttachments">{{showStageAttachments ? '收起附件' : '阶段附件'}}</button>
+      </view>
+
+      <view class="stage-attachments" wx:if="{{showStageAttachments}}">
+        <view class="muted">共 {{stageAttachments.length}} 个附件</view>
+        <block wx:if="{{stageAttachments.length}}">
+          <view class="attachment-row" wx:for="{{stageAttachments}}" wx:key="id">
+            <view class="attachment-meta">
+              <text class="attachment-name">{{item.file_name || '附件'}}</text>
+              <text class="muted">{{item.stage_name}} · {{item.uploaded_at || ''}}</text>
+            </view>
+            <button
+              class="action-btn"
+              size="mini"
+              data-stage-id="{{item.stageId}}"
+              data-attachment-id="{{item.id}}"
+              data-file-name="{{item.file_name}}"
+              bindtap="onStageAttachmentTap"
+            >下载</button>
+          </view>
+        </block>
+        <view class="muted" wx:else>暂无阶段附件。</view>
+      </view>
+
+      <block wx:if="{{stages.length}}">
+        <view class="stage-item" wx:for="{{stages}}" wx:key="id">
+          <view class="row">
+            <text class="name">{{item.sequence_no}}. {{item.stage_name}}</text>
+            <text class="badge stage-{{item.status}}">{{item.statusLabel}}</text>
+          </view>
+          <view class="muted">计划时间：{{item.dateText}}</view>
+          <view class="muted">附件数：{{item.attachmentCount}}</view>
+
+          <view class="stage-action-row">
+            <button
+              wx:if="{{item.actionKey !== 'none'}}"
+              class="action-btn action-btn-main"
+              size="mini"
+              data-action="{{item.actionKey}}"
+              bindtap="onStageActionTap"
+            >{{item.actionLabel}}</button>
+            <text class="muted" wx:else>{{item.actionLabel}}</text>
+          </view>
+        </view>
+      </block>
+      <view class="muted" wx:else>暂无阶段数据。</view>
+    </view>
+
+    <view class="card" wx:if="{{activeTab === 'members'}}">
+      <view class="mini-title">成员列表（{{members.length}}）</view>
+
+      <view class="member-editor" wx:if="{{canManageMembers}}">
+        <picker mode="selector" range="{{userOptions}}" range-key="label" value="{{selectedUserIndex}}" bindchange="onUserPickerChange">
+          <view class="picker-value">{{userOptions.length ? userOptions[selectedUserIndex].label : '暂无可添加成员'}}</view>
+        </picker>
+        <button class="action-btn action-btn-main" size="mini" loading="{{addingMember}}" bindtap="onAddMemberTap">添加成员</button>
+      </view>
+
+      <block wx:if="{{members.length}}">
+        <view class="member-item" wx:for="{{members}}" wx:key="id">
+          <view class="avatar">{{item.initial}}</view>
+          <view class="member-main">
+            <view class="name">{{item.nameText}}</view>
+            <view class="muted">{{item.roleText}}</view>
+          </view>
+          <button
+            wx:if="{{canManageMembers && item.canRemove}}"
+            class="action-btn action-btn-warn"
+            size="mini"
+            data-user-id="{{item.user_id}}"
+            loading="{{removingMemberId === item.user_id}}"
+            bindtap="onRemoveMemberTap"
+          >移除</button>
+        </view>
+      </block>
+      <view class="muted" wx:else>暂无成员数据。</view>
+    </view>
+
+    <view class="card" wx:if="{{activeTab === 'todos'}}">
+      <view class="mini-title">任务列表（{{todos.length}}）</view>
+      <block wx:if="{{todos.length}}">
+        <view class="todo-item" wx:for="{{todos}}" wx:key="id">
+          <view class="row">
+            <text class="name">{{item.titleText}}</text>
+            <text class="badge todo-{{item.status}}">{{item.statusLabel}}</text>
+          </view>
+          <view class="muted">负责人：{{item.assigneeText}}</view>
+          <view class="muted">优先级：{{item.priorityText}} · 截止：{{item.dueText}}</view>
+        </view>
+      </block>
+      <view class="muted" wx:else>暂无任务数据。</view>
+    </view>
+  </block>
+</view>

@@ -4,6 +4,7 @@
     "pages/home/index",
     "pages/todo/index",
     "pages/project/index",
+    "pages/project/detail/index",
     "pages/finance/index",
     "pages/mine/index",
     "pages/contract/index",

@@ -173,6 +173,7 @@ Mini program client (`miniprogram/`):
   - `pages/home`
   - `pages/todo`
   - `pages/project`
+  - `pages/project/detail`
   - `pages/finance`
   - `pages/mine`
   - `pages/contract`
@@ -181,6 +182,10 @@ Mini program client (`miniprogram/`):
   - Prefer the same visual language as the web app (`frontend/src/pages/*`), especially card hierarchy, status badges, and primary action styling.
   - Current mini program theme is aligned to a light `slate + indigo` style for consistency with core web business pages.
 - Todo page now contains both personal/team todo views and leave request/review panels.
+- Project pages now include:
+  - list page with status stats/search and detail entry (`pages/project`)
+  - detail page tabs (overview/stages/members/todos) with stage action labels aligned to web naming (`pages/project/detail`)
+  - a unified stage attachments entry in stage tab (aggregated across all stages)
 - Shared request/session utilities:
   - `utils/request.js`
   - `utils/storage.js`
@@ -209,6 +214,10 @@ Mini program client (`miniprogram/`):
 - Project -> stages -> todos.
 - Dev tasks can be generated/synced and then assigned/planned.
 - Attachments and export endpoints support delivery artifacts.
+- Mini program project detail currently supports:
+  - stage operation entry labels consistent with web (`功能清单/报价单/AI生成合同/原型确认单/开发进度/Bug管理/验收报告`)
+  - stage attachment aggregation + file download
+  - project member add/remove for PM/owner users
 
 5. Finance operations
 - Accounts and transactions are tracked through finance endpoints.

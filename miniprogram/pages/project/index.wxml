@@ -1,8 +1,25 @@
 <view class="container">
   <view class="card">
-    <view class="title">项目列表</view>
-    <view class="muted">按项目状态查看，快速掌握推进情况。</view>
-    <view class="muted section-gap">共 {{projects.length}} 条项目</view>
+    <view class="title">项目管理</view>
+    <view class="muted">查看项目状态、进度与核心负责人。</view>
+    <view class="stats-grid section-gap">
+      <view class="stat-item">
+        <view class="stat-num">{{stats.total}}</view>
+        <view class="muted">项目总数</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-num text-primary">{{stats.active}}</view>
+        <view class="muted">进行中</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-num text-warn">{{stats.paused}}</view>
+        <view class="muted">已暂停</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-num text-success">{{stats.closed}}</view>
+        <view class="muted">已关闭</view>
+      </view>
+    </view>
   </view>
 
   <scroll-view class="tab-scroll section-gap" scroll-x enable-flex>
@@ -17,6 +34,16 @@
     </view>
   </scroll-view>
 
+  <view class="card search-card">
+    <input
+      class="search-input"
+      placeholder="搜索项目名称 / 编号 / 项目经理"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+    />
+    <text class="search-clear" wx:if="{{keyword}}" bindtap="clearKeyword">清空</text>
+  </view>
+
   <view class="card loading-card" wx:if="{{loading}}">
     <view class="muted">正在加载项目...</view>
   </view>
@@ -27,10 +54,22 @@
         <text class="name">{{item.nameText}}</text>
         <text class="badge {{item.status}}">{{item.statusLabel}}</text>
       </view>
-      <view class="muted">类型：{{item.typeText}}</view>
-      <view class="muted">预算：{{item.budgetText}}</view>
+      <view class="muted">项目编号：{{item.projectNoText}}</view>
+      <view class="muted">类型：{{item.typeText}} · PM：{{item.pmText}}</view>
+      <view class="muted">截止：{{item.dueText}}</view>
+      <view class="progress-wrap">
+        <view class="progress-track">
+          <view class="progress-inner" style="width: {{item.progressWidth}};"></view>
+        </view>
+        <text class="progress-text">{{item.progressText}}</text>
+      </view>
+      <view class="action-row">
+        <button class="action-btn action-btn-main" size="mini" data-id="{{item.id}}" bindtap="goDetail">查看详情</button>
+      </view>
     </view>
   </block>
 
-  <view class="card" wx:else><view class="muted">当前状态下暂无项目。</view></view>
+  <view class="card" wx:else>
+    <view class="muted">当前筛选条件下暂无项目。</view>
+  </view>
 </view>
