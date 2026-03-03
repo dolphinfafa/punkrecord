@@ -1,4 +1,4 @@
-const { listMyTodos, startTodo, markTodoDone } = require('../../services/todo');
+const { listMyTodos, startTodo, submitTodo, blockTodo, recallTodo } = require('../../services/todo');
 
 function listItems(payload) {
   if (Array.isArray(payload)) return payload;
@@ -80,7 +80,9 @@ Page({
       priorityText: this.formatPriority(priority),
       dueText: this.formatDate(item.due_at || item.due_date),
       canStart: status === 'open',
-      canDone: status === 'open' || status === 'in_progress' || status === 'blocked',
+      canSubmit: status === 'open' || status === 'in_progress' || status === 'blocked',
+      canBlock: status === 'open' || status === 'in_progress',
+      canRecall: status === 'pending_review',
     };
   },
   formatStatus(status) {
@@ -118,13 +120,41 @@ Page({
       this.setData({ actionBusyId: '' });
     }
   },
-  async onDoneTap(e) {
+  async onSubmitTap(e) {
     const todoId = e.currentTarget.dataset.id;
     if (!todoId || this.data.actionBusyId) return;
     this.setData({ actionBusyId: todoId });
     try {
-      await markTodoDone(todoId);
-      wx.showToast({ title: '已更新', icon: 'success' });
+      await submitTodo(todoId);
+      wx.showToast({ title: '已提交', icon: 'success' });
+      await this.loadTodos();
+    } catch (err) {
+      // Request layer already toasts message.
+    } finally {
+      this.setData({ actionBusyId: '' });
+    }
+  },
+  async onBlockTap(e) {
+    const todoId = e.currentTarget.dataset.id;
+    if (!todoId || this.data.actionBusyId) return;
+    this.setData({ actionBusyId: todoId });
+    try {
+      await blockTodo(todoId);
+      wx.showToast({ title: '已标记阻塞', icon: 'success' });
+      await this.loadTodos();
+    } catch (err) {
+      // Request layer already toasts message.
+    } finally {
+      this.setData({ actionBusyId: '' });
+    }
+  },
+  async onRecallTap(e) {
+    const todoId = e.currentTarget.dataset.id;
+    if (!todoId || this.data.actionBusyId) return;
+    this.setData({ actionBusyId: todoId });
+    try {
+      await recallTodo(todoId);
+      wx.showToast({ title: '已撤回提交', icon: 'success' });
       await this.loadTodos();
     } catch (err) {
       // Request layer already toasts message.

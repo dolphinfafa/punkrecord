@@ -69,3 +69,8 @@
   color: #ffffff;
   border-color: #6366f1;
 }
+.action-btn-warn {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+}

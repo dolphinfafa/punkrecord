@@ -49,13 +49,29 @@
           bindtap="onStartTap"
         >开始</button>
         <button
-          wx:if="{{item.canDone}}"
+          wx:if="{{item.canSubmit}}"
           class="action-btn action-btn-main"
           size="mini"
           data-id="{{item.id}}"
           loading="{{actionBusyId === item.id}}"
-          bindtap="onDoneTap"
-        >完成</button>
+          bindtap="onSubmitTap"
+        >提交</button>
+        <button
+          wx:if="{{item.canBlock}}"
+          class="action-btn action-btn-warn"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onBlockTap"
+        >阻塞</button>
+        <button
+          wx:if="{{item.canRecall}}"
+          class="action-btn"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onRecallTap"
+        >撤回提交</button>
       </view>
     </view>
   </block>
