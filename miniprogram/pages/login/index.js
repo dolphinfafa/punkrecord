@@ -29,6 +29,8 @@ Page({
       const result = await login(username, password);
       const token = result.access_token || result.token;
       if (!token) throw new Error('登录响应无效');
+      // Persist token first so subsequent /auth/me request carries Authorization header.
+      setSession(token, null);
       let user = null;
       try {
         user = await getCurrentUser();

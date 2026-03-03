@@ -36,7 +36,8 @@ Page({
       ]);
       const accountItems = listItems(accounts).map((item) => ({
         ...item,
-        nameText: item.name || '未命名账户',
+        nameText: item.account_name || item.name || '未命名账户',
+        subText: item.bank_name || this.formatAccountCategory(item.account_category),
         balanceText: this.toNumber(item.balance),
       }));
       const transactionItems = listItems(txns).map((item) => this.normalizeTxn(item));
@@ -78,6 +79,10 @@ Page({
   formatDirection(direction) {
     const map = { in: '收入', income: '收入', out: '支出', expense: '支出' };
     return map[direction] || '未知';
+  },
+  formatAccountCategory(category) {
+    const map = { public: '对公账户', private: '个人账户' };
+    return map[String(category || '').toLowerCase()] || '账户';
   },
   computeTotals(accounts, transactions) {
     let totalBalance = 0;

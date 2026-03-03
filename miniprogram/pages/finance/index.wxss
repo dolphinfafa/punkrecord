@@ -39,7 +39,7 @@
 .row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8rpx;
 }
 .name { font-size: 26rpx; max-width: 500rpx; }

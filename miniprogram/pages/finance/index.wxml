@@ -41,7 +41,10 @@
     <view class="title mini">账户列表（{{accounts.length}}）</view>
     <block wx:if="{{accounts.length}}">
       <view class="row" wx:for="{{accounts}}" wx:key="id">
-        <text class="name">{{item.nameText}}</text>
+        <view>
+          <text class="name">{{item.nameText}}</text>
+          <view class="muted" wx:if="{{item.subText}}">{{item.subText}}</view>
+        </view>
         <text class="amt">{{item.balanceText.toFixed(2)}}</text>
       </view>
     </block>

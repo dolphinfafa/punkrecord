@@ -42,6 +42,7 @@ punkrecord/
 |     `- utils/
 |- miniprogram/
 |  |- pages/                  # WeChat Mini Program pages (mobile-first)
+|  |- custom-tab-bar/         # custom bottom tab bar component
 |  |- services/               # API service wrappers for mini program
 |  |- utils/                  # request/session helpers
 |  |- app.{js,json,wxss}
@@ -166,6 +167,7 @@ Layout and state:
 
 Mini program client (`miniprogram/`):
 - Native WeChat mini program structure (`app.js`, `app.json`, `app.wxss`).
+- Uses custom tab bar component at `custom-tab-bar/*` for icon + larger-label navigation.
 - Mobile-first pages:
   - `pages/login`
   - `pages/home`
@@ -178,6 +180,7 @@ Mini program client (`miniprogram/`):
 - UI direction:
   - Prefer the same visual language as the web app (`frontend/src/pages/*`), especially card hierarchy, status badges, and primary action styling.
   - Current mini program theme is aligned to a light `slate + indigo` style for consistency with core web business pages.
+- Todo page now contains both personal/team todo views and leave request/review panels.
 - Shared request/session utilities:
   - `utils/request.js`
   - `utils/storage.js`
@@ -189,15 +192,18 @@ Mini program client (`miniprogram/`):
 1. Authentication flow
 - Login returns token.
 - Frontend stores session via auth context and sends bearer token.
+- Mini program login should persist token before requesting `/auth/me`; Mine page can backfill profile via `/auth/me` when local user cache is empty.
 
 2. Todo lifecycle
 - Typical progression: `pending -> in_progress -> submitted -> done`.
 - Also supports blocked/rejected/dismissed transitions.
+- Mini program supports both "My Todos" and "Team Todos" with corresponding action buttons.
 
 3. Leave approval
 - Employee submits leave request.
 - Manager approves/rejects in pending team list.
 - Leave balance fields are updated after approval.
+- Mini program `pages/todo` includes leave submit, my leave history, and manager review actions.
 
 4. Project execution
 - Project -> stages -> todos.
@@ -285,4 +291,4 @@ When changed, update only impacted sections:
 Do not add deep implementation details. Keep this as a navigation and orientation document.
 
 ---
-Last updated: 2026-03-02
+Last updated: 2026-03-03

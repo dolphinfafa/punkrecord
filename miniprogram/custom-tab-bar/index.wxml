@@ -1,0 +1,19 @@
+<view class="tab-wrap">
+  <view class="tab-shadow"></view>
+  <view class="tab-bar">
+    <view
+      class="tab-item"
+      wx:for="{{list}}"
+      wx:key="pagePath"
+      data-index="{{index}}"
+      bindtap="onItemTap"
+    >
+      <text class="tab-icon" style="color: {{selected === index ? selectedColor : color}};">
+        {{selected === index ? item.activeIcon : item.icon}}
+      </text>
+      <text class="tab-text" style="color: {{selected === index ? selectedColor : color}};">
+        {{item.text}}
+      </text>
+    </view>
+  </view>
+</view>

@@ -1,7 +1,19 @@
 <view class="container">
   <view class="card">
-    <view class="title">我的待办</view>
-    <view class="muted">按状态筛选，并快速推进任务流程。</view>
+    <view class="title">待办与请假</view>
+    <view class="muted">支持我的待办、团队待办，以及请假申请审批。</view>
+  </view>
+
+  <view class="card scope-card section-gap">
+    <view class="scope-row">
+      <view
+        class="scope-item {{activeScope === item.key ? 'scope-item-active' : ''}}"
+        wx:for="{{scopeTabs}}"
+        wx:key="key"
+        data-scope="{{item.key}}"
+        bindtap="onScopeTabTap"
+      >{{item.label}}</view>
+    </view>
   </view>
 
   <scroll-view class="tab-scroll section-gap" scroll-x enable-flex>
@@ -19,7 +31,7 @@
   <view class="card search-card">
     <input
       class="search-input"
-      placeholder="搜索待办标题或描述"
+      placeholder="搜索待办标题、描述或人员"
       value="{{keyword}}"
       bindinput="onKeywordInput"
     />
@@ -27,7 +39,11 @@
   </view>
 
   <view class="card loading-card" wx:if="{{loading}}">
-    <view class="muted">正在加载待办...</view>
+    <view class="muted">正在加载数据...</view>
+  </view>
+
+  <view class="section-head">
+    <text class="section-title">{{activeScope === 'my' ? '我的待办' : '团队待办'}}</text>
   </view>
 
   <block wx:if="{{displayTodos.length}}">
@@ -36,6 +52,7 @@
         <text class="todo-title">{{item.titleText}}</text>
         <text class="badge {{item.status}}">{{item.statusLabel}}</text>
       </view>
+      <view class="muted" wx:if="{{activeScope === 'team'}}">负责人：{{item.assigneeText || '未设置'}}</view>
       <view class="muted">优先级：{{item.priorityText}}</view>
       <view class="muted">截止时间：{{item.dueText}}</view>
       <view class="todo-desc" wx:if="{{item.descriptionText}}">{{item.descriptionText}}</view>
@@ -72,11 +89,123 @@
           loading="{{actionBusyId === item.id}}"
           bindtap="onRecallTap"
         >撤回提交</button>
+        <button
+          wx:if="{{item.canApprove}}"
+          class="action-btn action-btn-main"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onApproveTap"
+        >通过</button>
+        <button
+          wx:if="{{item.canReject}}"
+          class="action-btn action-btn-warn"
+          size="mini"
+          data-id="{{item.id}}"
+          loading="{{actionBusyId === item.id}}"
+          bindtap="onRejectTap"
+        >驳回</button>
       </view>
     </view>
   </block>
 
   <view class="card" wx:else>
     <view class="muted">当前筛选条件下暂无待办。</view>
+  </view>
+
+  <view class="section-head">
+    <text class="section-title">请假申请</text>
+    <text class="section-subtitle">提交请假并查看审批进展</text>
+  </view>
+
+  <view class="card leave-card">
+    <view class="leave-balance-grid">
+      <view class="leave-balance-item">年假 {{myProfile && myProfile.leave_annual_remaining !== undefined ? myProfile.leave_annual_remaining : '-'}}</view>
+      <view class="leave-balance-item">产假 {{myProfile && myProfile.leave_maternity_remaining !== undefined ? myProfile.leave_maternity_remaining : '-'}}</view>
+      <view class="leave-balance-item">婚假 {{myProfile && myProfile.leave_marriage_remaining !== undefined ? myProfile.leave_marriage_remaining : '-'}}</view>
+      <view class="leave-balance-item">事假 {{myProfile && myProfile.leave_personal_remaining !== undefined ? myProfile.leave_personal_remaining : '-'}}</view>
+      <view class="leave-balance-item">病假 {{myProfile && myProfile.leave_sick_remaining !== undefined ? myProfile.leave_sick_remaining : '-'}}</view>
+    </view>
+
+    <view class="leave-type-row section-gap">
+      <view
+        class="chip {{leaveType === item.key ? 'chip-active' : ''}}"
+        wx:for="{{leaveTypes}}"
+        wx:key="key"
+        data-type="{{item.key}}"
+        bindtap="onLeaveTypeTap"
+      >{{item.label}}</view>
+    </view>
+
+    <view class="leave-date-row section-gap">
+      <view class="leave-date-col">
+        <view class="muted">开始日期</view>
+        <picker mode="date" value="{{leaveStartDate}}" bindchange="onLeaveStartDateChange">
+          <view class="picker-value">{{leaveStartDate || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="leave-date-col">
+        <view class="muted">结束日期</view>
+        <picker mode="date" value="{{leaveEndDate}}" bindchange="onLeaveEndDateChange">
+          <view class="picker-value">{{leaveEndDate || '请选择'}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <textarea
+      class="leave-reason section-gap"
+      placeholder="请假原因（可选）"
+      value="{{leaveReason}}"
+      bindinput="onLeaveReasonInput"
+      maxlength="120"
+    />
+
+    <button class="primary-btn leave-submit" loading="{{leaveSubmitting}}" bindtap="onSubmitLeaveTap">提交请假</button>
+  </view>
+
+  <view class="card">
+    <view class="title mini">我的请假（{{myLeaves.length}}）</view>
+    <block wx:if="{{myLeaves.length}}">
+      <view class="leave-item" wx:for="{{myLeaves}}" wx:key="id">
+        <view class="leave-head">
+          <text class="leave-type">{{item.leaveTypeLabel}}</text>
+          <text class="leave-status leave-status-{{item.status}}">{{item.leaveStatusLabel}}</text>
+        </view>
+        <view class="muted">{{item.rangeText}}</view>
+        <view class="leave-reason-text" wx:if="{{item.reason}}">{{item.reason}}</view>
+      </view>
+    </block>
+    <view class="muted" wx:else>暂无请假记录。</view>
+  </view>
+
+  <view class="card">
+    <view class="title mini">待我审批（{{teamPendingLeaves.length}}）</view>
+    <block wx:if="{{teamPendingLeaves.length}}">
+      <view class="leave-item" wx:for="{{teamPendingLeaves}}" wx:key="id">
+        <view class="leave-head">
+          <text class="leave-type">{{item.applicant_name || '员工'}} · {{item.leaveTypeLabel}}</text>
+          <text class="leave-status leave-status-pending">待审批</text>
+        </view>
+        <view class="muted">{{item.rangeText}}</view>
+        <view class="leave-reason-text" wx:if="{{item.reason}}">{{item.reason}}</view>
+        <view class="actions">
+          <button
+            class="action-btn action-btn-main"
+            size="mini"
+            data-id="{{item.id}}"
+            loading="{{leaveReviewingId === item.id}}"
+            bindtap="onApproveLeaveTap"
+          >通过</button>
+          <button
+            class="action-btn action-btn-warn"
+            size="mini"
+            data-id="{{item.id}}"
+            loading="{{leaveReviewingId === item.id}}"
+            bindtap="onRejectLeaveTap"
+          >驳回</button>
+        </view>
+      </view>
+    </block>
+    <view class="muted" wx:else>暂无待审批请假。</view>
   </view>
 </view>
