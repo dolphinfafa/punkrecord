@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    APP_ENV: str = "development"
+    DEBUG: bool = False
     
     # Database
     DB_TYPE: str = "sqlite"  # sqlite or mysql
@@ -24,9 +25,16 @@ class Settings(BaseSettings):
     SQLITE_DB_PATH: str = "./atlas.db"  # SQLite database file path
     
     # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    COOKIE_SECURE: bool = True
+    COOKIE_SAMESITE: str = "lax"
+
+    # Runtime controls
+    AUTO_CREATE_TABLES_ON_STARTUP: bool = False
+    AUTO_RUN_MIGRATIONS_ON_STARTUP: bool = False
+    ENFORCE_RBAC: bool = False
     
     # AI 
     GEMINI_API_KEY: Optional[str] = None 

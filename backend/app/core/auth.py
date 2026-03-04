@@ -1,18 +1,21 @@
 """
 Authentication dependencies
 """
+import logging
 from typing import Optional
 from uuid import UUID
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.security import decode_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
-from app.models.iam import User, UserStatus
+from app.core.config import settings
+from app.models.iam import User, UserStatus, UserRole, Role, RolePermission, Permission
 
 # Security scheme
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -21,7 +24,7 @@ async def get_current_user(
     session: Session = Depends(get_session)
 ) -> User:
     """Get current authenticated user"""
-    print(f"🔐 Authentication attempt...")
+    logger.debug("Authentication attempt")
     
     # Prefer explicit Bearer token from frontend, then fallback to cookie.
     # This avoids account-mismatch when stale cookies exist across logins.
@@ -30,31 +33,31 @@ async def get_current_user(
         token = request.cookies.get("access_token")
         
     if not token:
-        print(f"   ❌ No token found in cookie or header")
+        logger.debug("No token found in cookie or header")
         raise UnauthorizedException("Not authenticated")
     
     try:
         payload = decode_access_token(token)
         user_id: str = payload.get("sub")
         if user_id is None:
-            print(f"   ❌ No user_id in token payload")
+            logger.debug("No user_id in token payload")
             raise UnauthorizedException("Invalid authentication credentials")
-        print(f"   User ID from token: {user_id}")
+        logger.debug("Authenticated user id from token: %s", user_id)
     except Exception as e:
-        print(f"   ❌ Token decode failed: {type(e).__name__}: {str(e)}")
+        logger.debug("Token decode failed: %s: %s", type(e).__name__, str(e))
         raise UnauthorizedException("Invalid authentication credentials")
     
     # Get user from database
     user = session.get(User, UUID(user_id))
     if user is None:
-        print(f"   ❌ User not found in database")
+        logger.debug("User not found in database")
         raise UnauthorizedException("User not found")
     
     if user.status != UserStatus.ACTIVE:
-        print(f"   ❌ User is not active: {user.status}")
+        logger.debug("User is not active: %s", user.status)
         raise UnauthorizedException("User is inactive")
     
-    print(f"   ✅ Authentication successful: {user.username}")
+    logger.debug("Authentication successful: %s", user.username)
     return user
 
 
@@ -73,11 +76,33 @@ def require_permission(permission_code: str):
         current_user: User = Depends(get_current_user),
         session: Session = Depends(get_session)
     ):
-        # TODO: Implement permission checking logic
-        # For now, just check if user is active
-        # In full implementation, check user roles and permissions
         if current_user.status != UserStatus.ACTIVE:
             raise ForbiddenException("User does not have required permission")
+
+        # Soft rollout mode for legacy users without role assignment.
+        if not settings.ENFORCE_RBAC:
+            return current_user
+
+        role_codes = session.exec(
+            select(Role.code)
+            .select_from(UserRole)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(UserRole.user_id == current_user.id)
+        ).all()
+        if "admin" in role_codes:
+            return current_user
+
+        permission_codes = session.exec(
+            select(Permission.code)
+            .select_from(UserRole)
+            .join(Role, Role.id == UserRole.role_id)
+            .join(RolePermission, RolePermission.role_id == Role.id)
+            .join(Permission, Permission.id == RolePermission.permission_id)
+            .where(UserRole.user_id == current_user.id)
+        ).all()
+
+        if permission_code not in set(permission_codes):
+            raise ForbiddenException(f"Missing permission: {permission_code}")
         return current_user
     
     return permission_checker

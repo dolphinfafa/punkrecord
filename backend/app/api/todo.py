@@ -8,7 +8,7 @@ import math
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import get_current_user
+from app.core.auth import require_permission
 from app.core.exceptions import NotFoundException, ValidationException
 from app.core.response import success_response
 from app.models.iam import User, OurEntity, BeliRule, BeliRuleType
@@ -187,7 +187,7 @@ def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
 async def create_todo(
     todo_data: TodoCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Create new todo item. Notifies the assignee's manager."""
     import uuid as _uuid
@@ -230,7 +230,7 @@ async def get_my_todos(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.read"))
 ):
     """Get current user's todos (assigned to me)."""
     query = select(TodoItem).where(TodoItem.assignee_user_id == current_user.id)
@@ -274,7 +274,7 @@ async def get_team_todos(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.read"))
 ):
     """Get direct subordinates' todos (one level only)."""
     # Find direct subordinates
@@ -314,7 +314,7 @@ async def get_team_todos(
 async def create_leave_request(
     data: LeaveRequestCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Create a leave request for current user."""
     if data.end_at <= data.start_at:
@@ -364,7 +364,7 @@ async def list_my_leave_requests(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.read"))
 ):
     """List current user's leave requests."""
     query = select(LeaveRequest).where(LeaveRequest.applicant_user_id == current_user.id)
@@ -387,7 +387,7 @@ async def list_my_leave_requests(
 @router.get("/leaves/team/pending", response_model=dict)
 async def list_team_pending_leave_requests(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.read"))
 ):
     """List pending leave requests where current user is the direct manager approver."""
     subordinates = session.exec(
@@ -411,7 +411,7 @@ async def list_team_pending_leave_requests(
 async def approve_leave_request(
     leave_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Approve leave request by direct manager and deduct leave balance."""
     leave = session.get(LeaveRequest, leave_id)
@@ -451,7 +451,7 @@ async def reject_leave_request(
     leave_id: UUID,
     data: TodoReviewAction,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Reject leave request by direct manager."""
     leave = session.get(LeaveRequest, leave_id)
@@ -484,7 +484,7 @@ async def reject_leave_request(
 async def get_todo(
     todo_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.read"))
 ):
     """Get todo by ID."""
     todo = session.get(TodoItem, todo_id)
@@ -509,7 +509,7 @@ async def update_todo(
     todo_id: UUID,
     todo_data: TodoUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Update todo (assignee or creator only)."""
     todo = session.get(TodoItem, todo_id)
@@ -552,7 +552,7 @@ async def update_todo(
 async def start_todo(
     todo_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Start task: Open -> In Progress, record start_at."""
     todo = session.get(TodoItem, todo_id)
@@ -593,7 +593,7 @@ async def start_todo(
 async def submit_todo(
     todo_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Employee submits task as complete → pending_review. Notifies manager."""
     todo = session.get(TodoItem, todo_id)
@@ -653,7 +653,7 @@ async def approve_todo(
     todo_id: UUID,
     data: TodoReviewAction = TodoReviewAction(),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Manager approves task completion → done."""
     todo = session.get(TodoItem, todo_id)
@@ -707,7 +707,7 @@ async def reject_todo(
     todo_id: UUID,
     data: TodoReviewAction,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Manager rejects task, sends it back with a comment."""
     todo = session.get(TodoItem, todo_id)
@@ -745,7 +745,7 @@ async def reject_todo(
 async def mark_todo_done(
     todo_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Direct done (kept for backward compatibility, now redirects to submit flow)."""
     todo = session.get(TodoItem, todo_id)
@@ -798,7 +798,7 @@ async def block_todo(
     todo_id: UUID,
     blocked_reason: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Block todo with reason."""
     todo = session.get(TodoItem, todo_id)
@@ -830,7 +830,7 @@ async def dismiss_todo(
     todo_id: UUID,
     dismiss_reason: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """Dismiss todo."""
     todo = session.get(TodoItem, todo_id)
@@ -867,7 +867,7 @@ async def update_todo_status(
     todo_id: UUID,
     data: TodoStatusChange,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("todo.write"))
 ):
     """
     Manually update status. Handles backward transitions (Undo/Redo/Recall).

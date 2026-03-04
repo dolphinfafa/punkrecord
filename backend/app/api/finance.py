@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import get_current_user
+from app.core.auth import require_permission
 from app.core.exceptions import NotFoundException
 from app.core.response import success_response
 from app.models.iam import User
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/finance", tags=["Finance"])
 async def create_account(
     data: FinanceAccountCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create finance account"""
     account = FinanceAccount(
@@ -58,7 +58,7 @@ async def create_account(
 @router.get("/accounts", response_model=dict)
 async def list_accounts(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.read"))
 ):
     """List finance accounts"""
     accounts = session.exec(select(FinanceAccount).where(FinanceAccount.status == AccountStatus.ACTIVE)).all()
@@ -93,7 +93,7 @@ async def update_account(
     account_id: UUID,
     data: FinanceAccountUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Update finance account"""
     account = session.get(FinanceAccount, account_id)
@@ -137,7 +137,7 @@ async def update_account(
 async def create_transaction(
     data: TransactionCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create transaction"""
     txn_type = TransactionType(data.txn_type)
@@ -206,7 +206,7 @@ async def update_transaction(
     txn_id: UUID,
     data: TransactionUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Update transaction status"""
     transaction = session.get(FinanceTransaction, txn_id)
@@ -231,7 +231,7 @@ async def list_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.read"))
 ):
     """List transactions"""
     query = select(FinanceTransaction)
@@ -266,7 +266,7 @@ async def list_transactions(
 async def get_transaction(
     txn_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.read"))
 ):
     """Get transaction"""
     transaction = session.get(FinanceTransaction, txn_id)
@@ -282,7 +282,7 @@ async def get_transaction(
 async def create_invoice(
     data: InvoiceCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create invoice"""
     invoice = FinanceInvoice(
@@ -311,7 +311,7 @@ async def list_invoices(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.read"))
 ):
     """List invoices"""
     query = select(FinanceInvoice)
@@ -344,7 +344,7 @@ async def list_invoices(
 async def create_reimbursement(
     data: ReimbursementCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create reimbursement"""
     reimbursement = Reimbursement(
@@ -370,7 +370,7 @@ async def list_reimbursements(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("finance.read"))
 ):
     """List reimbursements"""
     query = select(Reimbursement).where(Reimbursement.requester_user_id == current_user.id)

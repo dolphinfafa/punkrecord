@@ -272,9 +272,9 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const inputWrapper = { borderBottom: '1px solid #e2e8f0', transition: 'border-color 0.2s', padding: '4px 0' };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-container" style={{ maxWidth: '1800px', width: '98vw', height: '95vh', display: 'flex', flexDirection: 'column' }}>
-                <div className="modal-header">
+        <div className="stage-modal-overlay">
+            <div className="stage-modal-container" style={{ maxWidth: '1800px', width: '98vw', height: '95vh', display: 'flex', flexDirection: 'column' }}>
+                <div className="stage-modal-header">
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Sparkles size={20} className="text-primary" />
                         功能清单助手 - {stage.stage_name}
@@ -282,7 +282,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
                     <button className="btn-icon" onClick={onClose}><X size={20} /></button>
                 </div>
 
-                <div className="modal-body" style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: 0, gap: '1px', backgroundColor: '#e2e8f0' }}>
+                <div className="stage-modal-body" style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: 0, gap: '1px', backgroundColor: '#e2e8f0' }}>
 
                     {/* Left Pane: Data Table Editor */}
                     <div style={{ flex: 2, display: 'flex', flexDirection: 'column', backgroundColor: 'white', padding: '1.5rem', overflowY: 'auto', minWidth: 0 }}>

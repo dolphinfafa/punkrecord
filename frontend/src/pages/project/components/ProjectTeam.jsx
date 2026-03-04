@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import projectApi from '@/api/project';
 import iamApi from '@/api/iam';
+import Modal from '@/components/common/Modal';
 
 export default function ProjectTeam({ project }) {
     const [members, setMembers] = useState([]);
@@ -55,17 +56,6 @@ export default function ProjectTeam({ project }) {
         }
     };
 
-    const handleSelectChange = (e) => {
-        const options = e.target.options;
-        const selectedValues = [];
-        for (let i = 0; i < options.length; i++) {
-            if (options[i].selected) {
-                selectedValues.push(options[i].value);
-            }
-        }
-        setNewMemberIds(selectedValues);
-    };
-
     const handleRemoveMember = async (userId) => {
         if (!window.confirm('确定要移除该成员吗？')) return;
         try {
@@ -86,47 +76,46 @@ export default function ProjectTeam({ project }) {
             </div>
 
             {showAddModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '400px' }}>
-                        <div className="modal-header">
-                            <h4>添加成员</h4>
-                            <button className="close-btn" onClick={() => setShowAddModal(false)}>&times;</button>
-                        </div>
-                        <form onSubmit={handleAddMember}>
-                            <div className="modal-body">
-                                {error && <div className="error-message">{error}</div>}
-                                <div className="form-group">
-                                    <label>用户 (勾选添加)</label>
-                                    <div className="checkbox-list" style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #dee2e6', padding: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
-                                        {users.map(u => (
-                                            <div key={u.id} style={{ marginBottom: '8px' }}>
-                                                <label style={{ display: 'flex', alignItems: 'center', fontWeight: 'normal', margin: 0, cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={newMemberIds.includes(u.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setNewMemberIds([...newMemberIds, u.id]);
-                                                            } else {
-                                                                setNewMemberIds(newMemberIds.filter(id => id !== u.id));
-                                                            }
-                                                        }}
-                                                        style={{ marginRight: '8px', width: 'auto', marginTop: 0 }}
-                                                    />
-                                                    {u.display_name} {u.department_id ? '(已分配部门)' : ''}
-                                                </label>
-                                            </div>
-                                        ))}
+                <Modal
+                    isOpen
+                    onClose={() => setShowAddModal(false)}
+                    title="添加成员"
+                    style={{ maxWidth: '400px' }}
+                    footer={(
+                        <>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>取消</button>
+                            <button type="submit" form="project-member-form" className="btn btn-primary" disabled={loading}>添加</button>
+                        </>
+                    )}
+                >
+                    <form id="project-member-form" onSubmit={handleAddMember}>
+                        {error && <div className="error-message" style={{ marginBottom: '10px' }}>{error}</div>}
+                        <div className="form-group">
+                            <label>用户 (勾选添加)</label>
+                            <div className="checkbox-list" style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #dee2e6', padding: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
+                                {users.map(u => (
+                                    <div key={u.id} style={{ marginBottom: '8px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', fontWeight: 'normal', margin: 0, cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={newMemberIds.includes(u.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setNewMemberIds([...newMemberIds, u.id]);
+                                                    } else {
+                                                        setNewMemberIds(newMemberIds.filter(id => id !== u.id));
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px', width: 'auto', marginTop: 0 }}
+                                            />
+                                            {u.display_name} {u.department_id ? '(已分配部门)' : ''}
+                                        </label>
                                     </div>
-                                </div>
+                                ))}
                             </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>取消</button>
-                                <button type="submit" className="btn btn-primary" disabled={loading}>添加</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                        </div>
+                    </form>
+                </Modal>
             )}
 
             <div className="members-list">

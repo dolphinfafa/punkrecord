@@ -15,7 +15,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_permission
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
 from app.models.iam import User, OurEntity, JobTitle
@@ -149,7 +149,7 @@ def _build_feature_task_title(row: dict, dev_type: str) -> str:
 async def create_project(
     data: ProjectCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Create project with automatic stage generation"""
     # Fetch default our_entity if not provided
@@ -200,7 +200,7 @@ async def create_project(
     session.add(project)
     session.commit()
     session.refresh(project)
-    
+    return success_response(enrich_project_response(session, project))
 
 @router.get("/projects", response_model=dict)
 async def list_projects(
@@ -274,7 +274,7 @@ async def upload_project_attachment(
     project_id: UUID,
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Upload an attachment for the project."""
     project = session.get(Project, project_id)
@@ -352,7 +352,7 @@ async def delete_project_attachment(
     project_id: UUID,
     attachment_id: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Delete a project-level attachment."""
     project = session.get(Project, project_id)
@@ -384,7 +384,7 @@ async def update_project(
     project_id: UUID,
     data: ProjectUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Update project"""
     project = session.get(Project, project_id)
@@ -446,7 +446,7 @@ async def update_stage_status(
     stage_id: UUID,
     data: StageStatusUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Update project stage (status, deliverables, feature_list)"""
     stage = session.get(ProjectStage, stage_id)
@@ -489,7 +489,7 @@ async def upload_stage_attachment(
     stage_id: UUID,
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Upload a stage attachment and append metadata into stage.attachments."""
     stage = session.get(ProjectStage, stage_id)
@@ -572,7 +572,7 @@ async def delete_stage_attachment(
     stage_id: UUID,
     attachment_id: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Delete stage attachment metadata and file."""
     stage = session.get(ProjectStage, stage_id)
@@ -603,7 +603,7 @@ async def delete_stage_attachment(
 async def delete_project(
     project_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Delete project"""
     project = session.get(Project, project_id)
@@ -628,7 +628,7 @@ async def add_project_member(
     project_id: UUID,
     data: Union[ProjectMemberCreate, ProjectMemberBatchCreate],
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Add member(s) to project"""
     project = session.get(Project, project_id)
@@ -712,7 +712,7 @@ async def remove_project_member(
     project_id: UUID,
     user_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Remove member from project"""
     member = session.exec(
@@ -806,7 +806,7 @@ async def assign_project_todo(
     todo_id: UUID,
     data: ProjectTaskAssignRequest,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Assign/reassign a project task to a member. Only PM can assign."""
     project = session.get(Project, project_id)
@@ -854,7 +854,7 @@ async def update_project_todo_plan(
     todo_id: UUID,
     data: ProjectTaskPlanUpdateRequest,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Update assignee and/or due date for a project task. Only PM can update."""
     project = session.get(Project, project_id)
@@ -939,7 +939,7 @@ async def delete_project_todo(
     project_id: UUID,
     todo_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Delete a project task/bug todo.
 
@@ -968,7 +968,7 @@ async def delete_project_todo(
 async def sync_dev_tasks_from_feature_list(
     project_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Strictly sync project tasks from feature list so task list matches feature list."""
     from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
@@ -1513,7 +1513,7 @@ async def generate_dev_tasks(
     project_id: UUID,
     payload: GenerateDevTasksRequest,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("project.write"))
 ):
     """Batch-create TodoItems from feature list rows for the development stage."""
     from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
@@ -1905,4 +1905,3 @@ async def download_acceptance_report(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
     )
-

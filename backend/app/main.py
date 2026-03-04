@@ -1,6 +1,8 @@
 """
 Main FastAPI application
 """
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,6 +11,8 @@ from app.core.database import create_db_and_tables
 from app.core.exceptions import AtlasException
 from app.core.response import error_response
 from app.api import auth, iam, todo, contract, project, finance, ai
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -38,13 +42,13 @@ app.add_middleware(
 # Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f"📥 Incoming request: {request.method} {request.url.path}")
+    logger.info("Incoming request: %s %s", request.method, request.url.path)
     try:
         response = await call_next(request)
-        print(f"📤 Response status: {response.status_code}")
+        logger.info("Response status: %s", response.status_code)
         return response
     except Exception as e:
-        print(f"❌ Request failed: {type(e).__name__}: {str(e)}")
+        logger.exception("Request failed: %s: %s", type(e).__name__, str(e))
         raise
 
 
@@ -61,14 +65,10 @@ async def atlas_exception_handler(request: Request, exc: AtlasException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle general exceptions"""
-    import traceback
-    print(f"❌ Unhandled exception on {request.method} {request.url.path}:")
-    traceback.print_exc()
-    with open('error.log', 'w') as f:
-        traceback.print_exc(file=f)
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content=error_response(500, f"Internal server error: {type(exc).__name__}: {str(exc)}")
+        content=error_response(500, "Internal server error")
     )
 
 
@@ -76,7 +76,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 def on_startup():
     """Initialize database on startup"""
-    create_db_and_tables()
+    if settings.AUTO_CREATE_TABLES_ON_STARTUP or settings.AUTO_RUN_MIGRATIONS_ON_STARTUP:
+        create_db_and_tables(
+            run_schema_create=settings.AUTO_CREATE_TABLES_ON_STARTUP,
+            run_alembic_migrations=settings.AUTO_RUN_MIGRATIONS_ON_STARTUP,
+        )
 
 
 # Health check

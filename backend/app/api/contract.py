@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import get_current_user
+from app.core.auth import require_permission
 from app.core.exceptions import NotFoundException
 from app.core.response import success_response
 from app.models.iam import User
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/contract", tags=["Contract"])
 async def create_counterparty(
     data: CounterpartyCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.write"))
 ):
     """Create counterparty"""
     counterparty = Counterparty(
@@ -55,7 +55,7 @@ async def create_counterparty(
 async def list_counterparties(
     type: Optional[str] = Query(None),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.read"))
 ):
     """List counterparties"""
     query = select(Counterparty)
@@ -72,7 +72,7 @@ async def list_counterparties(
 async def create_contract(
     data: ContractCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.write"))
 ):
     """Create contract"""
     contract = Contract(
@@ -125,7 +125,7 @@ async def list_contracts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.read"))
 ):
     """List contracts"""
     try:
@@ -175,7 +175,7 @@ async def list_contracts(
 async def get_contract(
     contract_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.read"))
 ):
     """Get contract by ID"""
     contract = session.get(Contract, contract_id)
@@ -190,7 +190,7 @@ async def update_contract(
     contract_id: UUID,
     data: ContractUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.write"))
 ):
     """Update contract"""
     contract = session.get(Contract, contract_id)
@@ -222,7 +222,7 @@ async def update_contract(
 async def get_contract_payment_plans(
     contract_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.read"))
 ):
     """Get contract payment plans"""
     contract = session.get(Contract, contract_id)
@@ -242,7 +242,7 @@ async def get_contract_payment_plans(
 async def submit_contract_for_approval(
     contract_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("contract.write"))
 ):
     """Submit contract for approval"""
     contract = session.get(Contract, contract_id)

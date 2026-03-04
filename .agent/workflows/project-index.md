@@ -49,6 +49,7 @@ punkrecord/
 |  |- project.config.json
 |  `- project.private.config.json
 |- apps/api/                  # experimental NestJS API area
+|- .github/workflows/         # CI workflows
 |- prd/                       # product requirement docs
 |- milestone/                 # dated milestone records
 `- .agent/workflows/          # workflow docs and this project index
@@ -231,6 +232,8 @@ uvicorn app.main:app --reload --port 8000
 alembic upgrade head
 python create_admin.py
 python init_database.py
+pytest -q tests/test_health.py
+pytest -q tests/test_project_workflow.py
 ```
 
 Frontend (from `frontend/`):
@@ -278,6 +281,14 @@ conda activate punkrecord
   - Never run project Python commands outside the `punkrecord` environment.
   - If shell activation is unavailable, use an equivalent isolated execution method.
 
+Backend runtime safety defaults:
+- Startup no longer auto-applies schema changes by default.
+- Use env flags only when explicitly needed:
+  - `AUTO_CREATE_TABLES_ON_STARTUP`
+  - `AUTO_RUN_MIGRATIONS_ON_STARTUP`
+- RBAC enforcement supports phased rollout with:
+  - `ENFORCE_RBAC` (default off for compatibility)
+
 ## 8. Conventions and Contracts
 
 Naming:
@@ -293,6 +304,10 @@ Response shape convention:
 - Success: `{ "data": ..., "message": "ok" }`
 - Error: `{ "code": <int>, "message": <string> }`
 
+Authorization convention:
+- API handlers should use `require_permission("<module>.<read|write>")` where applicable.
+- Current permission modules in use include: `iam`, `todo`, `contract`, `project`, `finance`.
+
 Encoding and line endings:
 - Workflow files must be UTF-8 (no BOM) and LF.
 
@@ -300,6 +315,12 @@ Encoding and line endings:
 
 - `.agent/workflows/use-project-index.md`
 - Other workflow guides in `.agent/workflows/*.md`
+
+CI:
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Current CI scope:
+  - Backend smoke test (`pytest -q tests/test_health.py`)
+  - Frontend smoke build (`npm run test:smoke`)
 
 ## 10. Maintenance Rules for This Index
 

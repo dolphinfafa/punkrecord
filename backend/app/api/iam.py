@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import get_current_user
+from app.core.auth import require_permission
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
@@ -144,7 +144,7 @@ def _build_org_chart(user: User, all_users: list[User], job_titles: dict, depart
 @router.get("/job-titles", response_model=dict)
 async def list_job_titles(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """List all job titles ordered by name"""
     titles = session.exec(select(JobTitle).order_by(JobTitle.name)).all()
@@ -155,7 +155,7 @@ async def list_job_titles(
 async def create_job_title(
     data: JobTitleCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Create a new job title"""
     jt = JobTitle(name=data.name, description=data.description)
@@ -170,7 +170,7 @@ async def update_job_title(
     job_title_id: UUID,
     data: JobTitleUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Update a job title"""
     jt = session.get(JobTitle, job_title_id)
@@ -190,7 +190,7 @@ async def update_job_title(
 async def delete_job_title(
     job_title_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Delete a job title"""
     jt = session.get(JobTitle, job_title_id)
@@ -210,7 +210,7 @@ async def delete_job_title(
 @router.get("/departments", response_model=dict)
 async def list_departments(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """List departments as a tree"""
     all_depts = session.exec(select(OrgUnit)).all()
@@ -232,7 +232,7 @@ async def list_departments(
 async def create_department(
     data: DepartmentCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Create a new department"""
     if data.parent_org_unit_id:
@@ -263,7 +263,7 @@ async def update_department(
     dept_id: UUID,
     data: DepartmentUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Update a department"""
     dept = session.get(OrgUnit, dept_id)
@@ -293,7 +293,7 @@ async def update_department(
 async def delete_department(
     dept_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Delete a department"""
     dept = session.get(OrgUnit, dept_id)
@@ -317,7 +317,7 @@ async def delete_department(
 @router.get("/entities", response_model=dict)
 async def list_entities(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """List all our entities (company / branches)"""
     entities = session.exec(select(OurEntity).order_by(OurEntity.name)).all()
@@ -332,7 +332,7 @@ async def list_entities(
 @router.get("/org-chart", response_model=dict)
 async def get_org_chart(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """Get organization chart as a tree"""
     all_users = session.exec(select(User).where(User.status == "active")).all()
@@ -361,7 +361,7 @@ async def get_org_chart(
 @router.get("/beli-rules", response_model=dict)
 async def list_beli_rules(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     rules = session.exec(select(BeliRule).order_by(BeliRule.created_at.desc())).all()
     return success_response([BeliRuleResponse.model_validate(r) for r in rules])
@@ -371,7 +371,7 @@ async def list_beli_rules(
 async def create_beli_rule(
     data: BeliRuleCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     _require_l0(current_user, session)
     rule_type = (data.rule_type or "").strip()
@@ -404,7 +404,7 @@ async def update_beli_rule(
     rule_id: UUID,
     data: BeliRuleUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     _require_l0(current_user, session)
     rule = session.get(BeliRule, rule_id)
@@ -450,7 +450,7 @@ async def update_beli_rule(
 async def delete_beli_rule(
     rule_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     _require_l0(current_user, session)
     rule = session.get(BeliRule, rule_id)
@@ -467,7 +467,7 @@ async def delete_beli_rule(
 async def create_user(
     user_data: UserCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Create new user"""
     new_user = User(
@@ -497,7 +497,7 @@ async def list_users(
     department_id: Optional[UUID] = Query(None),
     job_title_id: Optional[UUID] = Query(None),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """List users with pagination and optional filters"""
     query = select(User)
@@ -529,7 +529,7 @@ async def list_users(
 async def get_user(
     user_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """Get user by ID"""
     user = session.get(User, user_id)
@@ -544,7 +544,7 @@ async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Update user"""
     user = session.get(User, user_id)
@@ -609,7 +609,7 @@ async def update_user(
 async def reset_user_leave_balances(
     user_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Manually reset leave balances for a user. Only L0 can perform."""
     user = session.get(User, user_id)
@@ -638,7 +638,7 @@ async def reset_user_leave_balances(
 @router.post("/users/reset-leave-balances", response_model=dict)
 async def reset_all_users_leave_balances(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Manually reset leave balances for all users. Only L0 can perform."""
     all_users = session.exec(select(User)).all()
@@ -666,7 +666,7 @@ async def reset_all_users_leave_balances(
 async def create_our_entity(
     entity_data: OurEntityCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.write"))
 ):
     """Create our entity"""
     from app.models.iam import OurEntityType, OurEntityStatus
@@ -691,7 +691,7 @@ async def create_our_entity(
 @router.get("/our-entities", response_model=dict)
 async def list_our_entities(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("iam.read"))
 ):
     """List our entities"""
     entities = session.exec(select(OurEntity)).all()

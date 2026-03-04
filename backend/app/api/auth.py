@@ -1,7 +1,7 @@
 """
 Authentication API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Response
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.security import verify_password, create_access_token
@@ -48,8 +48,8 @@ async def login(
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=False  # Set to True in production with HTTPS
+        samesite=settings.COOKIE_SAMESITE,
+        secure=settings.COOKIE_SECURE
     )
     
     return TokenResponse(
@@ -65,8 +65,8 @@ async def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        samesite="lax",
-        secure=False
+        samesite=settings.COOKIE_SAMESITE,
+        secure=settings.COOKIE_SECURE
     )
     return {"message": "Successfully logged out"}
 

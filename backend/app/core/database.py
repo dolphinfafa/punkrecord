@@ -14,10 +14,12 @@ engine = create_engine(
 )
 
 
-def create_db_and_tables():
-    """Create database tables"""
-    SQLModel.metadata.create_all(engine)
-    run_migrations()
+def create_db_and_tables(run_schema_create: bool = True, run_alembic_migrations: bool = True):
+    """Create database tables and optionally apply migrations."""
+    if run_schema_create:
+        SQLModel.metadata.create_all(engine)
+    if run_alembic_migrations:
+        run_migrations()
 
 
 def run_migrations():

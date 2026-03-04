@@ -1,4 +1,4 @@
-.modal-overlay {
+.stage-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -11,7 +11,7 @@
     z-index: 1000;
 }
 
-.modal-container {
+.stage-modal-container {
     background-color: white;
     border-radius: 8px;
     width: 600px;
@@ -21,7 +21,7 @@
     flex-direction: column;
 }
 
-.modal-header {
+.stage-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -29,17 +29,17 @@
     border-bottom: 1px solid #e2e8f0;
 }
 
-.modal-header h2 {
+.stage-modal-header h2 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 600;
 }
 
-.modal-body {
+.stage-modal-body {
     padding: 1.5rem;
 }
 
-.modal-footer {
+.stage-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
