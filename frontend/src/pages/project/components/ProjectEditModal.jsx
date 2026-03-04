@@ -76,7 +76,10 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
                     <h3>编辑项目</h3>
                     <button className="close-btn" onClick={onClose}>&times;</button>
                 </div>
-                <form onSubmit={handleSubmit}>
+                <form
+                    onSubmit={handleSubmit}
+                    style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                >
                     <div className="modal-body">
                         {error && <div className="error-message">{error}</div>}
 

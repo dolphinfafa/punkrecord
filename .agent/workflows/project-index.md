@@ -259,9 +259,24 @@ curl http://localhost:8000/health
 ```
 
 Python environment policy:
-- macOS: `pyenv` environment `punkrecord`.
-- Windows: `conda` environment `punkrecord`.
-- Activate environment before any Python command.
+- Requirements:
+  - macOS: `pyenv`, environment name `punkrecord`
+  - Windows: `conda`, environment name `punkrecord`
+- Command rules:
+  1. Detect OS first.
+  2. Activate environment before any Python command.
+  3. Run Python command only after activation.
+- Activation:
+```bash
+# macOS
+pyenv activate punkrecord
+
+# Windows
+conda activate punkrecord
+```
+- Notes:
+  - Never run project Python commands outside the `punkrecord` environment.
+  - If shell activation is unavailable, use an equivalent isolated execution method.
 
 ## 8. Conventions and Contracts
 
@@ -284,7 +299,6 @@ Encoding and line endings:
 ## 9. Related Workflow Docs
 
 - `.agent/workflows/use-project-index.md`
-- `.agent/workflows/python-environment.md`
 - Other workflow guides in `.agent/workflows/*.md`
 
 ## 10. Maintenance Rules for This Index
@@ -299,5 +313,53 @@ When changed, update only impacted sections:
 
 Do not add deep implementation details. Keep this as a navigation and orientation document.
 
+## 11. Change Safety and Regression Guardrails
+
+Purpose:
+- Prevent "change in A breaks B" across UI, business logic, API contracts, data flow, and runtime behavior.
+
+### 11.1 Scope and Boundary Rules
+- Keep module boundaries explicit: business module A must not directly couple to module B internals.
+- Shared logic must live in common/service layers; avoid cross-module copy-paste and hidden dependencies.
+- For frontend styles, avoid broad global selectors in business pages; prefer page-scoped naming and shared components.
+
+### 11.2 Contract and Compatibility Rules
+- Backend API request/response schemas are contracts; contract changes must be backward-compatible by default.
+- Breaking contract changes require explicit versioning or coordinated frontend/backend release.
+- For high-risk fields/enums, add compatibility handling during transition windows.
+
+### 11.3 Risk Classification (Required in each change)
+- `low`: local UI/content updates with no shared dependency impact.
+- `medium`: shared component/style/util changes, non-breaking API behavior updates.
+- `high`: cross-module behavior changes, auth/permission logic, data model/schema changes, workflow/state-machine changes.
+- `high` changes require stricter review, wider regression scope, and staged rollout.
+
+### 11.4 Testing and Regression Requirements
+- Unit tests: core business rules, validators, state transitions.
+- Integration tests: cross-module API/service interactions and persistence behavior.
+- End-to-end tests: critical user journeys (auth, todo lifecycle, project create/edit/detail flow, finance core flows).
+- Any change in A must run A tests plus dependent-path tests for affected B workflows.
+- UI changes must include interaction checks: scroll, modal open/close, submit/cancel, responsive behavior.
+
+### 11.5 PR/Review Gate Requirements
+- Every PR must state: impacted modules, risk level, contract/data changes, and regression checklist.
+- Changes touching shared components/styles/contracts require at least one owner review from affected domain.
+- Changes involving overflow/position/layout/modal behavior should include before/after screenshots or short recordings.
+
+### 11.6 Data and Migration Safety
+- Use non-breaking migration sequence where applicable: expand -> migrate -> contract.
+- Avoid destructive schema/data changes without rollback or fallback strategy.
+- Validate migration scripts and data compatibility before full rollout.
+
+### 11.7 Release and Rollback Strategy
+- Prefer feature flags for high-impact behavior changes.
+- Roll out in stages (small scope first), then expand after checks pass.
+- Ensure quick rollback path exists (flag off, compatible fallback, or safe revert plan).
+
+### 11.8 Observability and Post-change Verification
+- Monitor key metrics by module after release: error rate, latency, critical business success rate.
+- Add targeted logs/traces for changed critical paths to speed regression diagnosis.
+- If regression occurs, run root-cause review and convert lessons into tests/checklists/gates.
+
 ---
-Last updated: 2026-03-03
+Last updated: 2026-03-04
