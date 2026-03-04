@@ -80,8 +80,17 @@ export const projectApi = {
     updateProjectTodoPlan: async (projectId, todoId, data) => {
         return client.post(`/project/projects/${projectId}/todos/${todoId}/plan`, data);
     },
+    batchAssignProjectTodos: async (projectId, todoIds, assigneeUserId) => {
+        return client.post(`/project/projects/${projectId}/todos/batch-assign`, {
+            todo_ids: todoIds,
+            assignee_user_id: assigneeUserId,
+        });
+    },
     deleteProjectTodo: async (projectId, todoId) => {
         return client.delete(`/project/projects/${projectId}/todos/${todoId}`);
+    },
+    clearProjectTodos: async (projectId) => {
+        return client.delete(`/project/projects/${projectId}/todos`);
     },
 
     // Dev Task Generation

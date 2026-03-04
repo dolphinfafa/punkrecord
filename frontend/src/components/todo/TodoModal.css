@@ -116,6 +116,13 @@
     color: #ef4444;
 }
 
+.form-helper {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+}
+
 .submit-error {
     margin-bottom: 16px;
     padding: 12px;

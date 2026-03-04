@@ -133,7 +133,13 @@
     display: flex;
     gap: 12px;
     margin-bottom: 32px;
-    padding-bottom: 8px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .filter-btn {
@@ -162,6 +168,70 @@
     color: white;
     border-color: var(--primary-color);
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+}
+
+.filter-select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.filter-select-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.filter-select {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 130px;
+    cursor: pointer;
+    padding-right: 4px;
+}
+
+.filter-select:focus {
+    color: var(--primary-color);
+}
+
+@media (max-width: 900px) {
+    .todo-filters {
+        gap: 10px;
+        border-radius: 12px;
+    }
+
+    .filter-btn {
+        padding: 7px 12px;
+    }
+
+    .filter-select-group {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .filter-select-item {
+        flex: 1;
+        min-width: 0;
+        justify-content: space-between;
+    }
+
+    .filter-select {
+        min-width: 0;
+        width: 100%;
+    }
 }
 
 /* --- Kanban Board Styles --- */

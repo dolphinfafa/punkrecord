@@ -1,11 +1,13 @@
 """
 Todo API endpoints
 """
-from typing import Optional
-from uuid import UUID
+from typing import Optional, Any
+from uuid import UUID, uuid4
 from datetime import datetime
 import math
-from fastapi import APIRouter, Depends, Query
+from pathlib import Path
+from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import require_permission
@@ -24,6 +26,8 @@ from app.schemas.todo import (
 from app.api.project import sync_project_progress
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
+TODO_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "todo-images"
+MAX_TODO_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB per image
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -36,6 +40,13 @@ def _enrich_todo(todo: TodoItem, session: Session) -> TodoResponse:
     data.assignee_name = assignee.display_name if assignee else None
     data.creator_name = creator.display_name if creator else None
     return data
+
+
+def _can_access_todo(todo: TodoItem, current_user: User, session: Session) -> bool:
+    if todo.assignee_user_id == current_user.id or todo.creator_user_id == current_user.id:
+        return True
+    assignee = session.get(User, todo.assignee_user_id)
+    return bool(assignee and assignee.manager_user_id == current_user.id)
 
 
 def _notify_manager(user_id: UUID, todo: TodoItem, session: Session):
@@ -492,11 +503,7 @@ async def get_todo(
         raise NotFoundException("未找到待办事项")
 
     # Access: assignee, creator, or direct manager of assignee
-    assignee = session.get(User, todo.assignee_user_id)
-    is_manager = assignee and assignee.manager_user_id == current_user.id
-    if (todo.assignee_user_id != current_user.id
-            and todo.creator_user_id != current_user.id
-            and not is_manager):
+    if not _can_access_todo(todo, current_user, session):
         raise NotFoundException("未找到待办事项")
 
     return success_response(_enrich_todo(todo, session))
@@ -511,12 +518,12 @@ async def update_todo(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Update todo (assignee or creator only)."""
+    """Update todo (assignee, creator, or direct manager of assignee)."""
     todo = session.get(TodoItem, todo_id)
     if not todo:
         raise NotFoundException("未找到待办事项")
 
-    if todo.assignee_user_id != current_user.id and todo.creator_user_id != current_user.id:
+    if not _can_access_todo(todo, current_user, session):
         raise NotFoundException("未找到待办事项")
 
     if todo_data.title is not None:
@@ -544,6 +551,131 @@ async def update_todo(
             pass
 
     return success_response(_enrich_todo(todo, session))
+
+
+@router.post("/{todo_id}/images", response_model=dict)
+async def upload_todo_image(
+    todo_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.write"))
+):
+    """Upload one image for a todo item (supports multiple images by repeated upload)."""
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到待办事项")
+    if not _can_access_todo(todo, current_user, session):
+        raise NotFoundException("未找到待办事项")
+    if not file.filename:
+        raise ValidationException("图片文件名不能为空")
+
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise ValidationException("仅支持图片文件")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise ValidationException("图片内容不能为空")
+    if len(file_bytes) > MAX_TODO_IMAGE_SIZE:
+        raise ValidationException("单张图片大小不能超过 10MB")
+
+    TODO_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    image_id = uuid4().hex
+    safe_suffix = Path(file.filename).suffix[:20]
+    stored_name = f"{todo.id}_{image_id}{safe_suffix}"
+    file_path = TODO_IMAGE_DIR / stored_name
+    file_path.write_bytes(file_bytes)
+
+    image_meta: dict[str, Any] = {
+        "id": image_id,
+        "file_name": file.filename,
+        "stored_name": stored_name,
+        "content_type": content_type,
+        "size": len(file_bytes),
+        "uploaded_at": datetime.utcnow().isoformat(),
+        "uploaded_by_user_id": str(current_user.id),
+    }
+
+    link = dict(todo.link or {})
+    images = list(link.get("todo_images") or [])
+    images.append(image_meta)
+    link["todo_images"] = images
+    todo.link = link
+    todo.updated_at = datetime.utcnow()
+    session.add(todo)
+    session.commit()
+
+    return success_response(image_meta)
+
+
+@router.get("/{todo_id}/images/{image_id}/download")
+async def download_todo_image(
+    todo_id: UUID,
+    image_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.read"))
+):
+    """Download one uploaded todo image by image_id."""
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到待办事项")
+    if not _can_access_todo(todo, current_user, session):
+        raise NotFoundException("未找到待办事项")
+
+    link = dict(todo.link or {})
+    image = next((item for item in list(link.get("todo_images") or []) if item.get("id") == image_id), None)
+    if not image:
+        raise NotFoundException("未找到任务图片")
+
+    stored_name = image.get("stored_name")
+    file_name = image.get("file_name") or "todo-image"
+    if not stored_name:
+        raise NotFoundException("图片元数据异常")
+
+    file_path = TODO_IMAGE_DIR / stored_name
+    if not file_path.exists():
+        raise NotFoundException("图片文件不存在")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=image.get("content_type") or "application/octet-stream",
+        filename=file_name,
+    )
+
+
+@router.delete("/{todo_id}/images/{image_id}", response_model=dict)
+async def delete_todo_image(
+    todo_id: UUID,
+    image_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.write"))
+):
+    """Delete one uploaded todo image."""
+    todo = session.get(TodoItem, todo_id)
+    if not todo:
+        raise NotFoundException("未找到待办事项")
+    if not _can_access_todo(todo, current_user, session):
+        raise NotFoundException("未找到待办事项")
+
+    link = dict(todo.link or {})
+    images = list(link.get("todo_images") or [])
+    target = next((item for item in images if item.get("id") == image_id), None)
+    if not target:
+        raise NotFoundException("未找到任务图片")
+
+    stored_name = target.get("stored_name")
+    if stored_name:
+        file_path = TODO_IMAGE_DIR / stored_name
+        if file_path.exists():
+            file_path.unlink()
+
+    remain = [item for item in images if item.get("id") != image_id]
+    link["todo_images"] = remain
+    todo.link = link
+    todo.updated_at = datetime.utcnow()
+    session.add(todo)
+    session.commit()
+    return success_response({"message": "图片已删除"})
 
 
 # ─── Start ───────────────────────────────────────────────────────────────────

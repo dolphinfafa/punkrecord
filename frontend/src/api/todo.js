@@ -1,4 +1,5 @@
 import client from './client';
+import axios from 'axios';
 
 export const todoApi = {
     // Create todo
@@ -15,6 +16,23 @@ export const todoApi = {
 
     // Update todo
     update: (id, data) => client.patch(`/todo/${id}`, data),
+    uploadImage: (id, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/todo/${id}/images`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    downloadImage: (id, imageId) => {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        return axios.get(`/api/v1/todo/${id}/images/${imageId}/download`, {
+            responseType: 'blob',
+            withCredentials: true,
+            headers,
+        });
+    },
+    deleteImage: (id, imageId) => client.delete(`/todo/${id}/images/${imageId}`),
 
     // Start todo (Open -> In Progress)
     start: (id) => client.post(`/todo/${id}/start`),

@@ -12,8 +12,11 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
         due_at: '',
         start_at: '',
         assignee_user_id: currentUserId || '',
+        project_id: '',
+        images: [],
     });
     const [users, setUsers] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
 
@@ -22,6 +25,9 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
         if (isOpen && mode === 'create') {
             client.get('/iam/users', { params: { page_size: 100 } })
                 .then(res => setUsers(res.data?.items || []))
+                .catch(() => { });
+            client.get('/project/projects', { params: { page_size: 200 } })
+                .then(res => setProjects(res.data?.items || []))
                 .catch(() => { });
         }
     }, [isOpen, mode]);
@@ -35,6 +41,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 16) : '',
                 start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 16) : '',
                 assignee_user_id: initialData.assignee_user_id || currentUserId || '',
+                project_id: initialData?.link?.project_id || '',
+                images: [],
             });
         } else {
             setFormData({
@@ -44,6 +52,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 due_at: '',
                 start_at: '',
                 assignee_user_id: currentUserId || '',
+                project_id: '',
+                images: [],
             });
         }
         setErrors({});
@@ -62,13 +72,18 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
         if (!validate()) return;
         setLoading(true);
         try {
+            const selectedProject = projects.find((item) => item.id === formData.project_id);
             const submitData = {
                 ...formData,
                 due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
                 start_at: formData.start_at ? new Date(formData.start_at).toISOString() : null,
-                source_type: 'custom',
-                source_id: '',
+                source_type: formData.project_id ? 'project_task' : 'custom',
+                source_id: formData.project_id || '',
                 action_type: 'do',
+                link: formData.project_id ? {
+                    project_id: formData.project_id,
+                    project_name: selectedProject?.name || '',
+                } : undefined,
             };
             await onSubmit(submitData);
             onClose();
@@ -120,23 +135,51 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                     </div>
 
                     {mode === 'create' && (
-                        <div className="form-group">
-                            <label htmlFor="assignee">分配给 *</label>
-                            <select
-                                id="assignee"
-                                value={formData.assignee_user_id}
-                                onChange={(e) => handleChange('assignee_user_id', e.target.value)}
-                                className={clsx({ error: errors.assignee_user_id })}
-                            >
-                                <option value="">请选择被分配人</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.display_name}{u.id === currentUserId ? '（我）' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
-                        </div>
+                        <>
+                            <div className="form-group">
+                                <label htmlFor="assignee">分配给 *</label>
+                                <select
+                                    id="assignee"
+                                    value={formData.assignee_user_id}
+                                    onChange={(e) => handleChange('assignee_user_id', e.target.value)}
+                                    className={clsx({ error: errors.assignee_user_id })}
+                                >
+                                    <option value="">请选择被分配人</option>
+                                    {users.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.display_name}{u.id === currentUserId ? '（我）' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="project_id">所属项目（可选）</label>
+                                <select
+                                    id="project_id"
+                                    value={formData.project_id}
+                                    onChange={(e) => handleChange('project_id', e.target.value)}
+                                >
+                                    <option value="">不关联项目</option>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.id}>{project.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="images">任务图片（可多选）</label>
+                                <input
+                                    id="images"
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={(e) => handleChange('images', Array.from(e.target.files || []))}
+                                />
+                                {formData.images?.length > 0 && (
+                                    <span className="form-helper">已选择 {formData.images.length} 张图片</span>
+                                )}
+                            </div>
+                        </>
                     )}
 
                     <div className="form-row">

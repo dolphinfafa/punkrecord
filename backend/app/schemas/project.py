@@ -144,7 +144,15 @@ class ProjectTaskResponse(BaseModel):
     creator_user_id: UUID
     creator_name: Optional[str] = None
     due_at: Optional[datetime] = None
+    start_at: Optional[datetime] = None
+    done_at: Optional[datetime] = None
+    blocked_reason: Optional[str] = None
+    review_comment: Optional[str] = None
+    dismiss_reason: Optional[str] = None
+    link: Optional[dict[str, Any]] = None
     tags: list = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -163,3 +171,9 @@ class ProjectTaskPlanUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     dev_type: Optional[str] = None
+
+
+class ProjectTaskBatchAssignRequest(BaseModel):
+    """Batch assign project tasks to one assignee"""
+    todo_ids: list[UUID]
+    assignee_user_id: UUID

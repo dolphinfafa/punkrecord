@@ -168,6 +168,56 @@
     color: #fff;
 }
 
+.dev-batch-panel {
+    margin-top: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dev-batch-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.dev-batch-title em {
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    padding: 3px 8px;
+    border: 1px solid #dbe3ef;
+    border-radius: 999px;
+    background: #fff;
+}
+
+.dev-batch-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dev-batch-select {
+    min-width: 220px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0 10px;
+    background: #fff;
+    font-size: 13px;
+    color: #0f172a;
+}
+
 .dev-table-wrap {
     margin-top: 12px;
     border: 1px solid var(--line);
@@ -495,4 +545,6 @@
     .dev-progress-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dev-progress-actions { flex-wrap: wrap; justify-content: flex-end; }
     .dev-progress-page .form-row { grid-template-columns: 1fr; }
+    .dev-batch-controls { width: 100%; justify-content: flex-end; }
+    .dev-batch-select { min-width: 180px; }
 }

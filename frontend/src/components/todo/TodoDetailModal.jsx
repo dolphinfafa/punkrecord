@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Calendar, Clock, Tag, User, CheckCircle, RotateCcw, AlertTriangle, Play } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
+import BugImagePreview from '@/components/common/BugImagePreview';
+import TodoImagePreview from '@/components/common/TodoImagePreview';
 import './TodoDetailModal.css';
 
 const PRIORITY_LABELS = { p0: 'P0 紧急', p1: 'P1 高', p2: 'P2 中', p3: 'P3 低' };
@@ -15,12 +17,20 @@ const STATUS_LABELS = {
 };
 const ACTION_LABELS = { do: '执行', approve: '审批', review: '审阅', ack: '确认' };
 
+function getBugImages(todo) {
+    const list = todo?.link?.bug_images;
+    if (Array.isArray(list) && list.length > 0) return list;
+    if (todo?.link?.bug_image) return [todo.link.bug_image];
+    return [];
+}
+
 export default function TodoDetailModal({
     isOpen, onClose, todo, onEdit, onStart, onSubmit, onApprove, onReject, onBlock, onDismiss,
-    currentUserId
+    currentUserId, canEdit = false, onUploadImages, onDeleteImage
 }) {
     const [rejectComment, setRejectComment] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     if (!isOpen || !todo) return null;
 
@@ -53,6 +63,19 @@ export default function TodoDetailModal({
         setShowRejectInput(false);
         setRejectComment('');
     };
+    const todoImages = Array.isArray(todo?.link?.todo_images) ? todo.link.todo_images : [];
+
+    const handleUploadImages = async (event) => {
+        const files = Array.from(event.target.files || []);
+        event.target.value = '';
+        if (!files.length || !onUploadImages) return;
+        try {
+            setUploading(true);
+            await onUploadImages(todo.id, files);
+        } finally {
+            setUploading(false);
+        }
+    };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -84,6 +107,49 @@ export default function TodoDetailModal({
                             <p className="detail-description">{todo.description}</p>
                         </div>
                     )}
+
+                    {getBugImages(todo).length > 0 && todo?.link?.project_id && (
+                        <div className="detail-section">
+                            <h4>Bug 配图（{getBugImages(todo).length}）</h4>
+                            <div className="todo-image-gallery">
+                                {getBugImages(todo).map((img, idx) => (
+                                    <BugImagePreview key={`${img.attachment_id || idx}`} projectId={todo.link.project_id} bugImage={img} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="detail-section">
+                        <h4>任务图片</h4>
+                        <div className="todo-image-gallery">
+                            {todoImages.map((image) => (
+                                <div key={image.id} className="todo-image-item">
+                                    <TodoImagePreview todoId={todo.id} image={image} />
+                                    {canEdit && (
+                                        <button
+                                            type="button"
+                                            className="todo-image-remove"
+                                            onClick={() => onDeleteImage?.(todo.id, image.id)}
+                                        >
+                                            删除
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            {canEdit && (
+                                <label className="todo-image-upload">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleUploadImages}
+                                        disabled={uploading}
+                                    />
+                                    {uploading ? '上传中...' : '+ 上传图片'}
+                                </label>
+                            )}
+                        </div>
+                    </div>
 
                     {/* People */}
                     <div className="detail-section">
@@ -194,10 +260,13 @@ export default function TodoDetailModal({
                 </div>
 
                 <div className="detail-modal-footer">
+                    {canEdit && (
+                        <button onClick={() => onEdit(todo)} className="btn-secondary">编辑</button>
+                    )}
+
                     {/* Employee actions */}
                     {canSubmit && (
                         <>
-                            <button onClick={() => onEdit(todo)} className="btn-secondary">编辑</button>
                             {canStart && (
                                 <button onClick={() => onStart(todo.id)} className="btn-primary">
                                     <Play size={14} /> 开始任务

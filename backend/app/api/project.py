@@ -27,7 +27,7 @@ from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectStageResponse, StageStatusUpdate,
     ProjectMemberCreate, ProjectMemberBatchCreate, ProjectMemberResponse, ProjectTaskResponse,
-    ProjectTaskAssignRequest, ProjectTaskPlanUpdateRequest
+    ProjectTaskAssignRequest, ProjectTaskPlanUpdateRequest, ProjectTaskBatchAssignRequest
 )
 
 router = APIRouter(prefix="/project", tags=["Project"])
@@ -143,6 +143,62 @@ def _build_feature_task_title(row: dict, dev_type: str) -> str:
     label = DEV_TYPE_LABELS.get(dev_type, dev_type)
     name = " - ".join([x for x in [row.get("l1_feature"), row.get("l2_feature")] if x])
     return f"[{label}] {name or '开发任务'}"
+
+
+def _is_project_member(session: Session, project: Project, user_id: UUID) -> bool:
+    if user_id in {project.pm_user_id, project.owner_user_id}:
+        return True
+    member = session.exec(
+        select(ProjectMember)
+        .where(ProjectMember.project_id == project.id)
+        .where(ProjectMember.user_id == user_id)
+    ).first()
+    return bool(member)
+
+
+def _is_bug_todo(todo: TodoItem) -> bool:
+    tags = list(todo.tags or [])
+    link = dict(todo.link or {})
+    return "bug" in tags or link.get("type") == "bug"
+
+
+def _normalize_ref_id(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _collect_related_todos_for_project_todo(session: Session, todo: TodoItem) -> List[TodoItem]:
+    """Find mirrored/linked todos that should be deleted together."""
+    all_todos = session.exec(select(TodoItem)).all()
+    target_id = _normalize_ref_id(todo.id)
+    link = dict(todo.link or {})
+    direct_ref = _normalize_ref_id(link.get("tracking_todo_id") or link.get("project_todo_id"))
+
+    related: List[TodoItem] = []
+    seen_ids = {target_id}
+    for item in all_todos:
+        item_id = _normalize_ref_id(item.id)
+        if item_id in seen_ids:
+            continue
+        item_link = dict(item.link or {})
+        item_ref = _normalize_ref_id(item_link.get("tracking_todo_id") or item_link.get("project_todo_id"))
+        if item_ref and item_ref == target_id:
+            related.append(item)
+            seen_ids.add(item_id)
+            continue
+        if direct_ref and item_id == direct_ref:
+            related.append(item)
+            seen_ids.add(item_id)
+    return related
+
+
+def _delete_project_todo_with_related(session: Session, todo: TodoItem) -> int:
+    count = 0
+    for related in _collect_related_todos_for_project_todo(session, todo):
+        session.delete(related)
+        count += 1
+    session.delete(todo)
+    count += 1
+    return count
 
 
 @router.post("/projects", response_model=dict)
@@ -856,19 +912,36 @@ async def update_project_todo_plan(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("project.write"))
 ):
-    """Update assignee and/or due date for a project task. Only PM can update."""
+    """Update project task planning fields.
+
+    PM/owner can update all fields.
+    Any project member can modify bug assignee only.
+    """
     project = session.get(Project, project_id)
     if not project:
         raise NotFoundException("未找到项目")
-
-    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
-        raise ForbiddenException("仅项目经理可修改开发计划")
 
     todo = session.get(TodoItem, todo_id)
     if not todo:
         raise NotFoundException("未找到任务")
     if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
         raise NotFoundException("任务不属于当前项目")
+
+    is_pm_or_owner = current_user.id in {project.pm_user_id, project.owner_user_id}
+    if not is_pm_or_owner:
+        if not _is_bug_todo(todo):
+            raise ForbiddenException("仅项目经理可修改开发计划")
+        if not _is_project_member(session, project, current_user.id):
+            raise ForbiddenException("仅项目组成员可修改 Bug 开发人员")
+        if (
+            data.assignee_user_id is None
+            or data.due_at is not None
+            or data.priority is not None
+            or data.title is not None
+            or data.description is not None
+            or data.dev_type is not None
+        ):
+            raise ForbiddenException("项目组成员仅可修改 Bug 的开发人员")
 
     if (
         data.assignee_user_id is None
@@ -934,6 +1007,46 @@ async def update_project_todo_plan(
     return success_response(resp)
 
 
+@router.post("/projects/{project_id}/todos/batch-assign", response_model=dict)
+async def batch_assign_project_todos(
+    project_id: UUID,
+    data: ProjectTaskBatchAssignRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("project.write"))
+):
+    """Batch assign project todos to one assignee."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
+        raise ForbiddenException("仅项目经理或项目负责人可批量分配任务")
+    if not data.todo_ids:
+        raise ValidationException("请选择至少一个任务")
+
+    assignee = session.get(User, data.assignee_user_id)
+    if not assignee:
+        raise NotFoundException("未找到用户")
+    if not _is_project_member(session, project, data.assignee_user_id):
+        raise ForbiddenException("只能指派给项目组成员")
+
+    todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.id.in_(data.todo_ids))
+        .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
+        .where(TodoItem.source_id == str(project_id))
+    ).all()
+    if not todos:
+        raise ValidationException("未找到可更新的任务")
+
+    now = datetime.utcnow()
+    for todo in todos:
+        todo.assignee_user_id = data.assignee_user_id
+        todo.updated_at = now
+        session.add(todo)
+    session.commit()
+    return success_response({"updated": len(todos), "assignee_user_id": str(data.assignee_user_id)})
+
+
 @router.delete("/projects/{project_id}/todos/{todo_id}", response_model=dict)
 async def delete_project_todo(
     project_id: UUID,
@@ -959,9 +1072,37 @@ async def delete_project_todo(
     if current_user.id not in allowed_users:
         raise ForbiddenException("仅项目经理/项目负责人或创建人可删除该任务")
 
-    session.delete(todo)
+    deleted_count = _delete_project_todo_with_related(session, todo)
     session.commit()
-    return success_response({"message": "任务已删除"})
+    return success_response({"message": "任务已删除", "deleted": deleted_count})
+
+
+@router.delete("/projects/{project_id}/todos", response_model=dict)
+async def clear_project_todos(
+    project_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("project.write"))
+):
+    """Clear all development tasks in a project and linked mirrored todos."""
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+    if current_user.id not in {project.pm_user_id, project.owner_user_id}:
+        raise ForbiddenException("仅项目经理或项目负责人可清空任务")
+
+    todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
+        .where(TodoItem.source_id == str(project_id))
+    ).all()
+
+    deleted_total = 0
+    for todo in todos:
+        if session.get(TodoItem, todo.id) is None:
+            continue
+        deleted_total += _delete_project_todo_with_related(session, todo)
+    session.commit()
+    return success_response({"deleted": deleted_total})
 
 
 @router.post("/projects/{project_id}/sync-dev-tasks", response_model=dict)
@@ -1025,8 +1166,9 @@ async def sync_dev_tasks_from_feature_list(
 
     deleted = 0
     for todo in existing_todos:
-        session.delete(todo)
-        deleted += 1
+        if session.get(TodoItem, todo.id) is None:
+            continue
+        deleted += _delete_project_todo_with_related(session, todo)
     session.flush()
 
     default_assignee = project.pm_user_id or project.owner_user_id or current_user.id

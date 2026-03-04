@@ -129,6 +129,50 @@
     border: 1px solid var(--border-color, #e2e8f0);
 }
 
+.todo-image-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.todo-image-item {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.todo-image-remove {
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    background: #fff5f5;
+    border-radius: 6px;
+    font-size: 12px;
+    padding: 3px 0;
+    cursor: pointer;
+}
+
+.todo-image-upload {
+    width: 72px;
+    height: 72px;
+    border: 1px dashed var(--border-color, #cbd5e1);
+    border-radius: 8px;
+    background: var(--bg-color, #f8fafc);
+    color: var(--text-secondary, #64748b);
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    text-align: center;
+    padding: 4px;
+}
+
+.todo-image-upload input {
+    display: none;
+}
+
 .detail-info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

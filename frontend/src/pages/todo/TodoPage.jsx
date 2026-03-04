@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { todoApi } from '@/api/todo';
 import { useAuth } from '@/contexts/AuthContext';
 import client from '@/api/client';
@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import clsx from 'clsx';
 import TodoModal from '@/components/todo/TodoModal';
 import TodoDetailModal from '@/components/todo/TodoDetailModal';
+import BugImagePreview from '@/components/common/BugImagePreview';
 import './TodoPage.css';
 
 const STATUS_LABELS = {
@@ -16,12 +17,55 @@ const STATUS_LABELS = {
     pending_review: '上报完成', done: '已完成', dismissed: '已忽略'
 };
 const PRIORITY_LABELS = { p0: 'P0', p1: 'P1', p2: 'P2', p3: 'P3' };
+const TASK_TYPE_LABELS = {
+    dev_frontend: '前端开发',
+    dev_backend: '后端开发',
+    dev_ui: 'UI设计',
+    dev_product: '产品',
+    bug: 'Bug',
+    bug_fix: 'Bug修复',
+    testing: '测试',
+    project_task: '项目任务',
+    custom: '自定义任务',
+    other: '其他',
+};
 
 const getProjectLabel = (todo) => {
     const projectName = todo?.link?.project_name;
     if (projectName) return projectName;
     if (todo?.source_type === 'project_task') return '项目任务';
     return null;
+};
+
+const getTodoTypeKey = (todo) => {
+    const tags = todo?.tags || [];
+    if (tags.includes('bug')) return 'bug';
+    if (tags.includes('bug_fix')) return 'bug_fix';
+    if (tags.includes('testing')) return 'testing';
+    if (tags.includes('dev_frontend')) return 'dev_frontend';
+    if (tags.includes('dev_backend')) return 'dev_backend';
+    if (tags.includes('dev_ui')) return 'dev_ui';
+    if (tags.includes('dev_product')) return 'dev_product';
+    if (todo?.source_type === 'project_task') return 'project_task';
+    if (todo?.source_type === 'custom') return 'custom';
+    return 'other';
+};
+
+const hasBugImage = (todo) => {
+    const linkType = todo?.link?.type;
+    return Boolean(
+        (
+            (Array.isArray(todo?.link?.bug_images) && todo.link.bug_images.length > 0)
+            || todo?.link?.bug_image?.attachment_id
+        )
+        && todo?.link?.project_id
+        && (linkType === 'bug' || linkType === 'bug_fix_todo' || (todo?.tags || []).includes('bug'))
+    );
+};
+
+const getFirstBugImage = (todo) => {
+    if (Array.isArray(todo?.link?.bug_images) && todo.link.bug_images.length > 0) return todo.link.bug_images[0];
+    return todo?.link?.bug_image || null;
 };
 
 export default function TodoPage() {
@@ -38,6 +82,8 @@ export default function TodoPage() {
     const [entityId, setEntityId] = useState(null);
     const [subordinates, setSubordinates] = useState([]);
     const [draggedTodo, setDraggedTodo] = useState(null);
+    const [taskTypeFilter, setTaskTypeFilter] = useState('all');
+    const [assigneeFilter, setAssigneeFilter] = useState('all');
     const actioningTodoIdsRef = useRef(new Set());
 
     // Fetch entity and check if user has subordinates
@@ -88,6 +134,30 @@ export default function TodoPage() {
 
     useEffect(() => { fetchTodos(); }, [filter, viewMode]);
 
+    const assigneeOptions = useMemo(() => {
+        const map = new Map();
+        todos.forEach((todo) => {
+            if (todo.assignee_user_id && todo.assignee_name) {
+                map.set(todo.assignee_user_id, todo.assignee_name);
+            }
+        });
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    }, [todos]);
+
+    const taskTypeOptions = useMemo(() => {
+        const set = new Set();
+        todos.forEach((todo) => set.add(getTodoTypeKey(todo)));
+        return Array.from(set);
+    }, [todos]);
+
+    const filteredTodos = useMemo(() => {
+        return todos.filter((todo) => {
+            if (taskTypeFilter !== 'all' && getTodoTypeKey(todo) !== taskTypeFilter) return false;
+            if (assigneeFilter !== 'all' && todo.assignee_user_id !== assigneeFilter) return false;
+            return true;
+        });
+    }, [todos, taskTypeFilter, assigneeFilter]);
+
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
         setTimeout(() => setNotification(null), 3000);
@@ -98,7 +168,14 @@ export default function TodoPage() {
 
     const handleCreateTodo = async (formData) => {
         try {
-            await todoApi.create({ ...formData, our_entity_id: entityId });
+            const createRes = await todoApi.create({ ...formData, our_entity_id: entityId });
+            const todoId = createRes?.data?.id;
+            const images = Array.isArray(formData.images) ? formData.images : [];
+            if (todoId && images.length > 0) {
+                for (const file of images) {
+                    await todoApi.uploadImage(todoId, file);
+                }
+            }
             showNotification('任务创建成功');
             fetchTodos();
         } catch {
@@ -199,6 +276,38 @@ export default function TodoPage() {
         setSelectedTodo(todo);
         setDetailModalOpen(false);
         setEditModalOpen(true);
+    };
+
+    const handleUploadTodoImages = async (todoId, files) => {
+        try {
+            for (const file of files) {
+                await todoApi.uploadImage(todoId, file);
+            }
+            showNotification(`已上传 ${files.length} 张图片`);
+            await fetchTodos();
+            const detailRes = await todoApi.get(todoId);
+            setSelectedTodo(detailRes?.data || null);
+        } catch (err) {
+            showNotification(getErrorMessage(err, '上传图片失败'), 'error');
+        }
+    };
+
+    const handleDeleteTodoImage = async (todoId, imageId) => {
+        try {
+            await todoApi.deleteImage(todoId, imageId);
+            showNotification('图片已删除');
+            await fetchTodos();
+            const detailRes = await todoApi.get(todoId);
+            setSelectedTodo(detailRes?.data || null);
+        } catch (err) {
+            showNotification(getErrorMessage(err, '删除图片失败'), 'error');
+        }
+    };
+
+    const canEditTodo = (todo) => {
+        if (!todo) return false;
+        if (todo.assignee_user_id === user?.id || todo.creator_user_id === user?.id) return true;
+        return isManagerOfTodo(todo);
     };
 
     // Determine if current user is manager of the selected todo's assignee
@@ -317,13 +426,13 @@ export default function TodoPage() {
             <div className="todo-view-tabs">
                 <button
                     className={clsx('view-tab', { active: viewMode === 'my' })}
-                    onClick={() => { setViewMode('my'); setFilter('board'); }}
+                    onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); }}
                 >
                     <User size={15} /> 我的任务
                 </button>
                 <button
                     className={clsx('view-tab', { active: viewMode === 'team' })}
-                    onClick={() => { setViewMode('team'); setFilter('board'); }}
+                    onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); }}
                 >
                     <Users size={15} /> 团队任务
                 </button>
@@ -343,6 +452,34 @@ export default function TodoPage() {
                 >
                     <List size={13} /> 全部列表
                 </button>
+                <div className="filter-select-group">
+                    <label className="filter-select-item">
+                        <span>类型</span>
+                        <select
+                            className="filter-select"
+                            value={taskTypeFilter}
+                            onChange={(e) => setTaskTypeFilter(e.target.value)}
+                        >
+                            <option value="all">全部类型</option>
+                            {taskTypeOptions.map((type) => (
+                                <option key={type} value={type}>{TASK_TYPE_LABELS[type] || type}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="filter-select-item">
+                        <span>负责人</span>
+                        <select
+                            className="filter-select"
+                            value={assigneeFilter}
+                            onChange={(e) => setAssigneeFilter(e.target.value)}
+                        >
+                            <option value="all">全部负责人</option>
+                            {assigneeOptions.map((item) => (
+                                <option key={item.id} value={item.id}>{item.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
             </div>
 
             {loading ? (
@@ -352,7 +489,7 @@ export default function TodoPage() {
                     {filter === 'board' ? (
                         <div className="todo-board">
                             {['open', 'in_progress', 'pending_review', 'done'].map(status => {
-                                const columnTodos = todos.filter(t => t.status === status);
+                                const columnTodos = filteredTodos.filter(t => t.status === status);
                                 return (
                                     <div
                                         key={status}
@@ -394,10 +531,10 @@ export default function TodoPage() {
                                                                 项目: {getProjectLabel(todo)}
                                                             </span>
                                                         )}
-                                                        {viewMode === 'team' && todo.assignee_name && (
-                                                            <div className="avatar-circle" title={todo.assignee_name}>
-                                                                {todo.assignee_name[0]}
-                                                            </div>
+                                                        {todo.assignee_name && (
+                                                            <span className="meta-tag">
+                                                                <User size={11} /> {todo.assignee_name}
+                                                            </span>
                                                         )}
                                                         {/* Actions could go here */}
                                                     </div>
@@ -410,10 +547,10 @@ export default function TodoPage() {
                         </div>
                     ) : (
                         <div className="todo-list">
-                            {todos.length === 0 ? (
+                            {filteredTodos.length === 0 ? (
                                 <div className="empty-state">暂无任务</div>
                             ) : (
-                                todos.map(todo => (
+                                filteredTodos.map(todo => (
                                     <div
                                         key={todo.id}
                                         className={clsx('todo-item', {
@@ -429,6 +566,13 @@ export default function TodoPage() {
                                         <div className="todo-content">
                                             <div className="todo-title">{todo.title}</div>
                                             <div className="todo-meta">
+                                                {hasBugImage(todo) && (
+                                                    <BugImagePreview
+                                                        projectId={todo.link.project_id}
+                                                        bugImage={getFirstBugImage(todo)}
+                                                        compact
+                                                    />
+                                                )}
                                                 <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
                                                     {PRIORITY_LABELS[todo.priority] || todo.priority}
                                                 </span>
@@ -493,6 +637,9 @@ export default function TodoPage() {
                 onBlock={handleBlock}
                 onDismiss={handleDismiss}
                 currentUserId={user?.id}
+                canEdit={canEditTodo(selectedTodo)}
+                onUploadImages={handleUploadTodoImages}
+                onDeleteImage={handleDeleteTodoImage}
             />
         </div>
     );

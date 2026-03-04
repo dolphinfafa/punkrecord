@@ -4,6 +4,7 @@ import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2 } 
 import { useAuth } from '@/contexts/AuthContext';
 import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
+import BugDetailModal from '@/components/common/BugDetailModal';
 
 const STATUS_LABELS = {
     open: '待处理',
@@ -82,6 +83,7 @@ function defaultBugForm(project, currentUserId, testerMembers, developerMembers)
         actual_result: '',
         expected_result: '',
         reproduce_steps: '',
+        screenshot_files: [],
     };
 }
 
@@ -96,6 +98,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState(defaultBugForm(project, '', [], []));
     const [message, setMessage] = useState('');
+    const [selectedBug, setSelectedBug] = useState(null);
 
     const bugList = useMemo(() => todos.filter(isBugTodo), [todos]);
     const testerMembers = useMemo(() => {
@@ -168,7 +171,21 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
             setSubmitting(true);
             setMessage('');
             const dueAt = form.due_at ? `${form.due_at}T18:00:00` : null;
-            const trackingRes = await todoApi.create({
+            const bugImages = [];
+            for (const file of (form.screenshot_files || [])) {
+                const uploadRes = await projectApi.uploadProjectAttachment(project.id, file);
+                const uploaded = uploadRes?.data;
+                if (uploaded?.id) {
+                    bugImages.push({
+                        attachment_id: uploaded.id,
+                        file_name: uploaded.file_name,
+                        content_type: uploaded.content_type,
+                        size: uploaded.size,
+                    });
+                }
+            }
+            const bugImage = bugImages[0] || null;
+            await todoApi.create({
                 our_entity_id: project.our_entity_id,
                 assignee_user_id: form.developer_user_id,
                 title: `[BUG] ${form.title.trim()}`,
@@ -188,45 +205,16 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     actual_result: form.actual_result?.trim() || '',
                     expected_result: form.expected_result?.trim() || '',
                     reproduce_steps: form.reproduce_steps?.trim() || '',
+                    bug_image: bugImage,
+                    bug_images: bugImages,
                     project_id: project.id,
                     project_name: project.name,
-                },
-            });
-
-            const trackingTodoId = trackingRes?.data?.id || '';
-            const devTodoDesc = [
-                form.description?.trim() ? `问题描述：${form.description.trim()}` : '',
-                form.actual_result?.trim() ? `实际结果：${form.actual_result.trim()}` : '',
-                form.expected_result?.trim() ? `期望结果：${form.expected_result.trim()}` : '',
-                form.reproduce_steps?.trim() ? `复现步骤：${form.reproduce_steps.trim()}` : '',
-            ].filter(Boolean).join('\n');
-
-            // Mirror task for developer's todo list visibility.
-            await todoApi.create({
-                our_entity_id: project.our_entity_id,
-                assignee_user_id: form.developer_user_id,
-                title: `[待修复][BUG] ${form.title.trim()}`,
-                description: devTodoDesc || '请在测试阶段处理该 Bug',
-                source_type: 'custom',
-                source_id: '',
-                action_type: 'do',
-                priority: form.priority,
-                due_at: dueAt,
-                tags: ['bug', 'testing', 'bug_fix'],
-                link: {
-                    type: 'bug_fix_todo',
-                    stage_code: 'testing',
-                    project_id: project.id,
-                    project_name: project.name,
-                    tracking_todo_id: trackingTodoId,
-                    tester_user_id: form.tester_user_id,
-                    reviewer_user_id: form.tester_user_id,
                 },
             });
 
             setShowCreate(false);
             setForm(defaultBugForm(project, currentUserId, testerMembers, developerMembers));
-            setMessage('Bug 已创建，并已同步新增到开发人员待办（创建人/审核人：测试员）');
+            setMessage(`Bug 已创建${bugImages.length > 0 ? `（含 ${bugImages.length} 张配图）` : ''}`);
             await loadData();
         } catch (err) {
             setMessage(err?.response?.data?.message || err?.message || '创建 Bug 失败');
@@ -408,6 +396,23 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                             <textarea value={form.reproduce_steps} onChange={(e) => setField('reproduce_steps', e.target.value)} rows={3} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
                         </label>
                         <label style={{ marginTop: '10px', display: 'block', fontSize: '0.83rem', color: '#334155' }}>
+                            配图（可选）
+                            <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={(e) => setField('screenshot_files', Array.from(e.target.files || []))}
+                                style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px', background: '#fff' }}
+                            />
+                            {(form.screenshot_files || []).length > 0 && (
+                                <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.75rem' }}>
+                                    已选择 {(form.screenshot_files || []).length} 张：
+                                    {' '}
+                                    {(form.screenshot_files || []).map((file) => file.name).join('、')}
+                                </div>
+                            )}
+                        </label>
+                        <label style={{ marginTop: '10px', display: 'block', fontSize: '0.83rem', color: '#334155' }}>
                             备注
                             <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} rows={2} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
                         </label>
@@ -447,17 +452,17 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                 {bugList.map((todo) => {
                                     const statusStyle = STATUS_COLORS[todo.status] || STATUS_COLORS.open;
                                     return (
-                                        <tr key={todo.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                        <tr key={todo.id} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }} onClick={() => setSelectedBug(todo)}>
                                             <td style={{ padding: '10px 8px', fontSize: '0.88rem', color: '#0f172a', maxWidth: '360px' }}>
                                                 <div style={{ fontWeight: 600 }}>{todo.title}</div>
                                                 {todo.description && <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.8rem' }}>{todo.description}</div>}
                                             </td>
-                                            <td style={{ padding: '10px 8px' }}>
+                                            <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', background: statusStyle.bg, color: statusStyle.color, fontWeight: 600 }}>
                                                     {STATUS_LABELS[todo.status] || todo.status}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '10px 8px' }}>
+                                            <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <select
                                                     value={(todo.priority || 'p2').toLowerCase()}
                                                     disabled={updatingId === todo.id}
@@ -469,7 +474,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     ))}
                                                 </select>
                                             </td>
-                                            <td style={{ padding: '10px 8px' }}>
+                                            <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <select
                                                     value={todo.assignee_user_id || ''}
                                                     disabled={updatingId === todo.id}
@@ -482,7 +487,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     ))}
                                                 </select>
                                             </td>
-                                            <td style={{ padding: '10px 8px' }}>
+                                            <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="date"
                                                     value={todo.due_at ? new Date(todo.due_at).toISOString().slice(0, 10) : ''}
@@ -495,6 +500,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                                     <button
                                                         onClick={() => flowAction(todo.id, 'start')}
+                                                        onMouseDown={(e) => e.stopPropagation()}
                                                         disabled={updatingId === todo.id}
                                                         style={{ border: '1px solid #bfdbfe', color: '#1d4ed8', background: '#eff6ff', borderRadius: '7px', padding: '4px 7px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                     >
@@ -502,6 +508,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     </button>
                                                     <button
                                                         onClick={() => flowAction(todo.id, 'submit')}
+                                                        onMouseDown={(e) => e.stopPropagation()}
                                                         disabled={updatingId === todo.id}
                                                         style={{ border: '1px solid #fde68a', color: '#a16207', background: '#fffbeb', borderRadius: '7px', padding: '4px 7px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                     >
@@ -510,6 +517,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     {todo.status === 'pending_review' && (
                                                         <button
                                                             onClick={() => flowAction(todo.id, 'approve')}
+                                                            onMouseDown={(e) => e.stopPropagation()}
                                                             disabled={updatingId === todo.id}
                                                             style={{ border: '1px solid #bbf7d0', color: '#15803d', background: '#f0fdf4', borderRadius: '7px', padding: '4px 7px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                         >
@@ -518,6 +526,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     )}
                                                     <button
                                                         onClick={() => flowAction(todo.id, 'reopen')}
+                                                        onMouseDown={(e) => e.stopPropagation()}
                                                         disabled={updatingId === todo.id}
                                                         style={{ border: '1px solid #fecaca', color: '#b91c1c', background: '#fef2f2', borderRadius: '7px', padding: '4px 7px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                     >
@@ -525,6 +534,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     </button>
                                                     <button
                                                         onClick={() => deleteBug(todo)}
+                                                        onMouseDown={(e) => e.stopPropagation()}
                                                         disabled={updatingId === todo.id}
                                                         style={{ border: '1px solid #e2e8f0', color: '#334155', background: '#f8fafc', borderRadius: '7px', padding: '4px 7px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                                     >
@@ -540,6 +550,16 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     )}
                 </div>
             </div>
+
+            <BugDetailModal
+                isOpen={Boolean(selectedBug)}
+                onClose={() => setSelectedBug(null)}
+                bug={selectedBug}
+                project={project}
+                members={members}
+                statusLabels={STATUS_LABELS}
+                priorityLabels={PRIORITY_LABELS}
+            />
         </div>
     );
 }
