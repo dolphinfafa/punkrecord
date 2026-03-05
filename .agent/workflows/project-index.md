@@ -342,6 +342,7 @@ Encoding and line endings:
 ## 9. Related Workflow Docs
 
 - `.agent/workflows/use-project-index.md`
+- `.agent/workflows/project-overview.md` -- 项目技术全景文档（架构、数据库、技术选型详解）
 - Other workflow guides in `.agent/workflows/*.md`
 
 CI:
@@ -359,6 +360,8 @@ When changed, update only impacted sections:
 - Route or page changes -> Sections 3 and 5
 - Command/runtime changes -> Section 7
 - Conventions changes -> Section 8
+
+Additionally, any structural change listed above must also update `project-overview.md` (the project technical overview document). See that file's Section 10 for a mapping of change types to sections that need updating. Both files must use UTF-8 (no BOM) encoding with LF line endings.
 
 Do not add deep implementation details. Keep this as a navigation and orientation document.
 
