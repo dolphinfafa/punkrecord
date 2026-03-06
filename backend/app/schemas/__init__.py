@@ -1,7 +1,7 @@
 """
 Pydantic schemas for API requests and responses
 """
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, EmailStr
@@ -21,6 +21,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: UUID
     display_name: str
+    profile_completed: bool = False
+    must_change_password: bool = True
 
 
 # JobTitle schemas
@@ -105,6 +107,11 @@ class UserUpdate(BaseModel):
     manager_user_id: Optional[UUID] = None
     job_title_id: Optional[UUID] = None
     department_id: Optional[UUID] = None
+    birthday: Optional[str] = None
+    id_number: Optional[str] = None
+    home_address: Optional[str] = None
+    graduation_school: Optional[str] = None
+    education_level: Optional[str] = None
     leave_annual_remaining: Optional[float] = None
     leave_maternity_remaining: Optional[float] = None
     leave_marriage_remaining: Optional[float] = None
@@ -130,6 +137,15 @@ class UserResponse(BaseModel):
     job_title_name: Optional[str] = None
     department_id: Optional[UUID] = None
     department_name: Optional[str] = None
+    birthday: Optional[str] = None
+    id_number: Optional[str] = None
+    home_address: Optional[str] = None
+    graduation_school: Optional[str] = None
+    education_level: Optional[str] = None
+    id_card_image: Optional[str] = None
+    resume_file: Optional[str] = None
+    profile_completed: bool = False
+    must_change_password: bool = True
     leave_annual_remaining: float = 5.0
     leave_maternity_remaining: float = 15.0
     leave_marriage_remaining: float = 3.0
@@ -137,9 +153,27 @@ class UserResponse(BaseModel):
     leave_sick_remaining: float = 3.0
     beili_balance: float = 0.0
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+
+class ProfileCompleteRequest(BaseModel):
+    """Profile completion request for first-time login"""
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    birthday: Optional[str] = None
+    id_number: Optional[str] = None
+    home_address: Optional[str] = None
+    graduation_school: Optional[str] = None
+    education_level: Optional[str] = None
+    new_password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Password change request"""
+    old_password: str
+    new_password: str
 
 
 # OurEntity schemas

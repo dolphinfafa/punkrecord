@@ -16,6 +16,19 @@ export const authApi = {
         return client.get('/auth/me');
     },
 
+    // Complete profile (first-time login)
+    completeProfile: async (data) => {
+        return client.post('/auth/complete-profile', data);
+    },
+
+    // Change password
+    changePassword: async (oldPassword, newPassword) => {
+        return client.post('/auth/change-password', {
+            old_password: oldPassword,
+            new_password: newPassword,
+        });
+    },
+
     // Logout (client-side only, clear token)
     logout: () => {
         localStorage.removeItem('token');

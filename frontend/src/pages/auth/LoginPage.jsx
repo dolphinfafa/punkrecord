@@ -18,8 +18,12 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await login(username, password);
-            navigate('/');
+            const userData = await login(username, password);
+            if (!userData.profile_completed || userData.must_change_password) {
+                navigate('/profile-setup');
+            } else {
+                navigate('/');
+            }
         } catch (err) {
             setError('用户名或密码错误');
         } finally {

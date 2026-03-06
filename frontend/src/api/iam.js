@@ -93,6 +93,40 @@ export const iamApi = {
         return client.get('/iam/org-chart');
     },
 
+    // User password reset
+    resetUserPassword: async (userId) => {
+        return client.post(`/iam/users/${userId}/reset-password`);
+    },
+
+    // User file uploads
+    uploadIdCardImage: async (userId, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/iam/users/${userId}/id-card-image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+
+    uploadResume: async (userId, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/iam/users/${userId}/resume`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+
+    getUserFileUrl: (userId, filename) => {
+        return `/api/v1/iam/users/${userId}/files/${filename}`;
+    },
+
+    downloadUserFile: async (userId, filename) => {
+        const response = await client.get(`/iam/users/${userId}/files/${filename}`, {
+            responseType: 'blob',
+            transformResponse: [(data) => data],
+        });
+        return response;
+    },
+
     // Our Entities
     listEntities: async () => {
         return client.get('/iam/entities');

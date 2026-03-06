@@ -3,10 +3,13 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
     width: 100vw;
     background-color: #11111b;
     background-image: linear-gradient(135deg, #1e1e2e 0%, #11111b 100%);
+    padding: 40px 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
 }
 
 .login-card {
@@ -39,7 +42,7 @@
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .form-group {
@@ -70,13 +73,39 @@
 .login-form .form-group input {
     flex: 1;
     width: 100%;
-    padding: 12px 12px 12px 48px !important;
+    padding: 12px;
     background-color: #1e1e2e;
     border: 1px solid #45475a;
     border-radius: 8px;
     color: #cdd6f4;
     font-size: 15px;
     transition: all 0.2s;
+}
+
+.login-form .form-group .input-with-icon input {
+    padding-left: 48px;
+}
+
+.login-form .form-group select {
+    width: 100%;
+    padding: 12px;
+    background-color: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    color: #cdd6f4;
+    font-size: 15px;
+    transition: all 0.2s;
+}
+
+.login-form .form-group select:focus {
+    outline: none;
+    border-color: #89b4fa;
+    box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.1);
+}
+
+.login-form .form-group input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
 }
 
 .login-form .form-group input:focus {

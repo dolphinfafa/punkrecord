@@ -1,422 +1,104 @@
 ---
-description: Complete project index for PunkRecord. Read first before coding tasks.
+description: PunkRecord 项目索引大纲。执行任何任务前先阅读此文件，按需查阅子文档。
 ---
 
-# Project Index
+# 项目索引
 
-Purpose: give agents a fast and reliable map of this repository so they can locate code with minimal scanning.
+本文件是项目的导航入口，提供仓库结构总览和子文档索引。Agent 执行任务时先读此文件定位方向，再按需阅读对应的子文档获取详细信息。
 
-Usage rule:
-- Read this file before starting any task.
-- Update only impacted sections after structural changes.
-- Keep this file focused on "where" and "what", not implementation details.
+---
 
-## 1. Repository Structure
+## 1. 仓库结构
 
 ```text
 punkrecord/
-|- backend/
+|- backend/                 # FastAPI 后端服务
 |  |- app/
-|  |  |- api/                 # FastAPI routers
-|  |  |- core/                # config, db, auth, response, exception handling
-|  |  |- models/              # SQLModel ORM models
-|  |  |- schemas/             # Pydantic request/response schemas
-|  |  |- services/            # business services (exports, AI-related logic)
+|  |  |- api/               # 路由模块（auth, iam, todo, contract, project, finance, ai）
+|  |  |- core/              # 配置、数据库、认证、响应、异常处理
+|  |  |- models/            # SQLModel ORM 模型
+|  |  |- schemas/           # Pydantic 请求/响应 Schema
+|  |  |- services/          # 业务服务（导出、AI 逻辑）
 |  |  `- utils/
-|  |- db_migrations/          # Alembic migrations
+|  |- db_migrations/        # Alembic 数据库迁移
 |  |- tests/
-|  |- create_admin.py
-|  |- init_database.py
+|  |- create_admin.py       # 创建管理员脚本
+|  |- init_database.py      # 初始化数据库脚本
 |  |- requirements.txt
-|  `- app/main.py             # FastAPI app bootstrap
-|- frontend/
+|  `- app/main.py           # FastAPI 应用入口
+|- frontend/                # React Web 前端
 |  `- src/
-|     |- api/                 # API wrappers
-|     |- components/
-|     |  |- common/
-|     |  |- layout/
-|     |  `- todo/
-|     |- contexts/            # Auth context and session state
+|     |- api/               # API 请求封装
+|     |- components/        # 共享组件（common/, layout/, todo/）
+|     |- contexts/          # AuthContext 认证状态
 |     |- hooks/
-|     |- pages/               # route pages by business domain
+|     |- pages/             # 按业务域划分的页面
 |     `- utils/
-|- miniprogram/
-|  |- pages/                  # WeChat Mini Program pages (mobile-first)
-|  |- custom-tab-bar/         # custom bottom tab bar component
-|  |- services/               # API service wrappers for mini program
-|  |- utils/                  # request/session helpers
-|  |- app.{js,json,wxss}
-|  |- project.config.json
-|  `- project.private.config.json
-|- apps/api/                  # experimental NestJS API area
-|- .github/workflows/         # CI workflows
-|- prd/                       # product requirement docs
-|- milestone/                 # dated milestone records
-`- .agent/workflows/          # workflow docs and this project index
+|- miniprogram/             # 微信小程序客户端
+|  |- pages/                # 小程序页面
+|  |- custom-tab-bar/       # 自定义底部导航栏
+|  |- services/             # API 服务封装
+|  `- utils/                # 请求/会话工具
+|- milestone/               # 里程碑工作记录
+|- prd/                     # 产品需求文档
+`- .agent/workflows/        # Agent 工作流文档（本目录）
 ```
-
-## 2. Backend Architecture
-
-Entry point:
-- `backend/app/main.py`
-- Registers routers with prefix `/api/v1`.
-- Adds CORS middleware.
-- Defines request logging middleware.
-- Handles `AtlasException` and generic exceptions.
-- Initializes database on startup (`create_db_and_tables`).
-
-Router modules in `backend/app/api`:
-- `auth.py` -> `/api/v1/auth`
-- `iam.py` -> `/api/v1/iam`
-- `todo.py` -> `/api/v1/todo`
-- `contract.py` -> `/api/v1/contract`
-- `project.py` -> `/api/v1/project`
-- `finance.py` -> `/api/v1/finance`
-- `ai.py` -> `/api/v1/ai`
-
-## 3. API Surface (Key Endpoints)
-
-Auth:
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
-
-IAM:
-- Job titles: `GET/POST/PATCH/DELETE /api/v1/iam/job-titles`
-- Job title permissions: `GET/PUT /api/v1/iam/job-titles/{id}/permissions`
-- Permissions list: `GET /api/v1/iam/permissions`
-- Departments: `GET/POST/PATCH/DELETE /api/v1/iam/departments`
-- Users: `POST /api/v1/iam/users`, `GET /api/v1/iam/users`, `GET/PATCH /api/v1/iam/users/{user_id}`
-- Leave reset: `POST /api/v1/iam/users/{user_id}/reset-leave-balances`, `POST /api/v1/iam/users/reset-leave-balances`
-- Entities/org: `GET /api/v1/iam/entities`, `GET /api/v1/iam/org-chart`, `GET/POST /api/v1/iam/our-entities`
-- BELI rules: `GET/POST/PATCH/DELETE /api/v1/iam/beli-rules`
-
-Todo:
-- Todo CRUD/lifecycle: create, my/team list, detail/update, `start/submit/approve/reject/done/block/dismiss/status`
-- AI agent workflow: `POST /api/v1/todo/{todo_id}/status` supports `ai_fixing` and `ai_fixed` statuses for AI-driven bug fix flow.
-- Leave flow: `POST /api/v1/todo/leaves`, `GET /api/v1/todo/leaves/my`, `GET /api/v1/todo/leaves/team/pending`, approve/reject endpoints
-- Team task access rule: direct manager can view and edit subordinate todos (in addition to assignee/creator).
-- Todo image attachments:
-  - `POST /api/v1/todo/{todo_id}/images` (single image upload; repeat for multiple)
-  - `GET /api/v1/todo/{todo_id}/images/{image_id}/download`
-  - `DELETE /api/v1/todo/{todo_id}/images/{image_id}`
-- Todo create modal supports:
-  - optional project binding (`source_type=project_task`, `source_id=project_id`)
-  - multi-image upload on create (uploaded after todo creation)
-
-Contract:
-- Counterparties: `POST/GET /api/v1/contract/counterparties`
-- Contracts: create/list/detail/update/submit
-- Payment plans: `GET /api/v1/contract/contracts/{contract_id}/payment-plans`
-
-Project:
-- Projects: create/list/detail/update/delete
-- Stages: list/update + stage attachment upload/download/delete
-- Project attachments: list/upload/download/delete
-- Members: add/remove/list
-- Project todos:
-  - `GET /api/v1/project/projects/{project_id}/todos`
-  - `POST /api/v1/project/projects/{project_id}/todos/{todo_id}/assign`
-  - `POST /api/v1/project/projects/{project_id}/todos/{todo_id}/plan`
-  - `POST /api/v1/project/projects/{project_id}/todos/batch-assign`
-  - `DELETE /api/v1/project/projects/{project_id}/todos/{todo_id}`
-  - `DELETE /api/v1/project/projects/{project_id}/todos` (clear all)
-  - `POST /api/v1/project/projects/{project_id}/sync-dev-tasks`
-- Project todo list response now carries richer fields used by Bug detail:
-  - `link`, `start_at`, `done_at`, `blocked_reason`, `review_comment`, `dismiss_reason`, `created_at`, `updated_at`
-- Exports and context:
-  - `POST /api/v1/project/export_quote_excel`
-  - `POST /api/v1/project/export-contract-docx`
-  - `GET /api/v1/project/projects/{project_id}/acceptance-report/download`
-  - `GET /api/v1/project/projects/{project_id}/contract-context`
-  - `POST /api/v1/project/projects/{project_id}/generate-dev-tasks`
-
-Finance:
-- Accounts: create/list/update
-- Transactions: create/list/detail/update
-- Invoices: create/list
-- Reimbursements: create/list
-
-AI:
-- `POST /api/v1/ai/chat`
-- `POST /api/v1/ai/chat-stream`
-
-Health/basic:
-- `GET /health`
-- `GET /`
-
-## 4. Core Data Models
-
-Model files (`backend/app/models`):
-- `base.py`: shared base model fields
-- `iam.py`: users, departments/org units, job titles, job title permissions, entities, memberships
-- `todo.py`: todo items, leave requests
-- `project.py`: project, stages, members, project-related structures
-- `contract.py`: contracts, counterparties, payment plans
-- `finance.py`: finance accounts, transactions, invoices, reimbursements
-- `approval.py`, `shared.py`: shared/approval-related models
-
-Common model groups:
-- IAM: `User`, `OrgUnit`, `JobTitle`, `JobTitlePermission`, `OurEntity`, `OrgMembership`
-- Todo: `TodoItem`, `LeaveRequest`
-- Project: `Project`, `ProjectStage`, `ProjectMember`
-- Contract: `Contract`, `Counterparty`, `ContractPaymentPlan`
-- Finance: `FinanceAccount`, `FinanceTransaction`, `FinanceInvoice`, `Reimbursement`
-
-## 5. Frontend Architecture
-
-App entry:
-- `frontend/src/App.jsx`
-- Uses `BrowserRouter` + nested routes.
-- Wraps protected routes with `ProtectedRoute` and `AuthProvider`.
-
-Main routes:
-- `/login` -> `pages/auth/LoginPage`
-- `/` -> dashboard
-- `/todo` -> todo page
-- `/iam/*` -> users, entities, departments, job titles, BELI rules, org chart
-- `/contract/*` -> contract list, counterparties
-- `/project` -> project list
-- `/project/:id` -> project detail
-- `/project/:id/dev-progress` -> development progress
-- `/finance/accounts` and `/finance/transactions`
-
-Layout and state:
-- Shared layout: `components/layout/*`
-- Shared image preview for bug screenshots: `components/common/BugImagePreview.jsx` (thumbnail + zoom viewer)
-- Reusable Bug detail modal: `components/common/BugDetailModal.jsx` (full-field detail rendering + image gallery)
-- Shared todo image preview: `components/common/TodoImagePreview.jsx` (todo attachments preview + zoom viewer)
-- Auth state: `contexts/AuthContext`
-- Domain pages: `src/pages/{auth,dashboard,iam,contract,project,finance,todo}`
-
-Mini program client (`miniprogram/`):
-- Native WeChat mini program structure (`app.js`, `app.json`, `app.wxss`).
-- Uses custom tab bar component at `custom-tab-bar/*` for icon + larger-label navigation.
-- Mobile-first pages:
-  - `pages/login`
-  - `pages/home`
-  - `pages/todo`
-  - `pages/project`
-  - `pages/project/detail`
-  - `pages/finance`
-  - `pages/mine`
-  - `pages/contract`
-  - `pages/iam`
-- UI direction:
-  - Prefer the same visual language as the web app (`frontend/src/pages/*`), especially card hierarchy, status badges, and primary action styling.
-  - Current mini program theme is aligned to a light `slate + indigo` style for consistency with core web business pages.
-- Todo page now contains both personal/team todo views and leave request/review panels.
-- Project pages now include:
-  - list page with status stats/search and detail entry (`pages/project`)
-  - detail page tabs (overview/stages/members/todos) with stage action labels aligned to web naming (`pages/project/detail`)
-  - a unified stage attachments entry in stage tab (aggregated across all stages)
-- Shared request/session utilities:
-  - `utils/request.js`
-  - `utils/storage.js`
-- API service mapping mirrors web domains:
-  - `services/{auth,todo,project,finance,contract,iam}.js`
-
-## 6. Key Workflows to Understand
-
-1. Authentication flow
-- Login returns token.
-- Frontend stores session via auth context and sends bearer token.
-- Mini program login should persist token before requesting `/auth/me`; Mine page can backfill profile via `/auth/me` when local user cache is empty.
-
-2. Todo lifecycle
-- Typical progression: `pending -> in_progress -> submitted -> done`.
-- Also supports blocked/rejected/dismissed transitions.
-- Mini program supports both "My Todos" and "Team Todos" with corresponding action buttons.
-
-3. Leave approval
-- Employee submits leave request.
-- Manager approves/rejects in pending team list.
-- Leave balance fields are updated after approval.
-- Mini program `pages/todo` includes leave submit, my leave history, and manager review actions.
-
-4. Project execution
-- Project -> stages -> todos.
-- Dev tasks in "开发进度" are synced from feature list only when user manually triggers sync.
-- Dev task module supports: manual create/edit/delete, batch assign assignee, one-click clear.
-- Project todo delete/clear now cascades linked mirrored todos (for example bug tracking + linked fix todo).
-- Bug management now supports opening per-bug detail view and uploading multiple bug images.
-- Bug creation now writes one bug todo record (no extra mirrored duplicate todo).
-- Bug management list view intentionally does not render attachment thumbnails; images are shown in detail modal only.
-- Bug management includes an "Agent 文档" panel that auto-generates an API handbook for AI agents, with one-click copy.
-- AI agent bug fix workflow: agents can transition bugs through `ai_fixing` → `ai_fixed` statuses via the todo status API.
-- Attachments and export endpoints support delivery artifacts.
-- Mini program project detail currently supports:
-  - stage operation entry labels consistent with web (`功能清单/报价单/AI生成合同/原型确认单/开发进度/Bug管理/验收报告`)
-  - stage attachment aggregation + file download
-  - project member add/remove for PM/owner users
-
-5. Finance operations
-- Accounts and transactions are tracked through finance endpoints.
-- Reimbursements and invoices are separate but linked workflows.
-
-## 7. Runbook and Commands
-
-Backend (from `backend/`):
-```bash
-uvicorn app.main:app --reload --port 8000
-alembic upgrade head
-python create_admin.py
-python init_database.py
-pytest -q tests/test_health.py
-pytest -q tests/test_project_workflow.py
-```
-
-Frontend (from `frontend/`):
-```bash
-npm run dev
-npm run build
-npm run lint
-npm run preview
-```
-
-Mini program (from `miniprogram/`):
-```bash
-# Import this directory into WeChat DevTools:
-# Project path: <repo>/miniprogram
-# Use appid from your WeChat mini program settings
-```
-
-Mini program compile note:
-- If DevTools reports missing base library (for example `2.31.0` not found),
-  update `miniprogram/project.private.config.json` -> `libVersion` to an available version
-  (current project baseline: `3.6.3`), then clear DevTools cache and recompile.
-
-Quick checks:
-```bash
-curl http://localhost:8000/health
-```
-
-Python environment policy:
-- Requirements:
-  - macOS: `pyenv`, environment name `punkrecord`
-  - Windows: `conda`, environment name `punkrecord`
-- Command rules:
-  1. Detect OS first.
-  2. Activate environment before any Python command.
-  3. Run Python command only after activation.
-- Activation:
-```bash
-# macOS
-pyenv activate punkrecord
-
-# Windows
-conda activate punkrecord
-```
-- Notes:
-  - Never run project Python commands outside the `punkrecord` environment.
-  - If shell activation is unavailable, use an equivalent isolated execution method.
-
-Backend runtime safety defaults:
-- Startup no longer auto-applies schema changes by default.
-- Use env flags only when explicitly needed:
-  - `AUTO_CREATE_TABLES_ON_STARTUP`
-  - `AUTO_RUN_MIGRATIONS_ON_STARTUP`
-- RBAC enforcement supports phased rollout with:
-  - `ENFORCE_RBAC` (default off for compatibility)
-
-## 8. Conventions and Contracts
-
-Naming:
-- Backend files: `snake_case`
-- Frontend components: `PascalCase`
-- JS variables/functions: `camelCase`
-- API paths: kebab-case style where applicable
-- Mini program pages follow `pages/<module>/index.*` convention
-- Mini program styles use `rpx` for responsive mobile layout
-- Mini program user-facing labels should be Chinese by default; keep backend enum/raw values in JS logic and map them to Chinese only for display.
-
-Response shape convention:
-- Success: `{ "data": ..., "message": "ok" }`
-- Error: `{ "code": <int>, "message": <string> }`
-
-Authorization convention:
-- API handlers should use `require_permission("<module>.<read|write>")` where applicable.
-- Current permission modules in use include: `iam`, `todo`, `contract`, `project`, `finance`.
-- Project Bug assignee update rule:
-  - PM/owner can edit full planning fields.
-  - Any project member can change bug assignee, but cannot edit other planning fields.
-
-Encoding and line endings:
-- Workflow files must be UTF-8 (no BOM) and LF.
-
-## 9. Related Workflow Docs
-
-- `.agent/workflows/use-project-index.md`
-- `.agent/workflows/project-overview.md` -- 项目技术全景文档（架构、数据库、技术选型详解）
-- Other workflow guides in `.agent/workflows/*.md`
-
-CI:
-- GitHub Actions workflow: `.github/workflows/ci.yml`
-- Current CI scope:
-  - Backend smoke test (`pytest -q tests/test_health.py`)
-  - Frontend smoke build (`npm run test:smoke`)
-
-## 10. Maintenance Rules for This Index
-
-When changed, update only impacted sections:
-- New/removed directories -> Section 1
-- Module responsibility changes -> Sections 2-3
-- Data model changes -> Section 4
-- Route or page changes -> Sections 3 and 5
-- Command/runtime changes -> Section 7
-- Conventions changes -> Section 8
-
-Additionally, any structural change listed above must also update `project-overview.md` (the project technical overview document). See that file's Section 10 for a mapping of change types to sections that need updating. Both files must use UTF-8 (no BOM) encoding with LF line endings.
-
-Do not add deep implementation details. Keep this as a navigation and orientation document.
-
-## 11. Change Safety and Regression Guardrails
-
-Purpose:
-- Prevent "change in A breaks B" across UI, business logic, API contracts, data flow, and runtime behavior.
-
-### 11.1 Scope and Boundary Rules
-- Keep module boundaries explicit: business module A must not directly couple to module B internals.
-- Shared logic must live in common/service layers; avoid cross-module copy-paste and hidden dependencies.
-- For frontend styles, avoid broad global selectors in business pages; prefer page-scoped naming and shared components.
-
-### 11.2 Contract and Compatibility Rules
-- Backend API request/response schemas are contracts; contract changes must be backward-compatible by default.
-- Breaking contract changes require explicit versioning or coordinated frontend/backend release.
-- For high-risk fields/enums, add compatibility handling during transition windows.
-
-### 11.3 Risk Classification (Required in each change)
-- `low`: local UI/content updates with no shared dependency impact.
-- `medium`: shared component/style/util changes, non-breaking API behavior updates.
-- `high`: cross-module behavior changes, auth/permission logic, data model/schema changes, workflow/state-machine changes.
-- `high` changes require stricter review, wider regression scope, and staged rollout.
-
-### 11.4 Testing and Regression Requirements
-- Unit tests: core business rules, validators, state transitions.
-- Integration tests: cross-module API/service interactions and persistence behavior.
-- End-to-end tests: critical user journeys (auth, todo lifecycle, project create/edit/detail flow, finance core flows).
-- Any change in A must run A tests plus dependent-path tests for affected B workflows.
-- UI changes must include interaction checks: scroll, modal open/close, submit/cancel, responsive behavior.
-
-### 11.5 PR/Review Gate Requirements
-- Every PR must state: impacted modules, risk level, contract/data changes, and regression checklist.
-- Changes touching shared components/styles/contracts require at least one owner review from affected domain.
-- Changes involving overflow/position/layout/modal behavior should include before/after screenshots or short recordings.
-
-### 11.6 Data and Migration Safety
-- Use non-breaking migration sequence where applicable: expand -> migrate -> contract.
-- Avoid destructive schema/data changes without rollback or fallback strategy.
-- Validate migration scripts and data compatibility before full rollout.
-
-### 11.7 Release and Rollback Strategy
-- Prefer feature flags for high-impact behavior changes.
-- Roll out in stages (small scope first), then expand after checks pass.
-- Ensure quick rollback path exists (flag off, compatible fallback, or safe revert plan).
-
-### 11.8 Observability and Post-change Verification
-- Monitor key metrics by module after release: error rate, latency, critical business success rate.
-- Add targeted logs/traces for changed critical paths to speed regression diagnosis.
-- If regression occurs, run root-cause review and convert lessons into tests/checklists/gates.
 
 ---
-Last updated: 2026-03-06
+
+## 2. 子文档索引
+
+执行任务时，根据需要阅读对应的子文档：
+
+| 文档 | 内容 | 何时阅读 |
+|------|------|----------|
+| [`backend-api.md`](backend-api.md) | 后端架构、路由模块、全部 API 接口清单 | 涉及后端代码或 API 调用时 |
+| [`data-models.md`](data-models.md) | 数据模型文件、模型分组和字段概览 | 涉及数据库、模型变更时 |
+| [`frontend.md`](frontend.md) | Web 前端路由/组件 + 微信小程序页面/架构 | 涉及前端或小程序代码时 |
+| [`workflows.md`](workflows.md) | 核心业务流程、运行命令、环境配置 | 需要了解业务逻辑或运行项目时 |
+| [`conventions.md`](conventions.md) | 命名规范、接口约定、变更安全守则 | 编写代码或提交变更时 |
+| [`project-overview.md`](project-overview.md) | 项目技术全景（技术选型、架构详解、数据库设计、认证权限） | 需要深入理解项目设计时 |
+
+---
+
+## 3. 关键信息速查
+
+- **后端端口**：8085（`uvicorn --port 8085`）
+- **前端代理**：Vite 将 `/api` 代理到 `localhost:8085`
+- **API 前缀**：所有接口在 `/api/v1` 下
+- **认证方式**：JWT Bearer Token（HS256，24 小时有效）
+- **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）
+- **数据库**：开发环境 SQLite，生产环境计划迁移 MySQL
+- **Python 环境**：虚拟环境名 `punkrecord`（macOS 用 pyenv，Linux/Windows 用 conda）
+- **RBAC 开关**：`ENFORCE_RBAC=False` 时跳过权限检查，便于分阶段上线
+
+---
+
+## 4. CI 与自动化
+
+- GitHub Actions 工作流：`.github/workflows/ci.yml`
+- 当前 CI 范围：
+  - 后端冒烟测试：`pytest -q tests/test_health.py`
+  - 前端冒烟构建：`npm run test:smoke`
+
+---
+
+## 5. 文档维护规则
+
+当项目发生结构性变更时，需同步更新相关文档：
+
+| 变更类型 | 需更新的文档 |
+|---------|-------------|
+| 新增/移除目录 | 本文件（§1 仓库结构） |
+| 后端路由/API 变更 | `backend-api.md` |
+| 数据模型变更 | `data-models.md` |
+| 前端路由/页面/组件变更 | `frontend.md` |
+| 业务流程/运行命令变更 | `workflows.md` |
+| 开发规范/安全规则变更 | `conventions.md` |
+| 架构/技术选型/设计变更 | `project-overview.md`（参见其第 10 章维护规则） |
+
+所有文档使用 UTF-8（无 BOM）编码，LF 换行符，中文书写（技术术语和代码标识符保持英文原文）。
+
+---
+
+*最后更新：2026-03-06*

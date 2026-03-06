@@ -240,7 +240,7 @@ AtlasException (基类, code=400)
 
 ```
 IAM 模块
-  +-- User                 用户（含请假额度、Beli 积分）
+  +-- User                 用户（含个人档案、请假额度、Beli 积分、首次登录状态）
   +-- OrgUnit              部门（树形自引用）
   +-- JobTitle             职位
   +-- JobTitlePermission   职位-权限关联
@@ -552,6 +552,13 @@ pages/
 **双通道 Token 投递**：
 - Web 端：`Authorization: Bearer <token>` 头部
 - Cookie 备选：`HttpOnly + Secure + SameSite=Lax`
+
+**首次登录流程**：
+- 新员工账号默认 `profile_completed=false`, `must_change_password=true`
+- 登录后前端检测到上述标记，重定向到 `/profile-setup` 页面
+- 用户填写个人档案（生日、身份证号、家庭住址、毕业学校、学历）并上传身份证图片和简历 PDF
+- 设置新密码后标记完成，进入系统正常页面
+- 管理员可通过 `POST /api/v1/iam/users/{id}/reset-password` 重置密码，触发下次登录强制修改
 
 ### 8.2 RBAC 权限模型
 

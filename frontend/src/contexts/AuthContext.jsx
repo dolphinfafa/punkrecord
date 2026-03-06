@@ -28,7 +28,12 @@ export const AuthProvider = ({ children }) => {
                 // Axios interceptor returns response.data, so resp is {code, data, message}
                 const profile = resp.data || resp;
                 if (profile && profile.id) {
-                    const userData = { id: profile.id, name: profile.display_name };
+                    const userData = {
+                        id: profile.id,
+                        name: profile.display_name,
+                        profile_completed: profile.profile_completed,
+                        must_change_password: profile.must_change_password,
+                    };
                     setUser(userData);
                     localStorage.setItem('user', JSON.stringify(userData));
                 }
@@ -47,15 +52,15 @@ export const AuthProvider = ({ children }) => {
     const login = async (username, password) => {
         try {
             const response = await client.post('/auth/login', { username, password });
-            const { access_token, user_id, display_name } = response;
+            const { access_token, user_id, display_name, profile_completed, must_change_password } = response;
 
-            const userData = { id: user_id, name: display_name };
+            const userData = { id: user_id, name: display_name, profile_completed, must_change_password };
 
             localStorage.setItem('token', access_token);
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
 
-            return true;
+            return userData;
         } catch (error) {
             console.error('Login failed:', error);
             throw error;

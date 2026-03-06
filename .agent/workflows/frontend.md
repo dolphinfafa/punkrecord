@@ -1,0 +1,98 @@
+# 前端与小程序架构
+
+> 本文档描述 Web 前端和微信小程序的架构设计。属于 `project-index.md` 的子文档。
+
+---
+
+## 1. Web 前端
+
+### 入口与路由
+
+入口文件：`frontend/src/App.jsx`
+- 使用 `BrowserRouter` + 嵌套路由
+- 受保护路由通过 `ProtectedRoute` 和 `AuthProvider` 包裹
+
+主要路由：
+
+| 路由 | 页面 |
+|------|------|
+| `/login` | 登录页（`pages/auth/LoginPage`） |
+| `/profile-setup` | 首次登录档案完善页（`pages/auth/ProfileSetupPage`） |
+| `/` | 仪表盘 |
+| `/todo` | 任务管理 |
+| `/iam/users` | 用户管理 |
+| `/iam/entities` | 实体管理 |
+| `/iam/departments` | 部门管理 |
+| `/iam/job-titles` | 职位管理 |
+| `/iam/beli-rules` | 积分规则 |
+| `/iam/org-chart` | 组织架构图 |
+| `/contract/list` | 合同列表 |
+| `/contract/counterparties` | 对手方管理 |
+| `/project` | 项目列表 |
+| `/project/:id` | 项目详情 |
+| `/project/:id/dev-progress` | 开发进度 |
+| `/finance/accounts` | 账户管理 |
+| `/finance/transactions` | 交易记录 |
+
+### 布局与状态
+
+- 共享布局组件：`components/layout/*`
+- 认证状态：`contexts/AuthContext`（React Context，非 Redux）
+- 业务页面：`src/pages/{auth,dashboard,iam,contract,project,finance,todo}`
+
+### 共享组件
+
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| Bug 图片预览 | `components/common/BugImagePreview.jsx` | 缩略图 + 放大查看 |
+| Bug 详情弹窗 | `components/common/BugDetailModal.jsx` | 全字段详情 + 图片画廊 |
+| 任务图片预览 | `components/common/TodoImagePreview.jsx` | 任务附件预览 + 放大 |
+
+---
+
+## 2. 微信小程序
+
+### 页面结构
+
+小程序目录：`miniprogram/`
+
+| 页面路径 | 说明 |
+|----------|------|
+| `pages/login` | 登录 |
+| `pages/home` | 首页 |
+| `pages/todo` | 任务（含请假提交/审批） |
+| `pages/project` | 项目列表 |
+| `pages/project/detail` | 项目详情（概览/阶段/成员/任务标签页） |
+| `pages/finance` | 财务概览 |
+| `pages/mine` | 个人中心 |
+| `pages/contract` | 合同 |
+| `pages/iam` | 组织管理 |
+
+### 设计原则
+
+- 与 Web 端保持统一的视觉语言（`slate + indigo` 企业主题）
+- 用户可见标签使用中文，后端枚举值在 JS 逻辑层映射
+- 响应式布局使用 `rpx` 单位
+- 自定义 TabBar（`custom-tab-bar/*`），支持大字号标签
+
+### 网络层与服务
+
+- 请求封装：`utils/request.js`（Promise 包装 `wx.request()`）
+- 会话管理：`utils/storage.js`
+- 统一 Bearer Token 鉴权，401 自动跳转登录
+- API 服务映射：`services/{auth,todo,project,finance,contract,iam}.js`
+
+### 项目详情功能
+
+- 阶段操作标签与 Web 一致（功能清单/报价单/AI 生成合同/原型确认单/开发进度/Bug 管理/验收报告）
+- 阶段附件聚合 + 文件下载
+- PM/owner 可添加/移除项目成员
+
+### 任务页功能
+
+- 个人/团队任务视图切换
+- 请假提交、请假历史、经理审批
+
+---
+
+*最后更新：2026-03-06*

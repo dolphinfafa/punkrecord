@@ -57,7 +57,9 @@ def create_admin():
             email="admin@atlas.com",
             hashed_password=hashed_password,
             status=UserStatus.ACTIVE,
-            is_shareholder=True
+            is_shareholder=True,
+            profile_completed=True,
+            must_change_password=False,
         )
         session.add(admin_user)
         session.commit()

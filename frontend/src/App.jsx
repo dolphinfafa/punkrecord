@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/layout/Layout';
 import LoginPage from '@/pages/auth/LoginPage';
+import ProfileSetupPage from '@/pages/auth/ProfileSetupPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import TodoPage from '@/pages/todo/TodoPage';
 import FinanceLayout from '@/pages/finance/FinanceLayout';
@@ -35,6 +36,11 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // First-time login: force profile setup
+  if (!user.profile_completed || user.must_change_password) {
+    return <Navigate to="/profile-setup" replace />;
+  }
+
   return children;
 };
 
@@ -44,6 +50,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/profile-setup" element={<ProfileSetupPage />} />
 
           <Route path="/" element={
             <ProtectedRoute>

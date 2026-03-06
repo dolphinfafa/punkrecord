@@ -37,6 +37,16 @@ class ScopeType(str, Enum):
     ALL_ENTITIES = "all_entities"
 
 
+class EducationLevel(str, Enum):
+    """Education level enumeration"""
+    HIGH_SCHOOL = "high_school"
+    ASSOCIATE = "associate"
+    BACHELOR = "bachelor"
+    MASTER = "master"
+    DOCTORATE = "doctorate"
+    OTHER = "other"
+
+
 class BeliRuleType(str, Enum):
     """Beli rule type enumeration."""
     TASK_TIMELINESS = "task_timeliness"
@@ -91,6 +101,19 @@ class User(BaseDBModel, table=True):
     hashed_password: Optional[str] = None
     status: UserStatus = Field(default=UserStatus.ACTIVE, nullable=False)
     is_shareholder: bool = Field(default=False, nullable=False)
+
+    # Profile fields
+    birthday: Optional[str] = None  # YYYY-MM-DD
+    id_number: Optional[str] = None  # 身份证号
+    home_address: Optional[str] = None  # 家庭住址
+    graduation_school: Optional[str] = None  # 毕业学校
+    education_level: Optional[EducationLevel] = None  # 学历
+    id_card_image: Optional[str] = None  # 身份证图片文件路径
+    resume_file: Optional[str] = None  # 简历 PDF 文件路径
+
+    # Account state
+    profile_completed: bool = Field(default=False, nullable=False)
+    must_change_password: bool = Field(default=True, nullable=False)
 
     # Organization fields
     manager_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")

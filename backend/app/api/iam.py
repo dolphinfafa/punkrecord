@@ -3,15 +3,17 @@ IAM API endpoints (Users, Roles, Entities, Departments, Job Titles, Org Chart)
 """
 from typing import List, Optional
 from datetime import datetime
-from uuid import UUID
-from fastapi import APIRouter, Depends, Query, HTTPException
+from pathlib import Path
+from uuid import UUID, uuid4
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import require_permission
+from app.core.auth import require_permission, get_current_user
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType, Permission, JobTitlePermission
+from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType, Permission, JobTitlePermission, EducationLevel
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse,
     OurEntityCreate, OurEntityResponse,
@@ -20,6 +22,9 @@ from app.schemas import (
     OrgChartNode,
     BeliRuleCreate, BeliRuleUpdate, BeliRuleResponse,
 )
+
+USER_UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads" / "user-files"
+USER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/iam", tags=["IAM"])
 _BELI_RULE_TYPES = {item.value for item in BeliRuleType}
@@ -93,6 +98,15 @@ def _enrich_user(user: User, session: Session, user_map: dict = None) -> UserRes
         job_title_name=job_title_name,
         department_id=user.department_id,
         department_name=department_name,
+        birthday=user.birthday,
+        id_number=user.id_number,
+        home_address=user.home_address,
+        graduation_school=user.graduation_school,
+        education_level=user.education_level.value if user.education_level else None,
+        id_card_image=user.id_card_image,
+        resume_file=user.resume_file,
+        profile_completed=user.profile_completed,
+        must_change_password=user.must_change_password,
         leave_annual_remaining=user.leave_annual_remaining,
         leave_maternity_remaining=user.leave_maternity_remaining,
         leave_marriage_remaining=user.leave_marriage_remaining,
@@ -637,6 +651,16 @@ async def update_user(
         user.job_title_id = user_data.job_title_id
     if user_data.department_id is not None:
         user.department_id = user_data.department_id
+    if user_data.birthday is not None:
+        user.birthday = user_data.birthday or None
+    if user_data.id_number is not None:
+        user.id_number = user_data.id_number or None
+    if user_data.home_address is not None:
+        user.home_address = user_data.home_address or None
+    if user_data.graduation_school is not None:
+        user.graduation_school = user_data.graduation_school or None
+    if user_data.education_level is not None:
+        user.education_level = EducationLevel(user_data.education_level) if user_data.education_level else None
 
     leave_fields = [
         ("leave_annual_remaining", user_data.leave_annual_remaining),
@@ -728,6 +752,101 @@ async def reset_all_users_leave_balances(
         session.add(user)
     session.commit()
     return success_response({"message": "已重置所有员工假期余额", "count": len(all_users)})
+
+
+# ─── User password reset (admin) ─────────────────────────────────────────────
+
+@router.post("/users/{user_id}/reset-password", response_model=dict)
+async def admin_reset_user_password(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("iam.write"))
+):
+    """Admin resets a user's password to a default value and forces password change on next login."""
+    user = session.get(User, user_id)
+    if not user:
+        raise NotFoundException("未找到用户")
+    default_password = "punkrecord123"
+    user.hashed_password = get_password_hash(default_password)
+    user.must_change_password = True
+    session.add(user)
+    session.commit()
+    return success_response({"message": f"密码已重置为 {default_password}，用户下次登录需修改密码"})
+
+
+# ─── User file upload/download ───────────────────────────────────────────────
+
+@router.post("/users/{user_id}/id-card-image", response_model=dict)
+async def upload_id_card_image(
+    user_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload ID card image for a user. User can upload their own, admin can upload for anyone."""
+    if str(current_user.id) != str(user_id):
+        # Check admin permission
+        try:
+            require_permission("iam.write")
+        except Exception:
+            raise ForbiddenException("只能上传自己的身份证图片")
+    user = session.get(User, user_id)
+    if not user:
+        raise NotFoundException("未找到用户")
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise ValidationException("仅支持 JPG/PNG/WebP 图片格式")
+    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "jpg"
+    filename = f"{user_id}_idcard_{uuid4().hex[:8]}.{ext}"
+    filepath = USER_UPLOAD_DIR / filename
+    content = await file.read()
+    filepath.write_bytes(content)
+    user.id_card_image = filename
+    session.add(user)
+    session.commit()
+    return success_response({"filename": filename})
+
+
+@router.post("/users/{user_id}/resume", response_model=dict)
+async def upload_resume(
+    user_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload resume PDF for a user."""
+    if str(current_user.id) != str(user_id):
+        try:
+            require_permission("iam.write")
+        except Exception:
+            raise ForbiddenException("只能上传自己的简历")
+    user = session.get(User, user_id)
+    if not user:
+        raise NotFoundException("未找到用户")
+    if file.content_type != "application/pdf":
+        raise ValidationException("仅支持 PDF 格式简历")
+    filename = f"{user_id}_resume_{uuid4().hex[:8]}.pdf"
+    filepath = USER_UPLOAD_DIR / filename
+    content = await file.read()
+    filepath.write_bytes(content)
+    user.resume_file = filename
+    session.add(user)
+    session.commit()
+    return success_response({"filename": filename})
+
+
+@router.get("/users/{user_id}/files/{filename}")
+async def download_user_file(
+    user_id: UUID,
+    filename: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download a user's uploaded file (ID card image or resume)."""
+    filepath = USER_UPLOAD_DIR / filename
+    if not filepath.exists() or not filepath.is_file():
+        raise NotFoundException("文件不存在")
+    return FileResponse(str(filepath), filename=filename)
 
 
 # ─── OurEntity endpoints ─────────────────────────────────────────────────────
