@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2 } from 'lucide-react';
+import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2, FileText, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
@@ -13,6 +13,8 @@ const STATUS_LABELS = {
     done: '已修复',
     blocked: '阻塞',
     dismissed: '已忽略',
+    ai_fixing: 'AI 修复中',
+    ai_fixed: 'AI 已修复',
 };
 
 const PRIORITY_LABELS = {
@@ -29,6 +31,8 @@ const STATUS_COLORS = {
     done: { bg: '#f0fdf4', color: '#15803d' },
     blocked: { bg: '#fef2f2', color: '#dc2626' },
     dismissed: { bg: '#f8fafc', color: '#64748b' },
+    ai_fixing: { bg: '#fdf4ff', color: '#a855f7' },
+    ai_fixed: { bg: '#ecfdf5', color: '#059669' },
 };
 
 function normalizeMembers(project, members) {
@@ -87,6 +91,85 @@ function defaultBugForm(project, currentUserId, testerMembers, developerMembers)
     };
 }
 
+function generateAgentDoc(project, members, user) {
+    const baseUrl = window.location.origin;
+    const memberList = members.map(m => `  - ${m.user_name} (user_id: ${m.user_id}, 角色: ${m.role_in_project || '成员'})`).join('\n');
+
+    return `# Bug 修复 Agent 工作手册
+
+## 项目信息
+- 项目名称: ${project.name}
+- 项目 ID: ${project.id}
+- 当前操作人: ${user?.display_name || user?.username || '未知'} (user_id: ${user?.id || '未知'})
+
+## 项目成员
+${memberList}
+
+## 认证方式
+所有 API 请求需在 Header 中携带 Bearer Token:
+\`\`\`
+Authorization: Bearer <你的登录Token>
+\`\`\`
+获取 Token: POST ${baseUrl}/api/v1/auth/login
+请求体: { "username": "<用户名>", "password": "<密码>" }
+返回的 data.token 即为 Bearer Token。
+
+## API 接口
+
+### 1. 获取本项目的 Bug 列表
+\`\`\`
+GET ${baseUrl}/api/v1/project/projects/${project.id}/todos
+\`\`\`
+返回所有项目任务。筛选 Bug: 检查 tags 包含 "bug" 或 link.type === "bug"。
+每条 Bug 的关键字段:
+- id: Bug ID (用于后续操作)
+- title: 标题
+- status: 状态 (open/in_progress/ai_fixing/ai_fixed/pending_review/done)
+- priority: 优先级 (p0/p1/p2/p3)
+- assignee_user_id: 负责开发人员的 user_id
+- assignee_name: 负责开发人员姓名
+- description: 备注
+- link.actual_result: 实际结果
+- link.expected_result: 期望结果
+- link.reproduce_steps: 复现步骤
+
+### 2. 开始 AI 修复 (将 Bug 标记为 "AI 修复中")
+\`\`\`
+POST ${baseUrl}/api/v1/todo/{bug_id}/status
+Content-Type: application/json
+
+{ "status": "ai_fixing" }
+\`\`\`
+适用于状态为 open / in_progress / blocked 的 Bug。
+
+### 3. 完成 AI 修复 (将 Bug 标记为 "AI 已修复")
+\`\`\`
+POST ${baseUrl}/api/v1/todo/{bug_id}/status
+Content-Type: application/json
+
+{ "status": "ai_fixed" }
+\`\`\`
+仅适用于状态为 ai_fixing 的 Bug。
+
+### 4. 获取单个 Bug 详情
+\`\`\`
+GET ${baseUrl}/api/v1/todo/{bug_id}
+\`\`\`
+
+## 工作流程
+1. 调用接口 1 获取 Bug 列表
+2. 根据 assignee_user_id 筛选出当前操作人负责的 Bug
+3. 操作人指定需要修复的 Bug 后，对每个 Bug 调用接口 2 标记为 "AI 修复中"
+4. 完成代码修复后，调用接口 3 标记为 "AI 已修复"
+5. 之后由测试人员人工验收
+
+## 状态流转图
+\`\`\`
+open/in_progress/blocked --> ai_fixing --> ai_fixed --> (人工验收) --> done
+\`\`\`
+`;
+}
+
 export default function BugManagementModal({ isOpen, onClose, project }) {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -99,6 +182,8 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     const [form, setForm] = useState(defaultBugForm(project, '', [], []));
     const [message, setMessage] = useState('');
     const [selectedBug, setSelectedBug] = useState(null);
+    const [docExpanded, setDocExpanded] = useState(false);
+    const [docCopied, setDocCopied] = useState(false);
 
     const bugList = useMemo(() => todos.filter(isBugTodo), [todos]);
     const testerMembers = useMemo(() => {
@@ -109,6 +194,28 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
         const filtered = members.filter(isDeveloperMember);
         return filtered.length > 0 ? filtered : members;
     }, [members]);
+
+    const agentDoc = useMemo(() => {
+        if (!project) return '';
+        return generateAgentDoc(project, members, user);
+    }, [project, members, user]);
+
+    const copyDoc = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(agentDoc);
+            setDocCopied(true);
+            setTimeout(() => setDocCopied(false), 2000);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = agentDoc;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            setDocCopied(true);
+            setTimeout(() => setDocCopied(false), 2000);
+        }
+    }, [agentDoc]);
 
     const loadData = async () => {
         if (!project?.id) return;
@@ -309,6 +416,12 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button
+                            onClick={() => setDocExpanded((prev) => !prev)}
+                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: docExpanded ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
+                        >
+                            <FileText size={14} /> Agent 文档 {docExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                        <button
                             onClick={loadData}
                             style={{ border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
                         >
@@ -328,6 +441,55 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                         </button>
                     </div>
                 </div>
+
+                {docExpanded && (
+                    <div style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <div style={{ padding: '12px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.83rem', color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <FileText size={14} style={{ color: '#6366f1' }} />
+                                Agent 工作手册
+                                <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.78rem' }}>— 复制以下内容给你的 AI Agent</span>
+                            </div>
+                            <button
+                                onClick={copyDoc}
+                                style={{
+                                    border: docCopied ? '1px solid #86efac' : '1px solid #c7d2fe',
+                                    background: docCopied ? '#f0fdf4' : '#eef2ff',
+                                    color: docCopied ? '#15803d' : '#4338ca',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    gap: '6px',
+                                    alignItems: 'center',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                {docCopied ? <><Check size={14} /> 已复制</> : <><Copy size={14} /> 一键复制</>}
+                            </button>
+                        </div>
+                        <div style={{ padding: '0 16px 12px' }}>
+                            <pre style={{
+                                background: '#1e293b',
+                                color: '#e2e8f0',
+                                borderRadius: '10px',
+                                padding: '14px 16px',
+                                fontSize: '0.78rem',
+                                lineHeight: '1.6',
+                                maxHeight: '320px',
+                                overflow: 'auto',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-all',
+                                margin: 0,
+                                fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
+                            }}>
+                                {agentDoc}
+                            </pre>
+                        </div>
+                    </div>
+                )}
 
                 <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -438,7 +600,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     {loading ? (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '28px 0', textAlign: 'center' }}>加载中...</div>
                     ) : bugList.length === 0 ? (
-                        <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '28px 0', textAlign: 'center' }}>暂无 Bug，点击上方“新建 Bug”开始记录</div>
+                        <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '28px 0', textAlign: 'center' }}>暂无 Bug，点击上方"新建 Bug"开始记录</div>
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                             <thead>

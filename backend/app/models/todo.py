@@ -42,6 +42,8 @@ class TodoStatus(str, Enum):
     PENDING_REVIEW = "pending_review"  # Employee submitted, waiting for manager approval
     DONE = "done"
     DISMISSED = "dismissed"
+    AI_FIXING = "ai_fixing"    # AI agent is working on the fix
+    AI_FIXED = "ai_fixed"      # AI agent has completed the fix, awaiting human review
 
 
 class TodoItem(BaseDBModel, table=True):

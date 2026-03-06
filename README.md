@@ -1,19 +1,15 @@
-# Atlas Enterprise Management System
+# PunkRecord Enterprise Management System
 
-This is the monorepo for the Atlas Enterprise Management System, comprising a backend API, a web administration frontend, and a WeChat mini-program.
+PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含后端 API、Web 管理后台和微信小程序三个客户端。
 
 ## Project Structure
 
--   `/apps`
-    -   `/api`: Backend API developed with Node.js and NestJS.
-    -   `/web-admin`: Web administration frontend (React/Vite).
-    -   `/miniprogram`: WeChat Mini-program (Taro/uni-app).
--   `/packages`
-    -   `/shared-types`: Shared TypeScript types across the applications.
--   `/prd`: Product Requirement Documents.
--   `/prd`: Product Requirement Documents.
--   `TODO.md`: A list of remaining tasks and instructions for setting up the project.
--   `MILESTONE.md`: Project progress and daily updates.
+-   `/backend`: 后端 API (Python / FastAPI)
+-   `/frontend`: Web 管理后台 (React / Vite)
+-   `/miniprogram`: 微信小程序 (原生框架)
+-   `/prd`: 产品需求文档
+-   `/milestone`: 项目里程碑记录
+-   `/.agent/workflows`: 项目工作流文档与索引
 
 ## 环境要求
 
@@ -64,10 +60,10 @@ python init_database.py
 
 ```bash
 # 在 backend 目录下运行
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
 ```
 
-后端服务将在 `http://localhost:8000` 启动，API 文档可访问 `http://localhost:8000/docs`
+后端服务将在 `http://localhost:8085` 启动，API 文档可访问 `http://localhost:8085/docs`
 
 ### 3. 前端服务启动
 
@@ -93,8 +89,8 @@ npm run dev
 ### 4. 访问应用
 
 - **前端界面**: http://localhost:5173
-- **后端 API**: http://localhost:8000
-- **API 文档**: http://localhost:8000/docs
+- **后端 API**: http://localhost:8085
+- **API 文档**: http://localhost:8085/docs
 
 ## 更多信息
 

@@ -91,6 +91,7 @@ IAM:
 
 Todo:
 - Todo CRUD/lifecycle: create, my/team list, detail/update, `start/submit/approve/reject/done/block/dismiss/status`
+- AI agent workflow: `POST /api/v1/todo/{todo_id}/status` supports `ai_fixing` and `ai_fixed` statuses for AI-driven bug fix flow.
 - Leave flow: `POST /api/v1/todo/leaves`, `GET /api/v1/todo/leaves/my`, `GET /api/v1/todo/leaves/team/pending`, approve/reject endpoints
 - Team task access rule: direct manager can view and edit subordinate todos (in addition to assignee/creator).
 - Todo image attachments:
@@ -239,6 +240,8 @@ Mini program client (`miniprogram/`):
 - Bug management now supports opening per-bug detail view and uploading multiple bug images.
 - Bug creation now writes one bug todo record (no extra mirrored duplicate todo).
 - Bug management list view intentionally does not render attachment thumbnails; images are shown in detail modal only.
+- Bug management includes an "Agent 文档" panel that auto-generates an API handbook for AI agents, with one-click copy.
+- AI agent bug fix workflow: agents can transition bugs through `ai_fixing` → `ai_fixed` statuses via the todo status API.
 - Attachments and export endpoints support delivery artifacts.
 - Mini program project detail currently supports:
   - stage operation entry labels consistent with web (`功能清单/报价单/AI生成合同/原型确认单/开发进度/Bug管理/验收报告`)
@@ -414,4 +417,4 @@ Purpose:
 - If regression occurs, run root-cause review and convert lessons into tests/checklists/gates.
 
 ---
-Last updated: 2026-03-04
+Last updated: 2026-03-06

@@ -1076,11 +1076,22 @@ async def update_todo_status(
              else:
                  raise NotFoundException("无权重置任务")
 
-    # 6. Fallback/Other transitions
+    # 6. AI workflow transitions
+    elif target_status == TodoStatus.AI_FIXING and current_status in (TodoStatus.OPEN, TodoStatus.IN_PROGRESS, TodoStatus.BLOCKED):
+        todo.status = TodoStatus.AI_FIXING
+        if not todo.start_at:
+            todo.start_at = datetime.utcnow()
+
+    elif target_status == TodoStatus.AI_FIXED and current_status == TodoStatus.AI_FIXING:
+        todo.status = TodoStatus.AI_FIXED
+
+    elif current_status == TodoStatus.AI_FIXED and target_status in (TodoStatus.OPEN, TodoStatus.PENDING_REVIEW, TodoStatus.DONE):
+        todo.status = target_status
+        if target_status == TodoStatus.DONE:
+            todo.done_at = datetime.utcnow()
+
+    # 7. Fallback/Other transitions
     else:
-        # Prevent arbitrary jumps for now, unless we want to be very flexible
-        # For drag and drop, we might need Pending -> Open (Reject) too, but that is covered by /reject
-        # Let's allow Pending -> Open via this API too to simplify frontend
         if current_status == TodoStatus.PENDING_REVIEW and target_status == TodoStatus.OPEN:
              # Treat as Reject
              if todo.creator_user_id != current_user.id and not _is_direct_manager(current_user, session.get(User, todo.assignee_user_id)):
