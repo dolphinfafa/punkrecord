@@ -83,6 +83,8 @@ Auth:
 
 IAM:
 - Job titles: `GET/POST/PATCH/DELETE /api/v1/iam/job-titles`
+- Job title permissions: `GET/PUT /api/v1/iam/job-titles/{id}/permissions`
+- Permissions list: `GET /api/v1/iam/permissions`
 - Departments: `GET/POST/PATCH/DELETE /api/v1/iam/departments`
 - Users: `POST /api/v1/iam/users`, `GET /api/v1/iam/users`, `GET/PATCH /api/v1/iam/users/{user_id}`
 - Leave reset: `POST /api/v1/iam/users/{user_id}/reset-leave-balances`, `POST /api/v1/iam/users/reset-leave-balances`
@@ -147,7 +149,7 @@ Health/basic:
 
 Model files (`backend/app/models`):
 - `base.py`: shared base model fields
-- `iam.py`: users, departments/org units, job titles, entities, memberships
+- `iam.py`: users, departments/org units, job titles, job title permissions, entities, memberships
 - `todo.py`: todo items, leave requests
 - `project.py`: project, stages, members, project-related structures
 - `contract.py`: contracts, counterparties, payment plans
@@ -155,7 +157,7 @@ Model files (`backend/app/models`):
 - `approval.py`, `shared.py`: shared/approval-related models
 
 Common model groups:
-- IAM: `User`, `OrgUnit`, `JobTitle`, `OurEntity`, `OrgMembership`
+- IAM: `User`, `OrgUnit`, `JobTitle`, `JobTitlePermission`, `OurEntity`, `OrgMembership`
 - Todo: `TodoItem`, `LeaveRequest`
 - Project: `Project`, `ProjectStage`, `ProjectMember`
 - Contract: `Contract`, `Counterparty`, `ContractPaymentPlan`

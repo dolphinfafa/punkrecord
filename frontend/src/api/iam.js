@@ -58,6 +58,19 @@ export const iamApi = {
         return client.delete(`/iam/job-titles/${id}`);
     },
 
+    // Permissions
+    listPermissions: async () => {
+        return client.get('/iam/permissions');
+    },
+
+    getJobTitlePermissions: async (jobTitleId) => {
+        return client.get(`/iam/job-titles/${jobTitleId}/permissions`);
+    },
+
+    setJobTitlePermissions: async (jobTitleId, permissionCodes) => {
+        return client.put(`/iam/job-titles/${jobTitleId}/permissions`, { permission_codes: permissionCodes });
+    },
+
     // Departments
     listDepartments: async () => {
         return client.get('/iam/departments');

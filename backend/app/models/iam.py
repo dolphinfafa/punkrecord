@@ -162,6 +162,14 @@ class UserRole(BaseDBModel, table=True):
     role: Role = Relationship(back_populates="user_roles")
 
 
+class JobTitlePermission(BaseDBModel, table=True):
+    """Job Title - Permission association"""
+    __tablename__ = "job_title_permission"
+
+    job_title_id: UUID = Field(foreign_key="job_title.id", nullable=False, index=True)
+    permission_id: UUID = Field(foreign_key="permission.id", nullable=False)
+
+
 class OrgMembership(BaseDBModel, table=True):
     """Organization membership"""
     __tablename__ = "org_membership"

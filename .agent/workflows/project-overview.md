@@ -243,6 +243,7 @@ IAM 模块
   +-- User                 用户（含请假额度、Beli 积分）
   +-- OrgUnit              部门（树形自引用）
   +-- JobTitle             职位
+  +-- JobTitlePermission   职位-权限关联
   +-- OurEntity            我方实体（公司/分支/工作室）
   +-- Role                 角色
   +-- Permission           权限
@@ -454,7 +455,7 @@ ApprovalInstance
 ### 6.1 技术栈
 
 - **框架**：React 19.2.0 + React Router 7.12.0
-- **构建**：Vite 7.2.4（路径别名 `@` -> `./src`，开发代理 `/api` -> `localhost:8000`）
+- **构建**：Vite 7.2.4（路径别名 `@` -> `./src`，开发代理 `/api` -> `localhost:8085`）
 - **状态管理**：React Context API（AuthContext 管理登录态）
 - **HTTP 客户端**：Axios 1.13.2（拦截器统一注入 Token、处理 401）
 - **样式**：Tailwind CSS 原子化类名 + 页面级作用域
@@ -555,15 +556,26 @@ pages/
 ### 8.2 RBAC 权限模型
 
 ```
+通道 1（角色权限）：
 User --< UserRole >-- Role --< RolePermission >-- Permission
               |
               +-- scope_type: GLOBAL / OUR_ENTITY / ALL_ENTITIES
               +-- our_entity_id: (仅 OUR_ENTITY 作用域时有效)
+
+通道 2（职位权限）：
+User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 ```
+
+**双通道权限合并**：鉴权时取两个通道的**并集**，即用户只要通过角色或职位中任一通道拥有某权限即可访问对应资源。实现位于 `backend/app/core/auth.py` 的 `require_permission()` 中。
 
 **默认角色**：`admin`, `finance`, `cashier`, `shareholder`, `pm`, `owner`, `employee`, `approver`, `legal`, `seal_admin`
 
 **权限粒度**：`<模块>.<操作>`，例如 `project.read`, `finance.write`
+
+**职位权限管理 API**：
+- `GET /api/v1/iam/permissions` — 获取所有权限列表（按模块分组）
+- `GET /api/v1/iam/job-titles/{id}/permissions` — 获取职位已分配的权限代码
+- `PUT /api/v1/iam/job-titles/{id}/permissions` — 设置职位权限（全量替换）
 
 **软发布机制**：`ENFORCE_RBAC=False` 时所有已认证用户可访问，便于分阶段上线。
 
@@ -607,4 +619,4 @@ User --< UserRole >-- Role --< RolePermission >-- Permission
 
 ---
 
-*最后更新：2026-03-05*
+*最后更新：2026-03-06*

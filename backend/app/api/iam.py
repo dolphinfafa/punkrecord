@@ -11,7 +11,7 @@ from app.core.auth import require_permission
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
-from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType
+from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType, Permission, JobTitlePermission
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse,
     OurEntityCreate, OurEntityResponse,
@@ -203,6 +203,76 @@ async def delete_job_title(
     session.delete(jt)
     session.commit()
     return success_response({"message": "删除成功"})
+
+
+# ─── Job Title Permission endpoints ──────────────────────────────────────────
+
+@router.get("/permissions", response_model=dict)
+async def list_permissions(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("iam.read"))
+):
+    """List all available permissions grouped by module"""
+    perms = session.exec(select(Permission).order_by(Permission.module, Permission.code)).all()
+    return success_response([
+        {"id": str(p.id), "code": p.code, "name": p.name, "module": p.module, "description": p.description}
+        for p in perms
+    ])
+
+
+@router.get("/job-titles/{job_title_id}/permissions", response_model=dict)
+async def get_job_title_permissions(
+    job_title_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("iam.read"))
+):
+    """Get permission codes assigned to a job title"""
+    jt = session.get(JobTitle, job_title_id)
+    if not jt:
+        raise NotFoundException("未找到职位")
+    perm_codes = session.exec(
+        select(Permission.code)
+        .select_from(JobTitlePermission)
+        .join(Permission, Permission.id == JobTitlePermission.permission_id)
+        .where(JobTitlePermission.job_title_id == job_title_id)
+    ).all()
+    return success_response(perm_codes)
+
+
+@router.put("/job-titles/{job_title_id}/permissions", response_model=dict)
+async def set_job_title_permissions(
+    job_title_id: UUID,
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("iam.write"))
+):
+    """Set permissions for a job title. Body: { "permission_codes": ["iam.read", ...] }"""
+    jt = session.get(JobTitle, job_title_id)
+    if not jt:
+        raise NotFoundException("未找到职位")
+
+    codes = data.get("permission_codes", [])
+
+    # Resolve permission IDs
+    all_perms = session.exec(select(Permission)).all()
+    perm_map = {p.code: p.id for p in all_perms}
+    valid_ids = []
+    for code in codes:
+        if code in perm_map:
+            valid_ids.append(perm_map[code])
+
+    # Clear existing and re-create
+    existing = session.exec(
+        select(JobTitlePermission).where(JobTitlePermission.job_title_id == job_title_id)
+    ).all()
+    for e in existing:
+        session.delete(e)
+
+    for pid in valid_ids:
+        session.add(JobTitlePermission(job_title_id=job_title_id, permission_id=pid))
+
+    session.commit()
+    return success_response({"message": "权限更新成功", "count": len(valid_ids)})
 
 
 # ─── Department endpoints ────────────────────────────────────────────────────

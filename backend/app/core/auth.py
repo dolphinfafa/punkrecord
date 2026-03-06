@@ -11,7 +11,7 @@ from app.core.database import get_session
 from app.core.security import decode_access_token
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.core.config import settings
-from app.models.iam import User, UserStatus, UserRole, Role, RolePermission, Permission
+from app.models.iam import User, UserStatus, UserRole, Role, RolePermission, Permission, JobTitlePermission
 
 # Security scheme
 security = HTTPBearer(auto_error=False)
@@ -100,6 +100,16 @@ def require_permission(permission_code: str):
             .join(Permission, Permission.id == RolePermission.permission_id)
             .where(UserRole.user_id == current_user.id)
         ).all()
+
+        # Also check permissions from job title
+        if current_user.job_title_id:
+            jt_permission_codes = session.exec(
+                select(Permission.code)
+                .select_from(JobTitlePermission)
+                .join(Permission, Permission.id == JobTitlePermission.permission_id)
+                .where(JobTitlePermission.job_title_id == current_user.job_title_id)
+            ).all()
+            permission_codes = list(set(permission_codes) | set(jt_permission_codes))
 
         if permission_code not in set(permission_codes):
             raise ForbiddenException(f"Missing permission: {permission_code}")
