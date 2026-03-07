@@ -43,8 +43,8 @@ class Project(BaseDBModel, table=True):
     project_type: ProjectType = Field(nullable=False)
     status: ProjectStatus = Field(default=ProjectStatus.DRAFT, nullable=False, index=True)
     
-    owner_user_id: UUID = Field(foreign_key="user.id", nullable=False)
-    pm_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    owner_user_id: UUID = Field(foreign_key="users.id", nullable=False)
+    pm_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     
     customer_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id")
     contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id")
@@ -86,5 +86,5 @@ class ProjectMember(BaseDBModel, table=True):
     __tablename__ = "project_member"
     
     project_id: UUID = Field(foreign_key="project.id", nullable=False, index=True)
-    user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", nullable=False)
     role_in_project: Optional[str] = None

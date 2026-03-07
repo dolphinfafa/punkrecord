@@ -111,4 +111,12 @@
 
 ---
 
-*最后更新：2026-03-06*
+## 7. 数据库命名注意
+
+- `user` 是 MySQL 保留字，User 模型表名使用 `users`（`__tablename__ = "users"`）
+- 所有外键引用使用 `foreign_key="users.id"` 而非 `foreign_key="user.id"`
+- 新增模型如需引用用户表，务必使用 `users.id`
+
+---
+
+*最后更新：2026-03-07*

@@ -53,7 +53,7 @@ class ApprovalInstance(BaseDBModel, table=True):
     flow_code: str = Field(nullable=False)
     status: ApprovalStatus = Field(default=ApprovalStatus.PENDING, nullable=False)
     current_step_no: int = Field(nullable=False)
-    created_by_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    created_by_user_id: UUID = Field(foreign_key="users.id", nullable=False)
 
 
 class ApprovalStep(BaseDBModel, table=True):
@@ -63,7 +63,7 @@ class ApprovalStep(BaseDBModel, table=True):
     approval_id: UUID = Field(foreign_key="approval_instance.id", nullable=False, index=True)
     step_no: int = Field(nullable=False)
     step_name: str = Field(nullable=False)
-    approver_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    approver_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     status: ApprovalStepStatus = Field(default=ApprovalStepStatus.PENDING, nullable=False)
     acted_at: Optional[datetime] = None
     comment: Optional[str] = None

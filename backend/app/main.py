@@ -72,30 +72,6 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-def _ensure_user_profile_columns():
-    """Add new profile columns to user table if they don't exist (SQLite compat)."""
-    from sqlalchemy import text, inspect
-    from app.core.database import engine
-    inspector = inspect(engine)
-    existing = {col["name"] for col in inspector.get_columns("user")}
-    new_columns = [
-        ("birthday", "VARCHAR"),
-        ("id_number", "VARCHAR"),
-        ("home_address", "VARCHAR"),
-        ("graduation_school", "VARCHAR"),
-        ("education_level", "VARCHAR"),
-        ("id_card_image", "VARCHAR"),
-        ("resume_file", "VARCHAR"),
-        ("profile_completed", "BOOLEAN DEFAULT 1"),  # existing users default to completed
-        ("must_change_password", "BOOLEAN DEFAULT 0"),  # existing users don't need to change
-    ]
-    with engine.begin() as conn:
-        for col_name, col_type in new_columns:
-            if col_name not in existing:
-                conn.execute(text(f"ALTER TABLE user ADD COLUMN {col_name} {col_type}"))
-                logger.info("Added column user.%s", col_name)
-
-
 # Startup event
 @app.on_event("startup")
 def on_startup():
@@ -105,7 +81,6 @@ def on_startup():
             run_schema_create=settings.AUTO_CREATE_TABLES_ON_STARTUP,
             run_alembic_migrations=settings.AUTO_RUN_MIGRATIONS_ON_STARTUP,
         )
-    _ensure_user_profile_columns()
 
 
 # Health check

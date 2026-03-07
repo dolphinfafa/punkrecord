@@ -51,8 +51,8 @@ class TodoItem(BaseDBModel, table=True):
     __tablename__ = "todo_item"
     
     our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False)
-    assignee_user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
-    creator_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    assignee_user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
+    creator_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     
     title: str = Field(nullable=False)
     description: Optional[str] = None
@@ -72,10 +72,10 @@ class TodoItem(BaseDBModel, table=True):
     
     blocked_reason: Optional[str] = None
     done_at: Optional[datetime] = None
-    done_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    done_by_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
     dismiss_reason: Optional[str] = None
     review_comment: Optional[str] = None  # Manager's feedback when rejecting
-    reviewed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    reviewed_by_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
 
 
 class NotificationChannel(str, Enum):
@@ -125,12 +125,12 @@ class LeaveRequest(BaseDBModel, table=True):
     __tablename__ = "leave_request"
 
     our_entity_id: Optional[UUID] = Field(default=None, foreign_key="our_entity.id", index=True)
-    applicant_user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    applicant_user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
     leave_type: LeaveType = Field(nullable=False, index=True)
     status: LeaveStatus = Field(default=LeaveStatus.PENDING, nullable=False, index=True)
     start_at: datetime = Field(nullable=False)
     end_at: datetime = Field(nullable=False)
     reason: Optional[str] = None
-    approved_by_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    approved_by_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
     approved_at: Optional[datetime] = None
     review_comment: Optional[str] = None

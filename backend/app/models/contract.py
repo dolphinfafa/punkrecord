@@ -81,8 +81,8 @@ class Contract(BaseDBModel, table=True):
     party_b_id: UUID = Field(foreign_key="counterparty.id", nullable=False, index=True)  # 乙方 (Party B)
     party_c_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id", index=True)  # 丙方 (Optional Party C)
     
-    owner_user_id: UUID = Field(foreign_key="user.id", nullable=False)
-    pm_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    owner_user_id: UUID = Field(foreign_key="users.id", nullable=False)
+    pm_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
     
     amount_total: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
     pending_amount: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))

@@ -67,10 +67,10 @@ class OurEntity(BaseDBModel, table=True):
     status: OurEntityStatus = Field(default=OurEntityStatus.ACTIVE, nullable=False)
     
     # Default personnel
-    default_finance_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
-    default_cashier_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
-    default_seal_admin_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
-    default_legal_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    default_finance_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
+    default_cashier_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
+    default_seal_admin_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
+    default_legal_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
 
 
 class JobTitle(BaseDBModel, table=True):
@@ -92,7 +92,7 @@ class OrgUnit(BaseDBModel, table=True):
 
 class User(BaseDBModel, table=True):
     """User model"""
-    __tablename__ = "user"
+    __tablename__ = "users"
     
     display_name: str = Field(nullable=False)
     email: Optional[str] = Field(default=None, unique=True)
@@ -116,7 +116,7 @@ class User(BaseDBModel, table=True):
     must_change_password: bool = Field(default=True, nullable=False)
 
     # Organization fields
-    manager_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    manager_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
     job_title_id: Optional[UUID] = Field(default=None, foreign_key="job_title.id")
     department_id: Optional[UUID] = Field(default=None, foreign_key="org_unit.id")
 
@@ -175,7 +175,7 @@ class UserRole(BaseDBModel, table=True):
     """User-Role association with scope"""
     __tablename__ = "user_role"
     
-    user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", nullable=False)
     role_id: UUID = Field(foreign_key="role.id", nullable=False)
     scope_type: ScopeType = Field(nullable=False)
     our_entity_id: Optional[UUID] = Field(default=None, foreign_key="our_entity.id")
@@ -197,7 +197,7 @@ class OrgMembership(BaseDBModel, table=True):
     """Organization membership"""
     __tablename__ = "org_membership"
     
-    user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", nullable=False)
     org_unit_id: UUID = Field(foreign_key="org_unit.id", nullable=False)
     title: Optional[str] = None
     is_manager: bool = Field(default=False, nullable=False)

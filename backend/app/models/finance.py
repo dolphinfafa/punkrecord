@@ -102,7 +102,7 @@ class FinanceAccount(BaseDBModel, table=True):
     status: AccountStatus = Field(default=AccountStatus.ACTIVE, nullable=False)
     is_default: bool = Field(default=False, nullable=False)
     
-    shareholder_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    shareholder_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
 
 
 class FinanceTransaction(BaseDBModel, table=True):
@@ -119,7 +119,7 @@ class FinanceTransaction(BaseDBModel, table=True):
     txn_date: date = Field(nullable=False, index=True)
     
     counterparty_id: Optional[UUID] = Field(default=None, foreign_key="counterparty.id")
-    employee_user_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
+    employee_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id")
     contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id", index=True)
     purpose: Optional[str] = None
     channel: Optional[str] = None
@@ -131,7 +131,7 @@ class FinanceTransaction(BaseDBModel, table=True):
     related_object_type: Optional[str] = None
     related_object_id: Optional[UUID] = None
     
-    created_by_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    created_by_user_id: UUID = Field(foreign_key="users.id", nullable=False)
 
 
 class FinanceInvoice(BaseDBModel, table=True):
@@ -165,7 +165,7 @@ class InvoiceRequest(BaseDBModel, table=True):
     contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id")
     payment_plan_id: Optional[UUID] = Field(default=None, foreign_key="contract_payment_plan.id")
     
-    requester_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    requester_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     amount_with_tax: Decimal = Field(sa_column=Column(DECIMAL(18, 2), nullable=False))
     
     status: InvoiceRequestStatus = Field(default=InvoiceRequestStatus.DRAFT, nullable=False)
@@ -177,7 +177,7 @@ class Reimbursement(BaseDBModel, table=True):
     __tablename__ = "reimbursement"
     
     our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False, index=True)
-    requester_user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    requester_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     
     project_id: Optional[UUID] = Field(default=None, foreign_key="project.id")
     contract_id: Optional[UUID] = Field(default=None, foreign_key="contract.id")

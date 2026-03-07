@@ -13,7 +13,7 @@ class AuditLog(BaseDBModel, table=True):
     """Audit log"""
     __tablename__ = "audit_log"
     
-    user_id: UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
     object_type: str = Field(nullable=False, index=True)
     object_id: UUID = Field(nullable=False, index=True)
     action: str = Field(nullable=False)  # create, update, delete, approve, reject, etc.
@@ -30,7 +30,7 @@ class FileMetadata(BaseDBModel, table=True):
     size: int = Field(nullable=False)
     storage_path: str = Field(nullable=False)
     
-    uploaded_by: UUID = Field(foreign_key="user.id", nullable=False)
+    uploaded_by: UUID = Field(foreign_key="users.id", nullable=False)
     
     related_object_type: Optional[str] = None
     related_object_id: Optional[UUID] = None
@@ -46,7 +46,7 @@ class WeChatUserBinding(BaseDBModel, table=True):
     """WeChat user binding"""
     __tablename__ = "wechat_user_binding"
     
-    user_id: UUID = Field(foreign_key="user.id", nullable=False)
+    user_id: UUID = Field(foreign_key="users.id", nullable=False)
     openid: str = Field(nullable=False, unique=True, index=True)
     unionid: Optional[str] = Field(default=None, index=True)
     

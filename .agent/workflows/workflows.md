@@ -137,15 +137,33 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-## 4. 后端运行时安全默认值
+## 4. 数据库配置
+
+项目已从 SQLite 迁移到 **MySQL 8.0**。
+
+| 配置项 | 值 |
+|--------|-----|
+| `DB_TYPE` | `mysql` |
+| `DB_HOST` | `14.103.133.34` |
+| `DB_PORT` | `13306` |
+| `DB_NAME` | `punkrecord_dev` |
+| 驱动 | `pymysql`（已在 `requirements.txt`） |
+| 连接池 | `pool_pre_ping=True`，`pool_recycle=3600` |
+
+**注意事项**：
+- User 模型表名为 `users`（`user` 是 MySQL 保留字），所有 `foreign_key` 引用已同步更新
+- 旧的 SQLite 专用启动迁移代码（`_ensure_user_profile_columns`）已删除
+- 测试仍使用 SQLite 内存数据库（`tests/test_project_workflow.py`），不影响生产
+
+## 5. 后端运行时安全默认值
 
 - 启动时默认**不再**自动应用数据库变更
 - 仅在需要时显式启用以下环境变量：
-  - `AUTO_CREATE_TABLES_ON_STARTUP`
+  - `AUTO_CREATE_TABLES_ON_STARTUP`（首次部署 MySQL 时需设为 `true`）
   - `AUTO_RUN_MIGRATIONS_ON_STARTUP`
 - RBAC 权限执行支持分阶段上线：
   - `ENFORCE_RBAC`（默认关闭，保持兼容）
 
 ---
 
-*最后更新：2026-03-06*
+*最后更新：2026-03-07*
