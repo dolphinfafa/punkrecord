@@ -70,7 +70,7 @@ punkrecord/
 - **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）
 - **数据库**：MySQL 8.0（`14.103.133.34:13306/punkrecord_dev`），驱动 `pymysql`
 - **Python 环境**：虚拟环境名 `punkrecord`（macOS 用 pyenv，Linux/Windows 用 conda）
-- **RBAC 开关**：`ENFORCE_RBAC=False` 时跳过权限检查，便于分阶段上线
+- **RBAC 状态**：`ENFORCE_RBAC=True`，已正式启用前后端双层权限控制
 
 ---
 
@@ -101,4 +101,4 @@ punkrecord/
 
 ---
 
-*最后更新：2026-03-07*
+*最后更新：2026-03-09*

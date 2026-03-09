@@ -208,7 +208,7 @@ AtlasException (基类, code=400)
 | `DB_TYPE` | `sqlite` | 数据库类型切换 |
 | `SECRET_KEY` | (需修改) | JWT 签名密钥 |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | Token 有效期 24 小时 |
-| `ENFORCE_RBAC` | `False` | RBAC 软发布开关 |
+| `ENFORCE_RBAC` | `True` | RBAC 权限开关（已正式启用） |
 | `AUTO_CREATE_TABLES_ON_STARTUP` | `False` | 启动时是否自动建表 |
 | `AUTO_RUN_MIGRATIONS_ON_STARTUP` | `False` | 启动时是否自动迁移 |
 | `UPLOAD_DIR` | `./data/files` | 文件上传存储路径 |
@@ -546,7 +546,7 @@ pages/
   |   (Bearer Token / Cookie)     |
   |                               |-- 解码 JWT
   |                               |-- 查询用户状态
-  |<--------- 用户信息 -----------|
+  |<-- 用户信息 + permissions ----|
 ```
 
 **双通道 Token 投递**：
@@ -577,14 +577,27 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 **默认角色**：`admin`, `finance`, `cashier`, `shareholder`, `pm`, `owner`, `employee`, `approver`, `legal`, `seal_admin`
 
-**权限粒度**：`<模块>.<操作>`，例如 `project.read`, `finance.write`
+**权限粒度**：`<模块>.<操作>`，共 10 个权限码：
+
+| 权限码 | 说明 |
+|--------|------|
+| `iam.read` / `iam.write` | 用户管理 |
+| `todo.read` / `todo.write` | 待办事项 |
+| `contract.read` / `contract.write` | 合同管理 |
+| `project.read` / `project.write` | 项目管理 |
+| `finance.read` / `finance.write` | 财务管理 |
 
 **职位权限管理 API**：
 - `GET /api/v1/iam/permissions` — 获取所有权限列表（按模块分组）
 - `GET /api/v1/iam/job-titles/{id}/permissions` — 获取职位已分配的权限代码
 - `PUT /api/v1/iam/job-titles/{id}/permissions` — 设置职位权限（全量替换）
 
-**软发布机制**：`ENFORCE_RBAC=False` 时所有已认证用户可访问，便于分阶段上线。
+**前后端双层权限控制**（`ENFORCE_RBAC=True`）：
+- **后端**：`require_permission()` 依赖在 API 端点校验权限，无权限返回 403
+- **前端**：`/auth/me` 返回用户 `permissions` 数组，`AuthContext` 提供 `hasPermission()` / `hasAnyPermission()` 方法
+  - `Sidebar` 根据权限过滤菜单项（无权限的模块不显示）
+  - `PermissionRoute` 路由守卫拦截直接 URL 访问，显示 403 页面
+- **权限查询**：`get_user_permissions()` 合并角色权限 + 职位权限取并集，admin 角色自动获得全部权限
 
 ---
 
@@ -626,4 +639,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-03-06*
+*最后更新：2026-03-09*

@@ -91,30 +91,24 @@ def create_admin():
         print("\nCreating default permissions...")
         permissions_data = [
             # IAM
-            {"code": "iam.user.read", "name": "Read Users", "module": "iam"},
-            {"code": "iam.user.write", "name": "Write Users", "module": "iam"},
-            {"code": "iam.role.read", "name": "Read Roles", "module": "iam"},
-            {"code": "iam.role.write", "name": "Write Roles", "module": "iam"},
-            
+            {"code": "iam.read", "name": "查看用户管理", "module": "iam"},
+            {"code": "iam.write", "name": "编辑用户管理", "module": "iam"},
+
             # Todo
-            {"code": "todo.read", "name": "Read Todos", "module": "todo"},
-            {"code": "todo.write", "name": "Write Todos", "module": "todo"},
-            
+            {"code": "todo.read", "name": "查看待办事项", "module": "todo"},
+            {"code": "todo.write", "name": "编辑待办事项", "module": "todo"},
+
             # Contract
-            {"code": "contract.read", "name": "Read Contracts", "module": "contract"},
-            {"code": "contract.write", "name": "Write Contracts", "module": "contract"},
-            
+            {"code": "contract.read", "name": "查看合同管理", "module": "contract"},
+            {"code": "contract.write", "name": "编辑合同管理", "module": "contract"},
+
             # Project
-            {"code": "project.read", "name": "Read Projects", "module": "project"},
-            {"code": "project.write", "name": "Write Projects", "module": "project"},
-            
+            {"code": "project.read", "name": "查看项目管理", "module": "project"},
+            {"code": "project.write", "name": "编辑项目管理", "module": "project"},
+
             # Finance
-            {"code": "finance.account.read", "name": "Read Accounts", "module": "finance"},
-            {"code": "finance.account.write", "name": "Write Accounts", "module": "finance"},
-            {"code": "finance.transaction.read", "name": "Read Transactions", "module": "finance"},
-            {"code": "finance.transaction.write", "name": "Write Transactions", "module": "finance"},
-            {"code": "finance.invoice.read", "name": "Read Invoices", "module": "finance"},
-            {"code": "finance.invoice.write", "name": "Write Invoices", "module": "finance"},
+            {"code": "finance.read", "name": "查看财务管理", "module": "finance"},
+            {"code": "finance.write", "name": "编辑财务管理", "module": "finance"},
         ]
         
         for perm_data in permissions_data:

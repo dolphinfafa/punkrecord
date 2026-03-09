@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import client from '@/api/client';
 
 const AuthContext = createContext(null);
@@ -33,6 +33,7 @@ export const AuthProvider = ({ children }) => {
                         name: profile.display_name,
                         profile_completed: profile.profile_completed,
                         must_change_password: profile.must_change_password,
+                        permissions: profile.permissions || [],
                     };
                     setUser(userData);
                     localStorage.setItem('user', JSON.stringify(userData));
@@ -54,9 +55,15 @@ export const AuthProvider = ({ children }) => {
             const response = await client.post('/auth/login', { username, password });
             const { access_token, user_id, display_name, profile_completed, must_change_password } = response;
 
-            const userData = { id: user_id, name: display_name, profile_completed, must_change_password };
-
             localStorage.setItem('token', access_token);
+
+            // Fetch full profile with permissions right after login
+            const meResp = await client.get('/auth/me');
+            const profile = meResp.data || meResp;
+            const permissions = profile.permissions || [];
+
+            const userData = { id: user_id, name: display_name, profile_completed, must_change_password, permissions };
+
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
 
@@ -79,8 +86,18 @@ export const AuthProvider = ({ children }) => {
         window.location.href = '/login';
     };
 
+    const hasPermission = useCallback((code) => {
+        if (!user || !user.permissions) return false;
+        return user.permissions.includes(code);
+    }, [user]);
+
+    const hasAnyPermission = useCallback((codes) => {
+        if (!user || !user.permissions) return false;
+        return codes.some((c) => user.permissions.includes(c));
+    }, [user]);
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, hasPermission, hasAnyPermission }}>
             {!loading && children}
         </AuthContext.Provider>
     );

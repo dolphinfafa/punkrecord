@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.exceptions import UnauthorizedException, ValidationException
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_user_permissions
 from app.core.response import success_response
 from app.models.iam import User, UserStatus, EducationLevel
 from app.schemas import LoginRequest, TokenResponse, ProfileCompleteRequest, ChangePasswordRequest
@@ -128,9 +128,11 @@ async def change_password(
 
 @router.get("/me", response_model=dict)
 async def get_me(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ):
     """Get current authenticated user's profile"""
+    permissions = get_user_permissions(current_user, session)
     return success_response({
         "id": str(current_user.id),
         "display_name": current_user.display_name,
@@ -139,4 +141,5 @@ async def get_me(
         "status": current_user.status,
         "profile_completed": current_user.profile_completed,
         "must_change_password": current_user.must_change_password,
+        "permissions": permissions,
     })

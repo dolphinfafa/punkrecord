@@ -17,16 +17,16 @@ import clsx from 'clsx';
 import './Sidebar.css';
 
 const MENU_ITEMS = [
-    { path: '/', label: '工作台', icon: LayoutDashboard },
-    { path: '/todo', label: '待办事项', icon: CheckSquare },
-    { path: '/iam', label: '用户管理', icon: Users },
-    { path: '/contract', label: '合同管理', icon: FileText },
-    { path: '/project', label: '项目管理', icon: Briefcase },
-    { path: '/finance', label: '财务管理', icon: CreditCard },
+    { path: '/', label: '工作台', icon: LayoutDashboard, permission: null },
+    { path: '/todo', label: '待办事项', icon: CheckSquare, permission: 'todo.read' },
+    { path: '/iam', label: '用户管理', icon: Users, permission: 'iam.read' },
+    { path: '/contract', label: '合同管理', icon: FileText, permission: 'contract.read' },
+    { path: '/project', label: '项目管理', icon: Briefcase, permission: 'project.read' },
+    { path: '/finance', label: '财务管理', icon: CreditCard, permission: 'finance.read' },
 ];
 
 export default function Sidebar() {
-    const { logout, user } = useAuth();
+    const { logout, user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
@@ -34,6 +34,10 @@ export default function Sidebar() {
     const handleNavigation = (path) => {
         navigate(path);
     };
+
+    const visibleItems = MENU_ITEMS.filter(
+        (item) => !item.permission || hasPermission(item.permission)
+    );
 
     return (
         <div className={clsx("sidebar", { collapsed })}>
@@ -45,7 +49,7 @@ export default function Sidebar() {
             </div>
 
             <nav className="sidebar-nav">
-                {MENU_ITEMS.map((item) => {
+                {visibleItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path ||
                         (item.path !== '/' && location.pathname.startsWith(item.path));

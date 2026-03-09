@@ -70,6 +70,45 @@ async def get_current_active_user(
     return current_user
 
 
+def get_user_permissions(user: User, session: Session) -> list[str]:
+    """Return the effective permission codes for a user (roles + job title merged)."""
+    role_codes = session.exec(
+        select(Role.code)
+        .select_from(UserRole)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(UserRole.user_id == user.id)
+    ).all()
+
+    if "admin" in role_codes:
+        # Admin gets all permissions
+        return session.exec(select(Permission.code)).all()
+
+    permission_codes: set[str] = set()
+
+    # Permissions from user roles
+    role_perms = session.exec(
+        select(Permission.code)
+        .select_from(UserRole)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .where(UserRole.user_id == user.id)
+    ).all()
+    permission_codes.update(role_perms)
+
+    # Permissions from job title
+    if user.job_title_id:
+        jt_perms = session.exec(
+            select(Permission.code)
+            .select_from(JobTitlePermission)
+            .join(Permission, Permission.id == JobTitlePermission.permission_id)
+            .where(JobTitlePermission.job_title_id == user.job_title_id)
+        ).all()
+        permission_codes.update(jt_perms)
+
+    return sorted(permission_codes)
+
+
 def require_permission(permission_code: str):
     """Dependency to require specific permission"""
     async def permission_checker(

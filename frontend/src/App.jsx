@@ -44,6 +44,22 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// Permission-guarded Route wrapper
+const PermissionRoute = ({ permission, children }) => {
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission(permission)) {
+    return (
+      <div style={{ padding: '60px 40px', textAlign: 'center', color: '#888' }}>
+        <h2>403 - 无访问权限</h2>
+        <p>你没有访问此模块的权限，请联系管理员。</p>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -58,8 +74,8 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<DashboardPage />} />
-            <Route path="todo" element={<TodoPage />} />
-            <Route path="iam" element={<IAMLayout />}>
+            <Route path="todo" element={<PermissionRoute permission="todo.read"><TodoPage /></PermissionRoute>} />
+            <Route path="iam" element={<PermissionRoute permission="iam.read"><IAMLayout /></PermissionRoute>}>
               <Route path="users" element={<UserListPage />} />
               <Route path="entities" element={<EntityListPage />} />
               <Route path="departments" element={<DepartmentPage />} />
@@ -67,17 +83,17 @@ function App() {
               <Route path="beli-rules" element={<BeliRulePage />} />
               <Route path="org-chart" element={<OrgChartPage />} />
             </Route>
-            <Route path="contract" element={<ContractLayout />}>
+            <Route path="contract" element={<PermissionRoute permission="contract.read"><ContractLayout /></PermissionRoute>}>
               <Route path="list" element={<ContractListPage />} />
               <Route path="counterparties" element={<CounterpartyListPage />} />
             </Route>
-            <Route path="project" element={<ProjectLayout />}>
+            <Route path="project" element={<PermissionRoute permission="project.read"><ProjectLayout /></PermissionRoute>}>
               <Route index element={<ProjectListPage />} />
               <Route path=":id" element={<ProjectDetailPage />} />
               <Route path=":id/dev-progress" element={<DevelopmentProgressPage />} />
             </Route>
 
-            <Route path="finance" element={<FinanceLayout />}>
+            <Route path="finance" element={<PermissionRoute permission="finance.read"><FinanceLayout /></PermissionRoute>}>
               <Route path="accounts" element={<AccountListPage />} />
               <Route path="transactions" element={<TransactionListPage />} />
             </Route>
