@@ -37,6 +37,14 @@ from app.models.shared import (
     AuditLog, FileMetadata, WeChatUserBinding, WeChatMessageTemplate,
     SubscribeStatus
 )
+from app.models.kb import (
+    KBDocument, KBDocumentChunk, KBConversation, KBMessage,
+    KBDocumentStatus
+)
+from app.models.meeting import (
+    MeetingRecord, MeetingTranscriptSegment,
+    MeetingStatus
+)
 
 __all__ = [
     # Base
@@ -74,5 +82,13 @@ __all__ = [
     
     # Shared
     "AuditLog", "FileMetadata", "WeChatUserBinding", "WeChatMessageTemplate",
-    "SubscribeStatus"
+    "SubscribeStatus",
+
+    # Knowledge Base
+    "KBDocument", "KBDocumentChunk", "KBConversation", "KBMessage",
+    "KBDocumentStatus",
+
+    # Meeting
+    "MeetingRecord", "MeetingTranscriptSegment",
+    "MeetingStatus",
 ]

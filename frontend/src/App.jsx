@@ -23,6 +23,11 @@ import ProjectLayout from '@/pages/project/ProjectLayout';
 import ProjectListPage from '@/pages/project/ProjectListPage';
 import ProjectDetailPage from '@/pages/project/ProjectDetailPage';
 import DevelopmentProgressPage from '@/pages/project/DevelopmentProgressPage';
+import DocumentListPage from '@/pages/kb/DocumentListPage';
+import DocumentDetailPage from '@/pages/kb/DocumentDetailPage';
+import ChatPage from '@/pages/kb/ChatPage';
+import MeetingListPage from '@/pages/meeting/MeetingListPage';
+import MeetingDetailPage from '@/pages/meeting/MeetingDetailPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -62,7 +67,7 @@ const PermissionRoute = ({ permission, children }) => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/punkrecord">
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -97,6 +102,14 @@ function App() {
               <Route path="accounts" element={<AccountListPage />} />
               <Route path="transactions" element={<TransactionListPage />} />
             </Route>
+
+            <Route path="kb" element={<PermissionRoute permission="kb.read"><DocumentListPage /></PermissionRoute>} />
+            <Route path="kb/chat" element={<PermissionRoute permission="kb.read"><ChatPage /></PermissionRoute>} />
+            <Route path="kb/chat/:id" element={<PermissionRoute permission="kb.read"><ChatPage /></PermissionRoute>} />
+            <Route path="kb/documents/:id" element={<PermissionRoute permission="kb.read"><DocumentDetailPage /></PermissionRoute>} />
+
+            <Route path="meeting" element={<PermissionRoute permission="meeting.read"><MeetingListPage /></PermissionRoute>} />
+            <Route path="meeting/:id" element={<PermissionRoute permission="meeting.read"><MeetingDetailPage /></PermissionRoute>} />
           </Route>
         </Routes>
       </AuthProvider>

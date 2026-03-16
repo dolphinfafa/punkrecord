@@ -25,6 +25,8 @@
 | `project.py` | `/api/v1/project` | 项目管理（项目、阶段、成员、任务、导出） |
 | `finance.py` | `/api/v1/finance` | 财务管理（账户、交易、发票、报销） |
 | `ai.py` | `/api/v1/ai` | AI 能力（对话、流式响应） |
+| `kb.py` | `/api/v1/kb` | 企业大脑（文档管理、RAG 对话、语义搜索） |
+| `meeting.py` | `/api/v1/meeting` | 会议记录（音频上传、ASR 转写、AI 总结、归档） |
 
 路由文件位于 `backend/app/api/` 目录。
 
@@ -139,6 +141,41 @@
 | POST | `/api/v1/ai/chat` | AI 对话（功能清单生成等） |
 | POST | `/api/v1/ai/chat-stream` | AI 流式对话（合同起草等） |
 
+### 企业大脑（Knowledge Base）
+
+| 方法 | 路径 | 权限 | 说明 |
+|------|------|------|------|
+| POST | `/api/v1/kb/documents/upload` | kb.write | 上传文档（multipart） |
+| GET | `/api/v1/kb/documents` | kb.read | 文档列表（分页+筛选） |
+| GET | `/api/v1/kb/documents/{id}` | kb.read | 文档详情 |
+| PATCH | `/api/v1/kb/documents/{id}` | kb.write | 更新元数据 |
+| DELETE | `/api/v1/kb/documents/{id}` | kb.write | 删除文档 |
+| GET | `/api/v1/kb/documents/{id}/download` | kb.read | 下载原始文件 |
+| POST | `/api/v1/kb/documents/{id}/reprocess` | kb.write | 重新解析 |
+| GET | `/api/v1/kb/tags` | kb.read | 获取所有标签 |
+| POST | `/api/v1/kb/conversations` | kb.write | 创建对话 |
+| GET | `/api/v1/kb/conversations` | kb.read | 对话列表 |
+| GET | `/api/v1/kb/conversations/{id}/messages` | kb.read | 对话消息 |
+| DELETE | `/api/v1/kb/conversations/{id}` | kb.write | 删除对话 |
+| POST | `/api/v1/kb/chat` | kb.write | RAG 对话（SSE 流式） |
+| POST | `/api/v1/kb/search` | kb.read | 语义搜索 |
+
+### 会议记录（Meeting）
+
+| 方法 | 路径 | 权限 | 说明 |
+|------|------|------|------|
+| POST | `/api/v1/meeting/records` | meeting.write | 上传音频创建会议 |
+| GET | `/api/v1/meeting/records` | meeting.read | 会议列表 |
+| GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
+| DELETE | `/api/v1/meeting/records/{id}` | meeting.write | 删除会议 |
+| GET | `/api/v1/meeting/records/{id}/status` | meeting.read | 轮询 ASR 状态 |
+| GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
+| PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本 |
+| PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射 |
+| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE） |
+| POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
+| GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
+
 ### 健康检查
 
 | 方法 | 路径 | 说明 |
@@ -148,4 +185,4 @@
 
 ---
 
-*最后更新：2026-03-06*
+*最后更新：2026-03-16*

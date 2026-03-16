@@ -57,6 +57,27 @@ AI Agent 工作流：
 - 通过财务接口跟踪账户和交易
 - 报销和发票是独立但关联的工作流
 
+### 1.6 企业大脑（知识库）
+
+- 上传文档（PDF/Word/Excel/TXT/图片）→ 后台异步处理管线：
+  1. 文本提取（PyPDF2/python-docx/openpyxl/Gemini Vision）
+  2. 文本切片（可配置大小和重叠）
+  3. Embedding 向量化（Gemini text-embedding-004）
+  4. 存入 ChromaDB 向量数据库
+  5. AI 自动生成摘要和分类标签
+- 文档状态流转：`processing → ready`（或 `failed`）
+- RAG 对话：用户提问 → Embedding 检索相关文档片段 → 拼接上下文 → Gemini 流式回答
+- 语义搜索：直接搜索知识库中的相关内容
+- 会议记录归档后自动进入知识库处理管线
+
+### 1.7 会议记录
+
+- 上传音频文件 → 后台异步调用豆包 ASR 转写（含说话人分离）
+- 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
+- 转写完成后可编辑文稿内容和说话人标注
+- AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项
+- 归档到企业大脑：将转写文稿 + 纪要存为知识库文档，自动进入处理管线
+
 ---
 
 ## 2. 运行命令
@@ -166,4 +187,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-03-07*
+*最后更新：2026-03-16*

@@ -29,7 +29,7 @@
 ## 3. 权限约定
 
 - API 处理函数使用 `require_permission("<模块>.<read|write>")` 守护
-- 当前使用的权限模块：`iam`, `todo`, `contract`, `project`, `finance`
+- 当前使用的权限模块：`iam`, `todo`, `contract`, `project`, `finance`, `kb`, `meeting`
 - 权限来源双通道：角色权限 + 职位权限，取并集
 - Bug 负责人修改规则：
   - PM/owner 可编辑全部计划字段
@@ -119,4 +119,4 @@
 
 ---
 
-*最后更新：2026-03-07*
+*最后更新：2026-03-16*

@@ -1,0 +1,259 @@
+.meeting-list-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    animation: meetingFadeIn 0.4s ease-out;
+}
+
+@keyframes meetingFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.meeting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.meeting-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.meeting-subtitle {
+    color: #718096;
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    margin-bottom: 0;
+}
+
+.upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+/* Table */
+.meeting-table-wrapper {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.meeting-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.meeting-table thead {
+    background: #f8f9fa;
+}
+
+.meeting-table th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5568;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.meeting-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9rem;
+    color: #2d3748;
+}
+
+.meeting-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.meeting-row:hover {
+    background: #f7fafc;
+}
+
+.meeting-row:last-child td {
+    border-bottom: none;
+}
+
+.meeting-title-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.title-icon {
+    color: #a0aec0;
+    flex-shrink: 0;
+}
+
+.col-duration,
+.col-creator,
+.col-time {
+    white-space: nowrap;
+    color: #718096;
+}
+
+.col-actions {
+    width: 60px;
+    text-align: center;
+}
+
+/* Status Badges */
+.meeting-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.status-uploading,
+.status-transcribing,
+.status-summarizing {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-transcribed {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-summarized {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-archived {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-unknown {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Delete button */
+.btn-delete-icon {
+    background: #fff;
+    border: 1px solid #fed7d7;
+    color: #e53e3e;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-icon:hover {
+    background: #fed7d7;
+    color: #c53030;
+}
+
+/* Pagination */
+.meeting-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding: 0.5rem 0;
+}
+
+.pagination-info {
+    font-size: 0.875rem;
+    color: #718096;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btn-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: #f8fafc;
+    border-radius: 16px;
+    border: 2px dashed #e2e8f0;
+    color: #a0aec0;
+}
+
+.empty-state h3 {
+    margin: 1rem 0 0.5rem;
+    color: #4a5568;
+    font-size: 1.25rem;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Loading & Error */
+.loading-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 4rem;
+    color: #718096;
+    font-size: 1rem;
+}
+
+.error-message {
+    text-align: center;
+    padding: 3rem;
+    color: #ea4335;
+    font-size: 1rem;
+}
+
+.spin {
+    animation: spinAnim 1s linear infinite;
+}
+
+@keyframes spinAnim {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

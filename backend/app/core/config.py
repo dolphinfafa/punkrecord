@@ -36,15 +36,34 @@ class Settings(BaseSettings):
     AUTO_RUN_MIGRATIONS_ON_STARTUP: bool = False
     ENFORCE_RBAC: bool = False
     
-    # AI 
-    GEMINI_API_KEY: Optional[str] = None 
+    # AI
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+
+    # Knowledge Base
+    CHROMADB_PATH: str = "./data/chromadb"
+    KB_CHUNK_SIZE: int = 1000
+    KB_CHUNK_OVERLAP: int = 200
+    KB_RAG_TOP_K: int = 5
+
+    # Volcengine ASR
+    VOLC_ASR_APP_KEY: str = "7858270680"
+    VOLC_ASR_ACCESS_KEY: str = "jWugJCpq3wc-7-lWclvF69r23YjDVKXP"
     
     # CORS
     BACKEND_CORS_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]
     
     # File storage
+    STORAGE_BACKEND: str = "local"  # "local" or "tos"
     UPLOAD_DIR: str = "./data/files"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+
+    # TOS (Volcengine Object Storage)
+    TOS_ACCESS_KEY: Optional[str] = None
+    TOS_SECRET_KEY: Optional[str] = None
+    TOS_ENDPOINT: Optional[str] = None
+    TOS_REGION: Optional[str] = None
+    TOS_BUCKET: Optional[str] = None
     
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20

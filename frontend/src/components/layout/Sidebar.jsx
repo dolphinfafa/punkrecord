@@ -9,6 +9,8 @@ import {
     FileText,
     Briefcase,
     CreditCard,
+    Brain,
+    Mic,
     LogOut,
     ChevronLeft,
     ChevronRight
@@ -23,6 +25,8 @@ const MENU_ITEMS = [
     { path: '/contract', label: '合同管理', icon: FileText, permission: 'contract.read' },
     { path: '/project', label: '项目管理', icon: Briefcase, permission: 'project.read' },
     { path: '/finance', label: '财务管理', icon: CreditCard, permission: 'finance.read' },
+    { path: '/kb', label: '企业大脑', icon: Brain, permission: 'kb.read' },
+    { path: '/meeting', label: '会议记录', icon: Mic, permission: 'meeting.read' },
 ];
 
 export default function Sidebar() {

@@ -39,6 +39,8 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | Contract | 三方合同管理、AI 智能生成、Word 导出 |
 | Finance | 账户、交易、发票、报销、实时余额 |
 | Beli | 积分激励体系、规则引擎、自动结算 |
+| KB (企业大脑) | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
+| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、说话人标注、AI 会议纪要、归档到企业大脑 |
 
 平台提供三个客户端：Web 管理后台、微信小程序（移动端）、RESTful API。
 
@@ -59,6 +61,8 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | **passlib + bcrypt** | 1.7.4 | 业界标准密码哈希方案，抗暴力破解 |
 | **python-docx** | 1.1.0+ | 服务端生成 Word 文档（合同、验收报告），无需依赖 Office |
 | **openpyxl + pandas** | 3.1.0+ / 2.0.0+ | Excel 导出（报价单、功能清单），数据处理能力强 |
+| **ChromaDB** | 1.5.5 | 嵌入式向量数据库，企业大脑 RAG 语义检索 |
+| **PyPDF2** | 3.0.1 | PDF 文本提取，知识库文档解析 |
 | **Uvicorn** | 0.27.0 | ASGI 服务器，支持热重载，适配 FastAPI 的异步特性 |
 
 ### 2.2 前端
@@ -154,7 +158,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 2. 注册 CORS 中间件（允许前端开发服务器跨域）
 3. 注册请求日志中间件（记录每个请求的方法、路径、响应码）
 4. 注册异常处理器（`AtlasException` 与通用异常）
-5. 注册 7 个路由模块（统一前缀 `/api/v1`）
+5. 注册 9 个路由模块（统一前缀 `/api/v1`）
 6. 启动事件中按需初始化数据库
 
 ### 4.2 路由模块一览
@@ -168,6 +172,8 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
   +-- project/        项目管理          (project.py,   ~2000+ 行)
   +-- finance/        财务管理          (finance.py)
   +-- ai/             AI 能力          (ai.py)
+  +-- kb/             企业大脑        (kb.py,        ~460 行)
+  +-- meeting/        会议记录        (meeting.py,   ~490 行)
 ```
 
 ### 4.3 中间件栈
@@ -214,11 +220,18 @@ AtlasException (基类, code=400)
 | `UPLOAD_DIR` | `./data/files` | 文件上传存储路径 |
 | `MAX_UPLOAD_SIZE` | `10MB` | 单文件上传大小限制 |
 | `GEMINI_API_KEY` | (可选) | AI 功能所需的 API 密钥 |
+| `CHROMADB_PATH` | `./data/chromadb` | ChromaDB 向量数据库存储路径 |
+| `GEMINI_EMBEDDING_MODEL` | `text-embedding-004` | Gemini Embedding 模型 |
+| `KB_CHUNK_SIZE` | `1000` | 知识库文档切片大小（字符） |
+| `KB_CHUNK_OVERLAP` | `200` | 切片重叠长度 |
+| `KB_RAG_TOP_K` | `5` | RAG 检索返回的 top-k 数量 |
+| `VOLC_ASR_APP_KEY` | (已配置) | 豆包 ASR 应用 Key |
+| `VOLC_ASR_ACCESS_KEY` | (已配置) | 豆包 ASR 访问 Key |
 
 ### 4.7 服务层模式
 
 - **Router 层**：请求校验、权限检查、调用服务/数据层、组装响应
-- **Service 层**：复杂业务逻辑（如 Word 文档生成）
+- **Service 层**：复杂业务逻辑（Word 文档生成、文档解析、Embedding、向量存储、RAG 对话、ASR 转写）
 - **数据富化函数**：各 Router 内的 `_enrich_*()` 辅助函数，负责关联查询（如将 `pm_user_id` 解析为显示名称）
 - **依赖注入**：通过 FastAPI 的 `Depends()` 注入数据库会话和当前用户
 
@@ -284,6 +297,16 @@ Shared 模块
   +-- FileMetadata         文件元数据
   +-- WeChatUserBinding    微信用户绑定
   +-- WeChatMessageTemplate 微信消息模板
+
+KB 模块（企业大脑）
+  +-- KBDocument           知识库文档（标题、文件、标签、AI摘要、状态）
+  +-- KBDocumentChunk      文档切片（文本、token数、ChromaDB ID）
+  +-- KBConversation       RAG 对话会话
+  +-- KBMessage            对话消息（用户/助手、引用信息）
+
+Meeting 模块（会议记录）
+  +-- MeetingRecord        会议主表（音频、ASR状态、说话人映射、AI纪要）
+  +-- MeetingTranscriptSegment  转写分段（说话人、时间、文本）
 ```
 
 ### 5.3 核心模型字段详情
@@ -394,6 +417,8 @@ Shared 模块
 | Finance | ReconcileStatus | `UNRECONCILED`, `COMPLETED`, `RECONCILED` |
 | Finance | InvoiceKind | `OUTPUT`(销项), `INPUT`(进项) |
 | Approval | ApprovalStatus | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` |
+| KB | KBDocumentStatus | `PROCESSING`, `READY`, `FAILED` |
+| Meeting | MeetingStatus | `UPLOADING`, `TRANSCRIBING`, `TRANSCRIBED`, `SUMMARIZED`, `ARCHIVED`, `FAILED` |
 
 ### 5.5 关键关联关系
 
@@ -482,8 +507,14 @@ ApprovalInstance
   |     +-- /:id                项目详情
   |     +-- /:id/dev-progress   开发进度
   +-- /finance
-        +-- /accounts           账户管理
-        +-- /transactions       交易记录
+  |     +-- /accounts           账户管理
+  |     +-- /transactions       交易记录
+  +-- /kb                       企业大脑 - 文档列表
+  |     +-- /chat               AI 对话（新对话）
+  |     +-- /chat/:id           AI 对话（历史对话）
+  |     +-- /documents/:id      文档详情
+  +-- /meeting                  会议列表
+        +-- /:id                会议详情/编辑
 ```
 
 ### 6.3 状态管理
@@ -577,7 +608,7 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 **默认角色**：`admin`, `finance`, `cashier`, `shareholder`, `pm`, `owner`, `employee`, `approver`, `legal`, `seal_admin`
 
-**权限粒度**：`<模块>.<操作>`，共 10 个权限码：
+**权限粒度**：`<模块>.<操作>`，共 14 个权限码：
 
 | 权限码 | 说明 |
 |--------|------|
@@ -586,6 +617,8 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | `contract.read` / `contract.write` | 合同管理 |
 | `project.read` / `project.write` | 项目管理 |
 | `finance.read` / `finance.write` | 财务管理 |
+| `kb.read` / `kb.write` | 企业大脑 |
+| `meeting.read` / `meeting.write` | 会议记录 |
 
 **职位权限管理 API**：
 - `GET /api/v1/iam/permissions` — 获取所有权限列表（按模块分组）
@@ -608,8 +641,14 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | 功能清单生成 | `POST /api/v1/ai/chat` | 调用 Gemini API，解析返回 JSON 为 10 列功能表 |
 | 合同智能起草 | `POST /api/v1/ai/chat-stream` | SSE 流式响应，注入项目上下文（甲乙方、金额、税号） |
 | 开发任务拆解 | 项目模块内 | 从功能清单自动生成任务，支持批量分配 |
+| RAG 企业知识对话 | `POST /api/v1/kb/chat` | Embedding检索→ChromaDB→上下文拼接→Gemini流式回答 |
+| 文档智能摘要/标签 | 上传文档后台自动触发 | Gemini 自动生成摘要和分类标签 |
+| 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要 |
+| 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
-通过 `httpx` 调用外部 AI API，使用 REST 代理绕过 SSL 限制。前端使用 `react-markdown` 渲染 A4 样式的 Markdown 预览。
+**AI 技术栈**：Gemini（对话/摘要/Vision） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
+
+通过 `httpx` 调用外部 AI API，使用 REST 代理绕过 SSL 限制。前端使用 `react-markdown` 渲染 Markdown。
 
 ---
 
@@ -639,4 +678,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-03-09*
+*最后更新：2026-03-16*

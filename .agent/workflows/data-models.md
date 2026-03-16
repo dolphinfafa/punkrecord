@@ -21,6 +21,8 @@
 | `finance.py` | 财务账户、交易记录、发票、报销 |
 | `approval.py` | 审批相关模型 |
 | `shared.py` | 共享/通用模型 |
+| `kb.py` | 企业大脑（知识库文档、文档切片、对话、消息） |
+| `meeting.py` | 会议记录（会议主表、转写分段） |
 
 ## 2. 模型分组
 
@@ -71,6 +73,22 @@
 | `FinanceInvoice` | 发票 |
 | `Reimbursement` | 报销 |
 
+### 企业大脑（Knowledge Base）
+
+| 模型 | 说明 |
+|------|------|
+| `KBDocument` | 知识库文档（标题、文件、状态、标签、AI摘要、切片数） |
+| `KBDocumentChunk` | 文档切片（文本内容、token数、ChromaDB ID） |
+| `KBConversation` | RAG 对话会话 |
+| `KBMessage` | 对话消息（用户/助手、引用信息） |
+
+### 会议记录（Meeting）
+
+| 模型 | 说明 |
+|------|------|
+| `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID） |
+| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容） |
+
 ---
 
-*最后更新：2026-03-07*
+*最后更新：2026-03-16*

@@ -33,12 +33,18 @@
 | `/project/:id/dev-progress` | 开发进度 |
 | `/finance/accounts` | 账户管理 |
 | `/finance/transactions` | 交易记录 |
+| `/kb` | 企业大脑 - 文档列表 |
+| `/kb/chat` | 企业大脑 - AI 对话（新对话） |
+| `/kb/chat/:id` | 企业大脑 - AI 对话（历史对话） |
+| `/kb/documents/:id` | 企业大脑 - 文档详情 |
+| `/meeting` | 会议记录 - 会议列表 |
+| `/meeting/:id` | 会议记录 - 会议详情/编辑 |
 
 ### 布局与状态
 
 - 共享布局组件：`components/layout/*`
 - 认证状态：`contexts/AuthContext`（React Context，非 Redux）
-- 业务页面：`src/pages/{auth,dashboard,iam,contract,project,finance,todo}`
+- 业务页面：`src/pages/{auth,dashboard,iam,contract,project,finance,todo,kb,meeting}`
 
 ### 共享组件
 
@@ -47,6 +53,30 @@
 | Bug 图片预览 | `components/common/BugImagePreview.jsx` | 缩略图 + 放大查看 |
 | Bug 详情弹窗 | `components/common/BugDetailModal.jsx` | 全字段详情 + 图片画廊 |
 | 任务图片预览 | `components/common/TodoImagePreview.jsx` | 任务附件预览 + 放大 |
+
+### 企业大脑页面（`pages/kb/`）
+
+| 页面/组件 | 说明 |
+|-----------|------|
+| `DocumentListPage.jsx` | 文档表格 + 标签筛选 + 上传按钮 |
+| `DocumentDetailPage.jsx` | 元数据、标签、文本预览、下载 |
+| `ChatPage.jsx` | 左侧对话列表 + 右侧聊天区（SSE 流式） |
+| `components/UploadDocumentModal.jsx` | 拖拽上传文档弹窗 |
+
+### 会议记录页面（`pages/meeting/`）
+
+| 页面/组件 | 说明 |
+|-----------|------|
+| `MeetingListPage.jsx` | 会议表格 + 上传音频按钮 |
+| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + AI 总结 + 归档 |
+| `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 |
+
+### API 模块（`api/`）
+
+| 文件 | 说明 |
+|------|------|
+| `kb.js` | 企业大脑 API（文档 CRUD、对话、搜索） |
+| `meeting.js` | 会议记录 API（会议 CRUD、转写、总结、归档） |
 
 ---
 
@@ -95,4 +125,4 @@
 
 ---
 
-*最后更新：2026-03-06*
+*最后更新：2026-03-16*

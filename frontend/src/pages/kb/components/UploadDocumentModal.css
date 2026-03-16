@@ -1,0 +1,212 @@
+/* UploadDocumentModal.css */
+
+.kb-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: kb-fade-in 0.15s ease;
+}
+
+@keyframes kb-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.kb-modal {
+    background: var(--card-bg, #fff);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    animation: kb-slide-up 0.2s ease;
+    overflow: hidden;
+}
+
+@keyframes kb-slide-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.kb-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.kb-modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary, #1e293b);
+    margin: 0;
+}
+
+.kb-modal-close {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-secondary, #64748b);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s ease;
+}
+
+.kb-modal-close:hover {
+    background: var(--bg-hover, #f1f5f9);
+    color: var(--text-primary, #1e293b);
+}
+
+.kb-modal-body {
+    padding: 24px;
+}
+
+.kb-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* Dropzone */
+.kb-upload-dropzone {
+    border: 2px dashed var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: var(--bg-hover, #f8fafc);
+    position: relative;
+}
+
+.kb-upload-dropzone:hover,
+.kb-upload-dropzone-active {
+    border-color: #1a73e8;
+    background: #f0f6ff;
+}
+
+.kb-upload-icon {
+    color: #1a73e8;
+    margin-bottom: 12px;
+}
+
+.kb-upload-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary, #1e293b);
+    margin: 0 0 8px;
+}
+
+.kb-upload-hint {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary, #64748b);
+    line-height: 1.5;
+}
+
+.kb-upload-file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+
+/* Selected file */
+.kb-upload-selected {
+    margin-bottom: 8px;
+}
+
+.kb-upload-file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-hover, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+}
+
+.kb-upload-file-icon {
+    color: #1a73e8;
+    flex-shrink: 0;
+}
+
+.kb-upload-file-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.kb-upload-file-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary, #1e293b);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kb-upload-file-size {
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+}
+
+/* Title field */
+.kb-upload-title-field {
+    margin-top: 20px;
+}
+
+.kb-upload-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 6px;
+}
+
+.kb-upload-title-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text-primary, #1e293b);
+    background: var(--card-bg, #fff);
+    outline: none;
+    transition: border-color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.kb-upload-title-input:focus {
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+}
+
+.kb-upload-title-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Error */
+.kb-upload-error {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: 8px;
+    font-size: 13px;
+    border: 1px solid #fecaca;
+}

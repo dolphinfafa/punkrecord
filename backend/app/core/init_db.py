@@ -91,6 +91,14 @@ def init_database():
             # Finance
             {"code": "finance.read", "name": "查看财务管理", "module": "finance"},
             {"code": "finance.write", "name": "编辑财务管理", "module": "finance"},
+
+            # Knowledge Base
+            {"code": "kb.read", "name": "查看企业大脑", "module": "kb"},
+            {"code": "kb.write", "name": "编辑企业大脑", "module": "kb"},
+
+            # Meeting
+            {"code": "meeting.read", "name": "查看会议记录", "module": "meeting"},
+            {"code": "meeting.write", "name": "编辑会议记录", "module": "meeting"},
         ]
         
         for perm_data in permissions_data:
