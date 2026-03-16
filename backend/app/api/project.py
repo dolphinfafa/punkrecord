@@ -23,6 +23,7 @@ from app.models.project import Project, ProjectStage, ProjectMember, ProjectType
 from app.models.todo import TodoItem, TodoSourceType, TodoPriority
 from app.models.contract import Counterparty
 from app.services.docx_generator import generate_acceptance_report
+from app.core.storage import save_file, get_file, delete_file, get_download_url
 from app.schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectStageResponse, StageStatusUpdate,
@@ -346,12 +347,10 @@ async def upload_project_attachment(
     if len(file_bytes) > MAX_PROJECT_ATTACHMENT_SIZE:
         raise ValidationException("附件大小不能超过 20MB")
 
-    PROJECT_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
     attachment_id = uuid4().hex
     safe_suffix = Path(file.filename).suffix[:20]
     stored_name = f"{project_id}_{attachment_id}{safe_suffix}"
-    file_path = PROJECT_ATTACHMENT_DIR / stored_name
-    file_path.write_bytes(file_bytes)
+    save_file("project-attachments", stored_name, file_bytes, file.content_type or "application/octet-stream")
 
     attachment = {
         "id": attachment_id,
@@ -392,12 +391,19 @@ async def download_project_attachment(
     if not stored_name:
         raise NotFoundException("附件元数据异常")
 
-    file_path = PROJECT_ATTACHMENT_DIR / stored_name
-    if not file_path.exists():
+    # TOS: redirect to pre-signed URL; local: return file directly
+    url = get_download_url("project-attachments", stored_name)
+    if url:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("project-attachments", stored_name)
+    except FileNotFoundError:
         raise NotFoundException("附件文件不存在")
 
     return FileResponse(
-        path=str(file_path),
+        path=local_path,
         media_type=attachment.get("content_type") or "application/octet-stream",
         filename=file_name
     )
@@ -423,9 +429,10 @@ async def delete_project_attachment(
     removed = attachments.pop(idx)
     stored_name = removed.get("stored_name")
     if stored_name:
-        file_path = PROJECT_ATTACHMENT_DIR / stored_name
-        if file_path.exists():
-            file_path.unlink()
+        try:
+            delete_file("project-attachments", stored_name)
+        except Exception:
+            pass  # best-effort cleanup
 
     project.attachments = attachments
     project.updated_at = datetime.utcnow()
@@ -561,12 +568,10 @@ async def upload_stage_attachment(
     if len(file_bytes) > MAX_STAGE_ATTACHMENT_SIZE:
         raise ValidationException("附件大小不能超过 20MB")
 
-    STAGE_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
     safe_suffix = Path(file.filename).suffix[:20]
     attachment_id = uuid4().hex
     stored_name = f"{project_id}_{stage_id}_{attachment_id}{safe_suffix}"
-    file_path = STAGE_ATTACHMENT_DIR / stored_name
-    file_path.write_bytes(file_bytes)
+    save_file("project-stage-attachments", stored_name, file_bytes, file.content_type or "application/octet-stream")
 
     attachment = {
         "id": attachment_id,
@@ -611,12 +616,18 @@ async def download_stage_attachment(
     if not stored_name:
         raise NotFoundException("附件元数据异常")
 
-    file_path = STAGE_ATTACHMENT_DIR / stored_name
-    if not file_path.exists():
+    url = get_download_url("project-stage-attachments", stored_name)
+    if url:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("project-stage-attachments", stored_name)
+    except FileNotFoundError:
         raise NotFoundException("附件文件不存在")
 
     return FileResponse(
-        path=str(file_path),
+        path=local_path,
         media_type=attachment.get("content_type") or "application/octet-stream",
         filename=file_name
     )
@@ -643,9 +654,10 @@ async def delete_stage_attachment(
     removed = attachments.pop(idx)
     stored_name = removed.get("stored_name")
     if stored_name:
-        file_path = STAGE_ATTACHMENT_DIR / stored_name
-        if file_path.exists():
-            file_path.unlink()
+        try:
+            delete_file("project-stage-attachments", stored_name)
+        except Exception:
+            pass
 
     stage.attachments = attachments
     stage.updated_at = datetime.utcnow()

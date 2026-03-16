@@ -11,6 +11,15 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 -   `/milestone`: 项目里程碑记录
 -   `/.agent/workflows`: 项目工作流文档与索引
 
+## 分支说明
+
+| 分支 | 用途 | 后端端口 | 前端端口 |
+|------|------|----------|----------|
+| `main` | 生产/稳定版本 | 8085 | 5173 |
+| `dev` | 日常开发 | 8086 | 5174 |
+
+> **注意**: 两套环境可同时运行，互不影响。dev 分支的前端代理已指向 8086 端口。
+
 ## 环境要求
 
 - **Node.js**: v16+ (用于前端)
@@ -59,11 +68,12 @@ python init_database.py
 #### 启动后端服务
 
 ```bash
-# 在 backend 目录下运行
+# main 分支（生产环境）
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
-```
 
-后端服务将在 `http://localhost:8085` 启动，API 文档可访问 `http://localhost:8085/docs`
+# dev 分支（开发环境）
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8086
+```
 
 ### 3. 前端服务启动
 
@@ -80,17 +90,26 @@ npm install
 #### 启动前端服务
 
 ```bash
-# 在 frontend 目录下运行
-npm run dev
-```
+# main 分支（生产环境）
+npm run dev -- --port 5173
 
-前端服务将在 `http://localhost:5173` 启动
+# dev 分支（开发环境）
+npm run dev -- --port 5174
+```
 
 ### 4. 访问应用
 
-- **前端界面**: http://localhost:5173
+#### main 分支（生产环境）
+
+- **前端界面**: http://localhost:5173/punkrecord/
 - **后端 API**: http://localhost:8085
 - **API 文档**: http://localhost:8085/docs
+
+#### dev 分支（开发环境）
+
+- **前端界面**: http://localhost:5174/punkrecord/
+- **后端 API**: http://localhost:8086
+- **API 文档**: http://localhost:8086/docs
 
 ## 更多信息
 

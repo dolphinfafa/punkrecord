@@ -13,6 +13,7 @@ from app.core.auth import require_permission, get_current_user
 from app.core.security import get_password_hash
 from app.core.exceptions import NotFoundException, ForbiddenException, ValidationException
 from app.core.response import success_response
+from app.core.storage import save_file, get_file, delete_file, get_download_url
 from app.models.iam import User, OurEntity, Role, UserStatus, JobTitle, OrgUnit, BeliRule, BeliRuleType, Permission, JobTitlePermission, EducationLevel
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse,
@@ -798,9 +799,8 @@ async def upload_id_card_image(
         raise ValidationException("仅支持 JPG/PNG/WebP 图片格式")
     ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "jpg"
     filename = f"{user_id}_idcard_{uuid4().hex[:8]}.{ext}"
-    filepath = USER_UPLOAD_DIR / filename
     content = await file.read()
-    filepath.write_bytes(content)
+    save_file("user-files", filename, content, file.content_type or "image/jpeg")
     user.id_card_image = filename
     session.add(user)
     session.commit()
@@ -826,9 +826,8 @@ async def upload_resume(
     if file.content_type != "application/pdf":
         raise ValidationException("仅支持 PDF 格式简历")
     filename = f"{user_id}_resume_{uuid4().hex[:8]}.pdf"
-    filepath = USER_UPLOAD_DIR / filename
     content = await file.read()
-    filepath.write_bytes(content)
+    save_file("user-files", filename, content, "application/pdf")
     user.resume_file = filename
     session.add(user)
     session.commit()
@@ -843,10 +842,16 @@ async def download_user_file(
     current_user: User = Depends(get_current_user)
 ):
     """Download a user's uploaded file (ID card image or resume)."""
-    filepath = USER_UPLOAD_DIR / filename
-    if not filepath.exists() or not filepath.is_file():
+    url = get_download_url("user-files", filename)
+    if url:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("user-files", filename)
+    except FileNotFoundError:
         raise NotFoundException("文件不存在")
-    return FileResponse(str(filepath), filename=filename)
+    return FileResponse(local_path, filename=filename)
 
 
 # ─── OurEntity endpoints ─────────────────────────────────────────────────────

@@ -2,8 +2,10 @@
 # Script to start the backend server
 
 cd "$(dirname "$0")/.."
-# Ensure we are using the correct pyenv version
-export PYENV_VERSION=punkrecord
+
+# Activate conda environment
+eval "$(conda shell.bash hook)"
+conda activate punk
 
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8085

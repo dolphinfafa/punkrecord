@@ -24,6 +24,7 @@ from app.schemas.todo import (
     LeaveRequestCreate, LeaveRequestResponse
 )
 from app.api.project import sync_project_progress
+from app.core.storage import save_file, get_file, delete_file, get_download_url
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
 TODO_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "todo-images"
@@ -579,12 +580,10 @@ async def upload_todo_image(
     if len(file_bytes) > MAX_TODO_IMAGE_SIZE:
         raise ValidationException("单张图片大小不能超过 10MB")
 
-    TODO_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     image_id = uuid4().hex
     safe_suffix = Path(file.filename).suffix[:20]
     stored_name = f"{todo.id}_{image_id}{safe_suffix}"
-    file_path = TODO_IMAGE_DIR / stored_name
-    file_path.write_bytes(file_bytes)
+    save_file("todo-images", stored_name, file_bytes, content_type)
 
     image_meta: dict[str, Any] = {
         "id": image_id,
@@ -632,12 +631,18 @@ async def download_todo_image(
     if not stored_name:
         raise NotFoundException("图片元数据异常")
 
-    file_path = TODO_IMAGE_DIR / stored_name
-    if not file_path.exists():
+    url = get_download_url("todo-images", stored_name)
+    if url:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("todo-images", stored_name)
+    except FileNotFoundError:
         raise NotFoundException("图片文件不存在")
 
     return FileResponse(
-        path=str(file_path),
+        path=local_path,
         media_type=image.get("content_type") or "application/octet-stream",
         filename=file_name,
     )
@@ -665,9 +670,10 @@ async def delete_todo_image(
 
     stored_name = target.get("stored_name")
     if stored_name:
-        file_path = TODO_IMAGE_DIR / stored_name
-        if file_path.exists():
-            file_path.unlink()
+        try:
+            delete_file("todo-images", stored_name)
+        except Exception:
+            pass
 
     remain = [item for item in images if item.get("id") != image_id]
     link["todo_images"] = remain
