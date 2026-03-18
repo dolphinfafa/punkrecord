@@ -2,7 +2,7 @@
 Meeting record models — meetings, transcript segments
 """
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
@@ -42,7 +42,9 @@ class MeetingRecord(BaseDBModel, table=True):
     duration_seconds: Optional[int] = Field(default=None)
     status: MeetingStatus = Field(default=MeetingStatus.UPLOADING, index=True)
     asr_task_id: Optional[str] = Field(default=None)
+    meeting_date: Optional[date] = Field(default=None, index=True)
     speaker_mapping: dict = Field(default={}, sa_column=Column(JSON))
+    attendees: Optional[list] = Field(default=None, sa_column=Column(JSON))
     summary: Optional[str] = Field(default=None, sa_column=Column(TEXT))
     created_by: UUID = Field(foreign_key="users.id")
     archived_document_id: Optional[UUID] = Field(default=None, foreign_key="kb_document.id")

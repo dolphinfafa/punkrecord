@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import httpx
@@ -27,7 +27,7 @@ from app.models.kb import KBDocument, KBDocumentStatus
 from app.schemas.meeting import (
     MeetingCreateResponse, MeetingResponse, MeetingListResponse,
     MeetingStatusResponse, TranscriptSegmentResponse,
-    TranscriptBatchUpdate, SpeakerMappingUpdate,
+    TranscriptBatchUpdate, SpeakerMappingUpdate, SummarizeRequest,
 )
 from app.services.asr_service import submit_asr_task
 
@@ -103,6 +103,7 @@ async def create_meeting(
     file: UploadFile = File(...),
     title: str = Form(...),
     meeting_type: str = Form(default="morning"),
+    meeting_date: Optional[str] = Form(default=None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.write")),
 ):
@@ -116,6 +117,14 @@ async def create_meeting(
     if meeting_type not in valid_types:
         meeting_type = MeetingType.MORNING.value
 
+    # Parse meeting_date
+    parsed_date = date.today()
+    if meeting_date:
+        try:
+            parsed_date = date.fromisoformat(meeting_date)
+        except ValueError:
+            parsed_date = date.today()
+
     original_name = file.filename or "audio"
     content_type = file.content_type or "audio/mpeg"
     ext = Path(original_name).suffix or ".mp3"
@@ -126,6 +135,7 @@ async def create_meeting(
     meeting = MeetingRecord(
         title=title,
         meeting_type=meeting_type,
+        meeting_date=parsed_date,
         audio_file_name=original_name,
         audio_stored_name=stored_name,
         audio_content_type=content_type,
@@ -157,6 +167,7 @@ async def list_meetings(
     limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     meeting_type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.read")),
 ):
@@ -166,6 +177,16 @@ async def list_meetings(
         query = query.where(MeetingRecord.status == status)
     if meeting_type:
         query = query.where(MeetingRecord.meeting_type == meeting_type)
+    if search:
+        search_pattern = f"%{search}%"
+        from sqlalchemy import or_, cast, String, func, text
+        query = query.where(
+            or_(
+                MeetingRecord.title.ilike(search_pattern),
+                cast(MeetingRecord.meeting_date, String).ilike(search_pattern),
+                func.json_search(MeetingRecord.attendees, "one", search_pattern) != None,
+            )
+        )
     query = query.order_by(MeetingRecord.created_at.desc())
 
     total = len(session.exec(query).all())
@@ -282,6 +303,8 @@ async def update_transcript(
         segment = session.get(MeetingTranscriptSegment, update.id)
         if segment and segment.meeting_id == meeting_id:
             segment.content = update.content
+            if update.speaker_id is not None:
+                segment.speaker_id = update.speaker_id
             session.add(segment)
 
     session.commit()
@@ -315,6 +338,7 @@ async def update_speakers(
 @router.post("/records/{meeting_id}/summarize", response_model=None)
 async def summarize_meeting(
     meeting_id: UUID,
+    body: Optional[SummarizeRequest] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.write")),
 ):
@@ -340,10 +364,28 @@ async def summarize_meeting(
         lines.append(f"{speaker_name}: {seg.content}")
     transcript_text = "\n".join(lines)
 
+    # Extract attendees from speaker_mapping
+    attendees_list = [name for name in speaker_mapping.values() if name and name.strip()]
+
     # Store meeting_id for the generator closure
     m_id = meeting.id
 
     system_prompt = "你是专业的会议纪要生成助手。请根据以下会议转写文稿，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
+
+    # Append custom prompt if provided
+    custom_prompt = body.prompt if body and body.prompt else None
+    if custom_prompt:
+        system_prompt += f"\n\n额外要求：{custom_prompt}"
+
+    # Build user message with optional previous meeting context
+    user_message_parts = []
+    previous_meeting_id = body.previous_meeting_id if body else None
+    if previous_meeting_id:
+        prev_meeting = session.get(MeetingRecord, previous_meeting_id)
+        if prev_meeting and prev_meeting.summary:
+            user_message_parts.append(f"上次会议纪要（供参考对比）：\n{prev_meeting.summary}\n\n---\n")
+    user_message_parts.append(f"会议转写文稿：\n{transcript_text}")
+    user_message = "\n".join(user_message_parts)
 
     async def generate():
         full_text = ""
@@ -352,7 +394,7 @@ async def summarize_meeting(
             "model": settings.LITELLM_MODEL,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"会议转写文稿：\n{transcript_text}"},
+                {"role": "user", "content": user_message},
             ],
             "stream": True,
         }
@@ -383,13 +425,15 @@ async def summarize_meeting(
             logger.exception("LLM streaming failed: %s", e)
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
-        # Save summary to DB
+        # Save summary + attendees to DB
         try:
             with Session(engine) as db:
                 m = db.get(MeetingRecord, m_id)
                 if m:
                     m.summary = full_text
                     m.status = MeetingStatus.SUMMARIZED
+                    if attendees_list:
+                        m.attendees = attendees_list
                     m.updated_at = now_cn()
                     db.add(m)
                     db.commit()

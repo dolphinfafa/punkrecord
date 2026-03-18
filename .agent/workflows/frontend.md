@@ -67,9 +67,9 @@
 
 | 页面/组件 | 说明 |
 |-----------|------|
-| `MeetingListPage.jsx` | 会议表格 + 上传音频按钮 |
-| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + AI 总结 + 归档 |
-| `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 |
+| `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 上传音频按钮 |
+| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词 + 引用上次会议 + AI 总结 + 参会人/日期显示 + 归档 |
+| `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 + 会议日期选择（默认今天） |
 
 ### API 模块（`api/`）
 
@@ -125,4 +125,4 @@
 
 ---
 
-*最后更新：2026-03-16*
+*最后更新：2026-03-18*

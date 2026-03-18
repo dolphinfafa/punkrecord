@@ -1,7 +1,7 @@
 """
 Meeting record schemas
 """
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List, Dict
 from uuid import UUID
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ class MeetingCreateResponse(BaseModel):
     id: UUID
     title: str
     meeting_type: str = "morning"
+    meeting_date: Optional[date] = None
     status: str
     created_at: datetime
 
@@ -22,6 +23,7 @@ class MeetingResponse(BaseModel):
     id: UUID
     title: str
     meeting_type: str = "morning"
+    meeting_date: Optional[date] = None
     audio_file_name: str
     audio_content_type: str
     audio_file_size: int
@@ -29,6 +31,7 @@ class MeetingResponse(BaseModel):
     status: str
     asr_task_id: Optional[str] = None
     speaker_mapping: dict = {}
+    attendees: Optional[list] = None
     summary: Optional[str] = None
     created_by: UUID
     creator_name: Optional[str] = None
@@ -63,6 +66,7 @@ class TranscriptSegmentResponse(BaseModel):
 class TranscriptSegmentUpdate(BaseModel):
     id: UUID
     content: str
+    speaker_id: Optional[str] = None
 
 
 class TranscriptBatchUpdate(BaseModel):
@@ -81,3 +85,4 @@ class MeetingStatusResponse(BaseModel):
 
 class SummarizeRequest(BaseModel):
     prompt: Optional[str] = None
+    previous_meeting_id: Optional[UUID] = None

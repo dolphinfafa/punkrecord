@@ -28,6 +28,7 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
     const [file, setFile] = useState(null);
     const [title, setTitle] = useState('');
     const [meetingType, setMeetingType] = useState('morning');
+    const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [dragOver, setDragOver] = useState(false);
@@ -93,7 +94,7 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
         try {
             setUploading(true);
             setError('');
-            await meetingApi.createMeeting(file, title.trim(), meetingType);
+            await meetingApi.createMeeting(file, title.trim(), meetingType, meetingDate);
             onSuccess();
         } catch (err) {
             setError(err?.response?.data?.message || err.message || '上传失败，请重试');
@@ -145,6 +146,18 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                                 <option key={t.value} value={t.value}>{t.label}</option>
                             ))}
                         </select>
+                    </div>
+
+                    {/* Meeting date */}
+                    <div className="form-group">
+                        <label className="form-label">会议日期</label>
+                        <input
+                            type="date"
+                            className="form-input"
+                            value={meetingDate}
+                            onChange={(e) => setMeetingDate(e.target.value)}
+                            disabled={uploading}
+                        />
                     </div>
 
                     {/* Drop zone */}

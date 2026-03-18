@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
 import { format } from 'date-fns';
-import { Mic, Upload, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Mic, Upload, Trash2, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import UploadAudioModal from './components/UploadAudioModal';
 import './MeetingListPage.css';
 
@@ -45,6 +45,8 @@ export default function MeetingListPage() {
     const [error, setError] = useState(null);
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [filterType, setFilterType] = useState('');
+    const [searchText, setSearchText] = useState('');
+    const [searchInput, setSearchInput] = useState('');
     const [page, setPage] = useState(1);
     const pageSize = 20;
 
@@ -54,6 +56,7 @@ export default function MeetingListPage() {
             const skip = (page - 1) * pageSize;
             const params = { skip, limit: pageSize };
             if (filterType) params.meeting_type = filterType;
+            if (searchText) params.search = searchText;
             const response = await meetingApi.getMeetings(params);
             setMeetings(response.data?.items || []);
             setTotal(response.data?.total || 0);
@@ -64,7 +67,7 @@ export default function MeetingListPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, filterType]);
+    }, [page, filterType, searchText]);
 
     useEffect(() => {
         loadMeetings();
@@ -115,6 +118,22 @@ export default function MeetingListPage() {
                     <p className="meeting-subtitle">管理会议音频、转录文本与 AI 会议纪要</p>
                 </div>
                 <div className="meeting-header-actions">
+                    <div className="search-box">
+                        <Search size={16} className="search-icon" />
+                        <input
+                            type="text"
+                            className="search-input"
+                            placeholder="搜索标题或参会人..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    setSearchText(searchInput);
+                                    setPage(1);
+                                }
+                            }}
+                        />
+                    </div>
                     <select
                         className="type-filter-select"
                         value={filterType}
@@ -143,7 +162,9 @@ export default function MeetingListPage() {
                         <table className="meeting-table">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>会议标题</th>
+                                    <th>会议日期</th>
                                     <th>类型</th>
                                     <th>状态</th>
                                     <th>时长</th>
@@ -157,11 +178,24 @@ export default function MeetingListPage() {
                                     const statusInfo = getStatusInfo(meeting.status);
                                     return (
                                         <tr key={meeting.id} onClick={() => handleRowClick(meeting.id)} className="meeting-row">
+                                            <td className="col-id" title={meeting.id} onClick={(e) => e.stopPropagation()}>
+                                                {meeting.id?.substring(0, 8)}
+                                            </td>
                                             <td className="col-title">
                                                 <div className="meeting-title-cell">
                                                     <Mic size={16} className="title-icon" />
-                                                    <span>{meeting.title}</span>
+                                                    <div>
+                                                        <span>{meeting.title}</span>
+                                                        {meeting.attendees && meeting.attendees.length > 0 && (
+                                                            <div className="meeting-attendees-sub">
+                                                                {meeting.attendees.join('、')}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                            </td>
+                                            <td className="col-date">
+                                                {meeting.meeting_date || '-'}
                                             </td>
                                             <td className="col-type">
                                                 <span className="meeting-type-badge">

@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    Play, Square, Check, AlertCircle, ExternalLink
+    Play, Square, Check, AlertCircle, ExternalLink, X
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -42,6 +42,15 @@ const SPEAKER_COLORS = [
     { bg: '#fecdd3', color: '#9f1239', border: '#f43f5e', dot: '#f43f5e' },
     { bg: '#e0e7ff', color: '#3730a3', border: '#6366f1', dot: '#6366f1' },
     { bg: '#d9f99d', color: '#3f6212', border: '#84cc16', dot: '#84cc16' },
+];
+
+const PRESET_PROMPTS = [
+    { value: '', label: '默认纪要' },
+    { value: '这是一次早会/站会，请重点关注：每人昨日完成事项、今日计划、遇到的阻塞问题。', label: '早会/站会' },
+    { value: '这是一次周会，请重点总结：本周各人工作进展、下周计划、需要协调的事项。', label: '周会' },
+    { value: '这是一次复盘会议，请按照"做得好的、做得不好的、改进措施"三个方面来总结。', label: '复盘会议' },
+    { value: '这是一次头脑风暴，请重点记录：提出的创意点子、讨论的可行性、最终筛选的方案。', label: '头脑风暴' },
+    { value: '请用简洁的要点列表格式生成纪要，不需要长段落描述。', label: '简洁要点' },
 ];
 
 function getSpeakerColor(speakerId, speakerIds) {
@@ -80,9 +89,21 @@ export default function MeetingDetailPage() {
     const [savingTranscript, setSavingTranscript] = useState(false);
     const [savingSpeakers, setSavingSpeakers] = useState(false);
 
+    // Speaker edit
+    const [editedSpeakers, setEditedSpeakers] = useState({});
+    const [speakerDropdownIndex, setSpeakerDropdownIndex] = useState(null);
+
+    // Previous meeting search
+    const [prevMeetingSearch, setPrevMeetingSearch] = useState('');
+    const [showPrevMeetingDropdown, setShowPrevMeetingDropdown] = useState(false);
+
     // Summary
     const [summary, setSummary] = useState('');
     const [summaryStreaming, setSummaryStreaming] = useState(false);
+    const [summaryPrompt, setSummaryPrompt] = useState('');
+    const [selectedPresetPrompt, setSelectedPresetPrompt] = useState('');
+    const [previousMeetingId, setPreviousMeetingId] = useState('');
+    const [summarizedMeetings, setSummarizedMeetings] = useState([]);
 
     // Archive
     const [archiving, setArchiving] = useState(false);
@@ -119,6 +140,15 @@ export default function MeetingDetailPage() {
             });
         }
     }, [speakerIds]);
+
+    // Close speaker dropdown on click outside
+    useEffect(() => {
+        const handleClickOutside = () => setSpeakerDropdownIndex(null);
+        if (speakerDropdownIndex !== null) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [speakerDropdownIndex]);
 
     const loadMeeting = useCallback(async () => {
         try {
@@ -171,6 +201,21 @@ export default function MeetingDetailPage() {
         }
     }, [id]);
 
+    const loadSummarizedMeetings = useCallback(async () => {
+        try {
+            const response = await meetingApi.getMeetings({ limit: 50, status: 'summarized' });
+            const items = response.data?.items || [];
+            // Also fetch archived meetings
+            const response2 = await meetingApi.getMeetings({ limit: 50, status: 'archived' });
+            const items2 = response2.data?.items || [];
+            const all = [...items, ...items2].filter(m => m.id !== id);
+            all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            setSummarizedMeetings(all);
+        } catch (err) {
+            console.error('Error loading summarized meetings:', err);
+        }
+    }, [id]);
+
     // Initial load
     useEffect(() => {
         const init = async () => {
@@ -181,6 +226,7 @@ export default function MeetingDetailPage() {
                 if (['transcribed', 'summarized', 'summarizing', 'archived'].includes(data.status)) {
                     loadTranscript();
                 }
+                loadSummarizedMeetings();
             }
             setLoading(false);
         };
@@ -277,15 +323,27 @@ export default function MeetingDetailPage() {
             setSavingTranscript(true);
             const updatePayload = [];
             const updatedSegments = segments.map((seg, idx) => {
-                if (editedSegments[idx] !== undefined) {
-                    updatePayload.push({ id: seg.id, content: editedSegments[idx] });
-                    return { ...seg, content: editedSegments[idx] };
+                const hasContentEdit = editedSegments[idx] !== undefined;
+                const hasSpeakerEdit = editedSpeakers[idx] !== undefined;
+                if (hasContentEdit || hasSpeakerEdit) {
+                    const entry = {
+                        id: seg.id,
+                        content: hasContentEdit ? editedSegments[idx] : seg.content,
+                    };
+                    if (hasSpeakerEdit) entry.speaker_id = editedSpeakers[idx];
+                    updatePayload.push(entry);
+                    return {
+                        ...seg,
+                        content: hasContentEdit ? editedSegments[idx] : seg.content,
+                        speaker_id: hasSpeakerEdit ? editedSpeakers[idx] : seg.speaker_id,
+                    };
                 }
                 return seg;
             });
             await meetingApi.updateTranscript(id, { segments: updatePayload });
             setSegments(updatedSegments);
             setEditedSegments({});
+            setEditedSpeakers({});
             alert('转录文本已保存');
         } catch (err) {
             alert(err.message || '保存失败');
@@ -317,12 +375,18 @@ export default function MeetingDetailPage() {
             setSummaryStreaming(true);
             setSummary('');
             const token = localStorage.getItem('token');
+            const body = {};
+            const promptText = summaryPrompt || selectedPresetPrompt;
+            if (promptText) body.prompt = promptText;
+            if (previousMeetingId) body.previous_meeting_id = previousMeetingId;
             const response = await fetch(`/punkrecord/api/v1/meeting/records/${id}/summarize`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'text/event-stream',
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
@@ -388,7 +452,38 @@ export default function MeetingDetailPage() {
         return speakerId || '未知';
     };
 
-    const hasEdits = Object.keys(editedSegments).length > 0;
+    const getShortId = (uuid) => uuid ? uuid.substring(0, 8) : '';
+
+    const filteredPrevMeetings = useMemo(() => {
+        if (!prevMeetingSearch.trim()) return summarizedMeetings;
+        const q = prevMeetingSearch.trim().toLowerCase();
+        return summarizedMeetings.filter((m) => {
+            const shortId = getShortId(m.id);
+            const attendeesStr = (m.attendees || []).join(' ');
+            const searchable = `${shortId} ${m.title} ${m.meeting_date || ''} ${attendeesStr}`.toLowerCase();
+            return searchable.includes(q);
+        });
+    }, [summarizedMeetings, prevMeetingSearch]);
+
+    const selectedPrevMeeting = useMemo(() => {
+        if (!previousMeetingId) return null;
+        return summarizedMeetings.find(m => m.id === previousMeetingId) || null;
+    }, [previousMeetingId, summarizedMeetings]);
+
+    // Close prev meeting dropdown on click outside
+    const prevMeetingRef = useRef(null);
+    useEffect(() => {
+        if (!showPrevMeetingDropdown) return;
+        const handleClick = (e) => {
+            if (prevMeetingRef.current && !prevMeetingRef.current.contains(e.target)) {
+                setShowPrevMeetingDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [showPrevMeetingDropdown]);
+
+    const hasEdits = Object.keys(editedSegments).length > 0 || Object.keys(editedSpeakers).length > 0;
 
     if (loading) {
         return (
@@ -432,12 +527,19 @@ export default function MeetingDetailPage() {
                 </div>
                 <div className="meeting-detail-meta">
                     <span className="meeting-type-tag">{MEETING_TYPE_MAP[meeting.meeting_type] || '早会'}</span>
+                    {meeting.meeting_date && <span>会议日期: {meeting.meeting_date}</span>}
                     {meeting.created_at && (
                         <span>创建时间: {format(new Date(meeting.created_at), 'yyyy-MM-dd HH:mm')}</span>
                     )}
                     {meeting.creator_name && <span>创建人: {meeting.creator_name}</span>}
                     {meeting.duration_seconds && <span>时长: {formatTime(meeting.duration_seconds)}</span>}
                 </div>
+                {meeting.attendees && meeting.attendees.length > 0 && (
+                    <div className="meeting-detail-attendees">
+                        <Users size={14} />
+                        <span>参会人员: {meeting.attendees.join('、')}</span>
+                    </div>
+                )}
             </div>
 
             {/* Processing indicator */}
@@ -541,12 +643,40 @@ export default function MeetingDetailPage() {
                                         style={{ borderLeft: `3px solid ${sc.border}` }}
                                     >
                                         <div className="segment-meta">
-                                            <span
-                                                className="segment-speaker"
-                                                style={{ background: sc.bg, color: sc.color }}
-                                            >
-                                                {getSpeakerName(sid)}
-                                            </span>
+                                            <div className="segment-speaker-wrapper">
+                                                <span
+                                                    className="segment-speaker segment-speaker-clickable"
+                                                    style={{ background: sc.bg, color: sc.color }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSpeakerDropdownIndex(speakerDropdownIndex === index ? null : index);
+                                                    }}
+                                                    title="点击切换说话人"
+                                                >
+                                                    {getSpeakerName(editedSpeakers[index] !== undefined ? editedSpeakers[index] : sid)}
+                                                </span>
+                                                {speakerDropdownIndex === index && (
+                                                    <div className="speaker-dropdown">
+                                                        {speakerIds.map((optSid) => {
+                                                            const optSc = getSpeakerColor(optSid, speakerIds);
+                                                            return (
+                                                                <div
+                                                                    key={optSid}
+                                                                    className="speaker-dropdown-item"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditedSpeakers(prev => ({ ...prev, [index]: optSid }));
+                                                                        setSpeakerDropdownIndex(null);
+                                                                    }}
+                                                                >
+                                                                    <span className="speaker-color-dot" style={{ background: optSc.dot }} />
+                                                                    <span>{getSpeakerName(optSid)}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <button
                                                 className={`segment-time ${playingSegmentIndex === index ? 'segment-time-playing' : ''}`}
                                                 onClick={() => handleSeek(
@@ -607,6 +737,110 @@ export default function MeetingDetailPage() {
                             )}
                         </div>
                     </div>
+
+                    {/* Prompt & Previous Meeting options */}
+                    {!isArchived && hasTranscript && (
+                        <div className="summary-options">
+                            <div className="summary-option-row">
+                                <label className="summary-option-label">提示词预设</label>
+                                <select
+                                    className="summary-option-select"
+                                    value={selectedPresetPrompt}
+                                    onChange={(e) => {
+                                        setSelectedPresetPrompt(e.target.value);
+                                        if (e.target.value) setSummaryPrompt('');
+                                    }}
+                                    disabled={summaryStreaming}
+                                >
+                                    {PRESET_PROMPTS.map((p) => (
+                                        <option key={p.label} value={p.value}>{p.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="summary-option-row">
+                                <label className="summary-option-label">自定义提示词</label>
+                                <textarea
+                                    className="summary-prompt-textarea"
+                                    value={summaryPrompt}
+                                    onChange={(e) => {
+                                        setSummaryPrompt(e.target.value);
+                                        if (e.target.value) setSelectedPresetPrompt('');
+                                    }}
+                                    placeholder="输入自定义提示词，覆盖预设..."
+                                    rows={2}
+                                    disabled={summaryStreaming}
+                                />
+                            </div>
+                            {summarizedMeetings.length > 0 && (
+                                <div className="summary-option-row">
+                                    <label className="summary-option-label">引用上次会议</label>
+                                    <div className="prev-meeting-picker" ref={prevMeetingRef}>
+                                        <div
+                                            className="prev-meeting-display"
+                                            onClick={() => !summaryStreaming && setShowPrevMeetingDropdown(!showPrevMeetingDropdown)}
+                                        >
+                                            {selectedPrevMeeting ? (
+                                                <span className="prev-meeting-selected">
+                                                    <span className="prev-meeting-short-id">{getShortId(selectedPrevMeeting.id)}</span>
+                                                    {selectedPrevMeeting.title}
+                                                    {selectedPrevMeeting.meeting_date && <span className="prev-meeting-date">{selectedPrevMeeting.meeting_date}</span>}
+                                                </span>
+                                            ) : (
+                                                <span className="prev-meeting-placeholder">搜索 ID / 标题 / 日期 / 参会人...</span>
+                                            )}
+                                            {previousMeetingId && (
+                                                <button
+                                                    className="prev-meeting-clear"
+                                                    onClick={(e) => { e.stopPropagation(); setPreviousMeetingId(''); setPrevMeetingSearch(''); }}
+                                                    title="清除选择"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {showPrevMeetingDropdown && (
+                                            <div className="prev-meeting-dropdown">
+                                                <input
+                                                    type="text"
+                                                    className="prev-meeting-search-input"
+                                                    placeholder="输入 ID、标题、日期或参会人搜索..."
+                                                    value={prevMeetingSearch}
+                                                    onChange={(e) => setPrevMeetingSearch(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <div className="prev-meeting-list">
+                                                    {filteredPrevMeetings.length === 0 ? (
+                                                        <div className="prev-meeting-empty">无匹配会议</div>
+                                                    ) : (
+                                                        filteredPrevMeetings.map((m) => (
+                                                            <div
+                                                                key={m.id}
+                                                                className={`prev-meeting-item ${m.id === previousMeetingId ? 'prev-meeting-item-active' : ''}`}
+                                                                onClick={() => {
+                                                                    setPreviousMeetingId(m.id);
+                                                                    setShowPrevMeetingDropdown(false);
+                                                                    setPrevMeetingSearch('');
+                                                                }}
+                                                            >
+                                                                <div className="prev-meeting-item-main">
+                                                                    <span className="prev-meeting-short-id">{getShortId(m.id)}</span>
+                                                                    <span className="prev-meeting-item-title">{m.title}</span>
+                                                                    {m.meeting_date && <span className="prev-meeting-date">{m.meeting_date}</span>}
+                                                                </div>
+                                                                {m.attendees && m.attendees.length > 0 && (
+                                                                    <div className="prev-meeting-item-attendees">{m.attendees.join('、')}</div>
+                                                                )}
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {isArchived && (
                         <div className="archive-badge">
