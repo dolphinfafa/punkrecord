@@ -2,6 +2,7 @@
 Finance API endpoints
 """
 from typing import Optional
+from app.models.base import now_cn
 from uuid import UUID
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query
@@ -123,7 +124,7 @@ async def update_account(
     if data.account_no_masked is not None:
         account.account_no_masked = data.account_no_masked
 
-    account.updated_at = datetime.utcnow()
+    account.updated_at = now_cn()
     session.add(account)
     session.commit()
     session.refresh(account)
@@ -216,7 +217,7 @@ async def update_transaction(
     if data.reconcile_status is not None:
         transaction.reconcile_status = ReconcileStatus(data.reconcile_status)
 
-    transaction.updated_at = datetime.utcnow()
+    transaction.updated_at = now_cn()
     session.add(transaction)
     session.commit()
     session.refresh(transaction)

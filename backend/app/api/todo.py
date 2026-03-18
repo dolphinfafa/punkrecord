@@ -2,6 +2,7 @@
 Todo API endpoints
 """
 from typing import Optional, Any
+from app.models.base import now_cn
 from uuid import UUID, uuid4
 from datetime import datetime
 import math
@@ -59,7 +60,7 @@ def _notify_manager(user_id: UUID, todo: TodoItem, session: Session):
         todo_id=todo.id,
         channel=NotificationChannel.IN_APP,
         status=NotificationStatus.SENT,
-        sent_at=datetime.utcnow(),
+        sent_at=now_cn(),
     )
     session.add(log)
 
@@ -70,7 +71,7 @@ def _notify_user(user_id: UUID, todo: TodoItem, session: Session):
         todo_id=todo.id,
         channel=NotificationChannel.IN_APP,
         status=NotificationStatus.SENT,
-        sent_at=datetime.utcnow(),
+        sent_at=now_cn(),
     )
     # Note: NotificationLog doesn't have a 'recipient_user_id' field in the model shown?
     # Wait, looking at app/models/todo.py:
@@ -144,7 +145,7 @@ def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
     if not todo.due_at or not todo.done_at:
         link["beli_applied"] = True
         link["beli_delta"] = 0.0
-        link["beli_applied_at"] = datetime.utcnow().isoformat()
+        link["beli_applied_at"] = now_cn().isoformat()
         todo.link = link
         session.add(todo)
         return
@@ -186,7 +187,7 @@ def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
 
     link["beli_applied"] = True
     link["beli_delta"] = delta
-    link["beli_applied_at"] = datetime.utcnow().isoformat()
+    link["beli_applied_at"] = now_cn().isoformat()
     link["beli_days_diff"] = days_diff
     link["beli_rule_hits"] = hits
     todo.link = link
@@ -447,9 +448,9 @@ async def approve_leave_request(
     setattr(applicant, balance_field, current_balance - leave_days)
     leave.status = LeaveStatus.APPROVED
     leave.approved_by_user_id = current_user.id
-    leave.approved_at = datetime.utcnow()
+    leave.approved_at = now_cn()
     leave.review_comment = None
-    leave.updated_at = datetime.utcnow()
+    leave.updated_at = now_cn()
     session.add(applicant)
     session.add(leave)
 
@@ -480,9 +481,9 @@ async def reject_leave_request(
 
     leave.status = LeaveStatus.REJECTED
     leave.approved_by_user_id = current_user.id
-    leave.approved_at = datetime.utcnow()
+    leave.approved_at = now_cn()
     leave.review_comment = data.comment or "请假申请未通过"
-    leave.updated_at = datetime.utcnow()
+    leave.updated_at = now_cn()
     session.add(leave)
 
     session.commit()
@@ -540,7 +541,7 @@ async def update_todo(
     if todo_data.tags is not None:
         todo.tags = todo_data.tags
 
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     session.refresh(todo)
@@ -591,7 +592,7 @@ async def upload_todo_image(
         "stored_name": stored_name,
         "content_type": content_type,
         "size": len(file_bytes),
-        "uploaded_at": datetime.utcnow().isoformat(),
+        "uploaded_at": now_cn().isoformat(),
         "uploaded_by_user_id": str(current_user.id),
     }
 
@@ -600,7 +601,7 @@ async def upload_todo_image(
     images.append(image_meta)
     link["todo_images"] = images
     todo.link = link
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
 
@@ -678,7 +679,7 @@ async def delete_todo_image(
     remain = [item for item in images if item.get("id") != image_id]
     link["todo_images"] = remain
     todo.link = link
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     return success_response({"message": "图片已删除"})
@@ -709,8 +710,8 @@ async def start_todo(
         raise ValidationException(f"当前状态 {todo.status} 不能开始任务")
 
     todo.status = TodoStatus.IN_PROGRESS
-    todo.start_at = datetime.utcnow()
-    todo.updated_at = datetime.utcnow()
+    todo.start_at = now_cn()
+    todo.updated_at = now_cn()
 
     session.add(todo)
     session.commit()
@@ -752,10 +753,10 @@ async def submit_todo(
     # Check if creator is assignee (Self-assigned)
     if todo.creator_user_id == current_user.id:
         todo.status = TodoStatus.DONE
-        todo.done_at = datetime.utcnow()
+        todo.done_at = now_cn()
         todo.done_by_user_id = current_user.id
         todo.reviewed_by_user_id = current_user.id  # Auto-approved
-        todo.updated_at = datetime.utcnow()
+        todo.updated_at = now_cn()
         _apply_beli_rules_on_done(todo, session)
 
         session.add(todo)
@@ -765,7 +766,7 @@ async def submit_todo(
         # Assigned by someone else: Needs review by CREATOR
         todo.status = TodoStatus.PENDING_REVIEW
         todo.review_comment = None  # Clear previous rejection comment
-        todo.updated_at = datetime.utcnow()
+        todo.updated_at = now_cn()
 
         session.add(todo)
         session.commit()
@@ -809,7 +810,7 @@ async def approve_todo(
         raise NotFoundException("只有任务创建人才能审核")
 
     todo.status = TodoStatus.DONE
-    todo.done_at = datetime.utcnow()
+    todo.done_at = now_cn()
     # done_by_user_id is already set when submitted/completed? 
     # Usually completion time is when employee submits. 
     # But usually 'done' status implies approved.
@@ -822,7 +823,7 @@ async def approve_todo(
     todo.done_by_user_id = todo.assignee_user_id # The doer is the assignee
     todo.reviewed_by_user_id = current_user.id
     todo.review_comment = data.comment
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     _apply_beli_rules_on_done(todo, session)
 
     session.add(todo)
@@ -862,7 +863,7 @@ async def reject_todo(
     todo.status = TodoStatus.OPEN
     todo.reviewed_by_user_id = current_user.id
     todo.review_comment = data.comment or "请修改后重新提交"
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
 
     session.add(todo)
     session.commit()
@@ -900,10 +901,10 @@ async def mark_todo_done(
     # Check if creator is assignee (Self-assigned)
     if todo.creator_user_id == current_user.id:
         todo.status = TodoStatus.DONE
-        todo.done_at = datetime.utcnow()
+        todo.done_at = now_cn()
         todo.done_by_user_id = current_user.id
         todo.reviewed_by_user_id = current_user.id
-        todo.updated_at = datetime.utcnow()
+        todo.updated_at = now_cn()
         _apply_beli_rules_on_done(todo, session)
 
         session.add(todo)
@@ -913,7 +914,7 @@ async def mark_todo_done(
         # Use submit flow: go to pending_review
         todo.status = TodoStatus.PENDING_REVIEW
         todo.review_comment = None
-        todo.updated_at = datetime.utcnow()
+        todo.updated_at = now_cn()
 
         session.add(todo)
         session.commit()
@@ -948,7 +949,7 @@ async def block_todo(
 
     todo.status = TodoStatus.BLOCKED
     todo.blocked_reason = blocked_reason
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
 
     session.add(todo)
     session.commit()
@@ -980,7 +981,7 @@ async def dismiss_todo(
 
     todo.status = TodoStatus.DISMISSED
     todo.dismiss_reason = dismiss_reason
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
 
     session.add(todo)
     session.commit()
@@ -1064,7 +1065,7 @@ async def update_todo_status(
              raise NotFoundException("只有被分配人才能开始任务")
         todo.status = TodoStatus.IN_PROGRESS
         if not todo.start_at:
-            todo.start_at = datetime.utcnow()
+            todo.start_at = now_cn()
 
     # 5. Done -> Open (Reset fully)
     elif current_status == TodoStatus.DONE and target_status == TodoStatus.OPEN:
@@ -1086,7 +1087,7 @@ async def update_todo_status(
     elif target_status == TodoStatus.AI_FIXING and current_status in (TodoStatus.OPEN, TodoStatus.IN_PROGRESS, TodoStatus.BLOCKED):
         todo.status = TodoStatus.AI_FIXING
         if not todo.start_at:
-            todo.start_at = datetime.utcnow()
+            todo.start_at = now_cn()
 
     elif target_status == TodoStatus.AI_FIXED and current_status == TodoStatus.AI_FIXING:
         todo.status = TodoStatus.AI_FIXED
@@ -1094,7 +1095,7 @@ async def update_todo_status(
     elif current_status == TodoStatus.AI_FIXED and target_status in (TodoStatus.OPEN, TodoStatus.PENDING_REVIEW, TodoStatus.DONE):
         todo.status = target_status
         if target_status == TodoStatus.DONE:
-            todo.done_at = datetime.utcnow()
+            todo.done_at = now_cn()
 
     # 7. Fallback/Other transitions
     else:
@@ -1109,7 +1110,7 @@ async def update_todo_status(
              from app.core.exceptions import ValidationException
              raise ValidationException(f"不支持从 {current_status} 到 {target_status} 的直接变更")
 
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     session.refresh(todo)

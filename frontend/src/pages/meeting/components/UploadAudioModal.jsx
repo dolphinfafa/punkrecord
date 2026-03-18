@@ -3,9 +3,18 @@ import { meetingApi } from '@/api/meeting';
 import { Upload, X, FileAudio, Loader2, AlertCircle } from 'lucide-react';
 import './UploadAudioModal.css';
 
-const ACCEPTED_FORMATS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg'];
-const ACCEPTED_MIME = 'audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/flac,audio/ogg';
+const ACCEPTED_FORMATS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.amr'];
+const ACCEPTED_MIME = 'audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/flac,audio/ogg,audio/aac,audio/x-ms-wma,audio/amr';
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+
+const MEETING_TYPES = [
+    { value: 'morning', label: '早会' },
+    { value: 'weekly', label: '周会' },
+    { value: 'project', label: '项目会议' },
+    { value: 'review', label: '复盘会议' },
+    { value: 'brainstorm', label: '头脑风暴' },
+    { value: 'other', label: '其他' },
+];
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
@@ -18,6 +27,7 @@ function formatFileSize(bytes) {
 export default function UploadAudioModal({ onClose, onSuccess }) {
     const [file, setFile] = useState(null);
     const [title, setTitle] = useState('');
+    const [meetingType, setMeetingType] = useState('morning');
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [dragOver, setDragOver] = useState(false);
@@ -83,7 +93,7 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
         try {
             setUploading(true);
             setError('');
-            await meetingApi.createMeeting(file, title.trim());
+            await meetingApi.createMeeting(file, title.trim(), meetingType);
             onSuccess();
         } catch (err) {
             setError(err?.response?.data?.message || err.message || '上传失败，请重试');
@@ -120,6 +130,21 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                             placeholder="输入会议标题"
                             disabled={uploading}
                         />
+                    </div>
+
+                    {/* Meeting type select */}
+                    <div className="form-group">
+                        <label className="form-label">会议类型 <span className="required">*</span></label>
+                        <select
+                            className="form-input"
+                            value={meetingType}
+                            onChange={(e) => setMeetingType(e.target.value)}
+                            disabled={uploading}
+                        >
+                            {MEETING_TYPES.map(t => (
+                                <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Drop zone */}

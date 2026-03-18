@@ -10,6 +10,7 @@ from pydantic import BaseModel
 class MeetingCreateResponse(BaseModel):
     id: UUID
     title: str
+    meeting_type: str = "morning"
     status: str
     created_at: datetime
 
@@ -20,6 +21,7 @@ class MeetingCreateResponse(BaseModel):
 class MeetingResponse(BaseModel):
     id: UUID
     title: str
+    meeting_type: str = "morning"
     audio_file_name: str
     audio_content_type: str
     audio_file_size: int

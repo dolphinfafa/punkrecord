@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
+    # LiteLLM (meeting summary LLM)
+    LITELLM_BASE_URL: str = "http://212.50.233.55:4000/v1"
+    LITELLM_API_KEY: str = "sk-9SNEoaU6eUFuJnMW76-clg"
+    LITELLM_MODEL: str = "gemini/gemini-3.1-flash-lite-preview"
+
     # Knowledge Base
     CHROMADB_PATH: str = "./data/chromadb"
     KB_CHUNK_SIZE: int = 1000
@@ -49,6 +54,9 @@ class Settings(BaseSettings):
     # Volcengine ASR
     VOLC_ASR_APP_KEY: str = "7858270680"
     VOLC_ASR_ACCESS_KEY: str = "jWugJCpq3wc-7-lWclvF69r23YjDVKXP"
+
+    # Public base URL for ASR audio callback (Volcengine needs to fetch audio via URL)
+    PUBLIC_BASE_URL: str = "https://dev-cn-01.yios.cn/punkrecord"
     
     # CORS
     BACKEND_CORS_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]

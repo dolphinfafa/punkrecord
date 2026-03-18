@@ -2,6 +2,7 @@
 Project API endpoints
 """
 from typing import Optional, Dict, Any, List, Union, Tuple
+from app.models.base import now_cn
 from uuid import UUID, uuid4
 from datetime import datetime
 import io
@@ -358,12 +359,12 @@ async def upload_project_attachment(
         "stored_name": stored_name,
         "content_type": file.content_type or "application/octet-stream",
         "size": len(file_bytes),
-        "uploaded_at": datetime.utcnow().isoformat()
+        "uploaded_at": now_cn().isoformat()
     }
     attachments = list(project.attachments or [])
     attachments.append(attachment)
     project.attachments = attachments
-    project.updated_at = datetime.utcnow()
+    project.updated_at = now_cn()
     session.add(project)
     session.commit()
 
@@ -435,7 +436,7 @@ async def delete_project_attachment(
             pass  # best-effort cleanup
 
     project.attachments = attachments
-    project.updated_at = datetime.utcnow()
+    project.updated_at = now_cn()
     session.add(project)
     session.commit()
 
@@ -471,7 +472,7 @@ async def update_project(
     if data.customer_id is not None:
         project.customer_id = data.customer_id
     
-    project.updated_at = datetime.utcnow()
+    project.updated_at = now_cn()
     session.add(project)
     session.commit()
     session.refresh(project)
@@ -523,9 +524,9 @@ async def update_stage_status(
         if data.skip_reason:
             stage.skip_reason = data.skip_reason
         if stage.status == StageStatus.IN_PROGRESS and not stage.actual_start_at:
-            stage.actual_start_at = datetime.utcnow().date()
+            stage.actual_start_at = now_cn().date()
         elif stage.status == StageStatus.DONE and not stage.actual_end_at:
-            stage.actual_end_at = datetime.utcnow().date()
+            stage.actual_end_at = now_cn().date()
 
     if data.deliverables is not None:
         stage.deliverables = data.deliverables
@@ -536,7 +537,7 @@ async def update_stage_status(
     if data.planned_end_at is not None:
         stage.planned_end_at = data.planned_end_at
 
-    stage.updated_at = datetime.utcnow()
+    stage.updated_at = now_cn()
     session.add(stage)
     session.commit()
     session.refresh(stage)
@@ -579,13 +580,13 @@ async def upload_stage_attachment(
         "stored_name": stored_name,
         "content_type": file.content_type or "application/octet-stream",
         "size": len(file_bytes),
-        "uploaded_at": datetime.utcnow().isoformat()
+        "uploaded_at": now_cn().isoformat()
     }
 
     attachments = list(stage.attachments or [])
     attachments.append(attachment)
     stage.attachments = attachments
-    stage.updated_at = datetime.utcnow()
+    stage.updated_at = now_cn()
 
     session.add(stage)
     session.commit()
@@ -660,7 +661,7 @@ async def delete_stage_attachment(
             pass
 
     stage.attachments = attachments
-    stage.updated_at = datetime.utcnow()
+    stage.updated_at = now_cn()
     session.add(stage)
     session.commit()
 
@@ -745,7 +746,7 @@ async def add_project_member(
             # Keep existing role when already set; otherwise backfill from org job title.
             if not existing.role_in_project:
                 existing.role_in_project = resolved_role
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = now_cn()
                 session.add(existing)
                 session.commit()
                 session.refresh(existing)
@@ -903,7 +904,7 @@ async def assign_project_todo(
         raise ForbiddenException("只能指派给项目成员或项目经理")
 
     todo.assignee_user_id = data.assignee_user_id
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     session.refresh(todo)
@@ -1004,7 +1005,7 @@ async def update_project_todo_plan(
         link["dev_type"] = dev_type or ""
         todo.link = link
 
-    todo.updated_at = datetime.utcnow()
+    todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     session.refresh(todo)
@@ -1050,7 +1051,7 @@ async def batch_assign_project_todos(
     if not todos:
         raise ValidationException("未找到可更新的任务")
 
-    now = datetime.utcnow()
+    now = now_cn()
     for todo in todos:
         todo.assignee_user_id = data.assignee_user_id
         todo.updated_at = now

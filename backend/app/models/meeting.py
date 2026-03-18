@@ -20,11 +20,21 @@ class MeetingStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class MeetingType(str, enum.Enum):
+    MORNING = "morning"          # 早会
+    WEEKLY = "weekly"            # 周会
+    PROJECT = "project"          # 项目会议
+    REVIEW = "review"            # 复盘会议
+    BRAINSTORM = "brainstorm"    # 头脑风暴
+    OTHER = "other"              # 其他
+
+
 class MeetingRecord(BaseDBModel, table=True):
     """Meeting record"""
     __tablename__ = "meeting_record"
 
     title: str = Field(nullable=False)
+    meeting_type: str = Field(default=MeetingType.MORNING, index=True)
     audio_file_name: str = Field(default="")
     audio_stored_name: str = Field(default="")
     audio_content_type: str = Field(default="")

@@ -16,6 +16,15 @@ const STATUS_MAP = {
     failed: { label: '失败', className: 'status-failed' },
 };
 
+const MEETING_TYPE_MAP = {
+    morning: '早会',
+    weekly: '周会',
+    project: '项目会议',
+    review: '复盘会议',
+    brainstorm: '头脑风暴',
+    other: '其他',
+};
+
 function formatDuration(seconds) {
     if (!seconds && seconds !== 0) return '-';
     const s = Math.floor(seconds);
@@ -35,6 +44,7 @@ export default function MeetingListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const [filterType, setFilterType] = useState('');
     const [page, setPage] = useState(1);
     const pageSize = 20;
 
@@ -42,7 +52,9 @@ export default function MeetingListPage() {
         try {
             setLoading(true);
             const skip = (page - 1) * pageSize;
-            const response = await meetingApi.getMeetings({ skip, limit: pageSize });
+            const params = { skip, limit: pageSize };
+            if (filterType) params.meeting_type = filterType;
+            const response = await meetingApi.getMeetings(params);
             setMeetings(response.data?.items || []);
             setTotal(response.data?.total || 0);
             setError(null);
@@ -52,7 +64,7 @@ export default function MeetingListPage() {
         } finally {
             setLoading(false);
         }
-    }, [page]);
+    }, [page, filterType]);
 
     useEffect(() => {
         loadMeetings();
@@ -102,9 +114,21 @@ export default function MeetingListPage() {
                     <h1>会议记录</h1>
                     <p className="meeting-subtitle">管理会议音频、转录文本与 AI 会议纪要</p>
                 </div>
-                <button className="btn btn-primary upload-btn" onClick={() => setShowUploadModal(true)}>
-                    <Upload size={18} /> 上传音频
-                </button>
+                <div className="meeting-header-actions">
+                    <select
+                        className="type-filter-select"
+                        value={filterType}
+                        onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+                    >
+                        <option value="">全部类型</option>
+                        {Object.entries(MEETING_TYPE_MAP).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                        ))}
+                    </select>
+                    <button className="btn btn-primary upload-btn" onClick={() => setShowUploadModal(true)}>
+                        <Upload size={18} /> 上传音频
+                    </button>
+                </div>
             </div>
 
             {meetings.length === 0 ? (
@@ -120,6 +144,7 @@ export default function MeetingListPage() {
                             <thead>
                                 <tr>
                                     <th>会议标题</th>
+                                    <th>类型</th>
                                     <th>状态</th>
                                     <th>时长</th>
                                     <th>创建人</th>
@@ -138,12 +163,17 @@ export default function MeetingListPage() {
                                                     <span>{meeting.title}</span>
                                                 </div>
                                             </td>
+                                            <td className="col-type">
+                                                <span className="meeting-type-badge">
+                                                    {MEETING_TYPE_MAP[meeting.meeting_type] || meeting.meeting_type || '早会'}
+                                                </span>
+                                            </td>
                                             <td>
                                                 <span className={`meeting-status-badge ${statusInfo.className}`}>
                                                     {statusInfo.label}
                                                 </span>
                                             </td>
-                                            <td className="col-duration">{formatDuration(meeting.duration)}</td>
+                                            <td className="col-duration">{formatDuration(meeting.duration_seconds)}</td>
                                             <td className="col-creator">{meeting.creator_name || meeting.creator_id || '-'}</td>
                                             <td className="col-time">
                                                 {meeting.created_at

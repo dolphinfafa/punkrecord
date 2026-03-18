@@ -2,6 +2,7 @@
 Knowledge Base (企业大脑) API endpoints
 """
 import asyncio
+from app.models.base import now_cn
 import logging
 from typing import Optional, List
 from uuid import UUID, uuid4
@@ -169,7 +170,7 @@ async def update_document(
     if data.tags is not None:
         doc.tags = data.tags
 
-    doc.updated_at = datetime.utcnow()
+    doc.updated_at = now_cn()
     session.add(doc)
     session.commit()
     session.refresh(doc)
@@ -278,7 +279,7 @@ async def reprocess_document(
     doc.chunk_count = 0
     doc.extracted_text = None
     doc.summary = None
-    doc.updated_at = datetime.utcnow()
+    doc.updated_at = now_cn()
     session.add(doc)
     session.commit()
 

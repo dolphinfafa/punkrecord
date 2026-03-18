@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    ChevronDown, ChevronUp, Play, Check, AlertCircle, ExternalLink
+    Play, Square, Check, AlertCircle, ExternalLink
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -19,6 +20,34 @@ const STATUS_MAP = {
     archived: { label: '已归档', className: 'status-archived' },
     failed: { label: '失败', className: 'status-failed' },
 };
+
+const MEETING_TYPE_MAP = {
+    morning: '早会',
+    weekly: '周会',
+    project: '项目会议',
+    review: '复盘会议',
+    brainstorm: '头脑风暴',
+    other: '其他',
+};
+
+// 10 distinct speaker colors
+const SPEAKER_COLORS = [
+    { bg: '#dbeafe', color: '#1e40af', border: '#3b82f6', dot: '#3b82f6' },
+    { bg: '#fce7f3', color: '#9d174d', border: '#ec4899', dot: '#ec4899' },
+    { bg: '#d1fae5', color: '#065f46', border: '#10b981', dot: '#10b981' },
+    { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', dot: '#f59e0b' },
+    { bg: '#ede9fe', color: '#5b21b6', border: '#8b5cf6', dot: '#8b5cf6' },
+    { bg: '#ffedd5', color: '#9a3412', border: '#f97316', dot: '#f97316' },
+    { bg: '#cffafe', color: '#155e75', border: '#06b6d4', dot: '#06b6d4' },
+    { bg: '#fecdd3', color: '#9f1239', border: '#f43f5e', dot: '#f43f5e' },
+    { bg: '#e0e7ff', color: '#3730a3', border: '#6366f1', dot: '#6366f1' },
+    { bg: '#d9f99d', color: '#3f6212', border: '#84cc16', dot: '#84cc16' },
+];
+
+function getSpeakerColor(speakerId, speakerIds) {
+    const idx = speakerIds.indexOf(speakerId);
+    return SPEAKER_COLORS[idx >= 0 ? idx % SPEAKER_COLORS.length : 0];
+}
 
 function formatTime(seconds) {
     if (!seconds && seconds !== 0) return '00:00';
@@ -41,13 +70,13 @@ export default function MeetingDetailPage() {
     // Audio
     const [audioUrl, setAudioUrl] = useState(null);
     const [audioLoading, setAudioLoading] = useState(false);
+    const [playingSegmentIndex, setPlayingSegmentIndex] = useState(null);
 
     // Transcript
     const [transcript, setTranscript] = useState(null);
     const [segments, setSegments] = useState([]);
     const [editedSegments, setEditedSegments] = useState({});
     const [speakerMapping, setSpeakerMapping] = useState({});
-    const [showSpeakerPanel, setShowSpeakerPanel] = useState(false);
     const [savingTranscript, setSavingTranscript] = useState(false);
     const [savingSpeakers, setSavingSpeakers] = useState(false);
 
@@ -62,6 +91,35 @@ export default function MeetingDetailPage() {
     // Polling
     const pollingRef = useRef(null);
 
+    // Extract unique speaker IDs from segments (stable order)
+    const speakerIds = useMemo(() => {
+        const seen = new Set();
+        const ids = [];
+        for (const seg of segments) {
+            const sid = seg.speaker_id || seg.speaker || '';
+            if (sid && !seen.has(sid)) {
+                seen.add(sid);
+                ids.push(sid);
+            }
+        }
+        return ids;
+    }, [segments]);
+
+    // Initialize speaker mapping for new speaker IDs
+    useEffect(() => {
+        if (speakerIds.length > 0) {
+            setSpeakerMapping(prev => {
+                const updated = { ...prev };
+                for (const sid of speakerIds) {
+                    if (!(sid in updated)) {
+                        updated[sid] = '';
+                    }
+                }
+                return updated;
+            });
+        }
+    }, [speakerIds]);
+
     const loadMeeting = useCallback(async () => {
         try {
             const response = await meetingApi.getMeeting(id);
@@ -71,8 +129,11 @@ export default function MeetingDetailPage() {
             if (data.summary) {
                 setSummary(data.summary);
             }
-            if (data.archive_doc_id) {
-                setArchiveResult({ doc_id: data.archive_doc_id });
+            if (data.speaker_mapping && Object.keys(data.speaker_mapping).length > 0) {
+                setSpeakerMapping(prev => ({ ...prev, ...data.speaker_mapping }));
+            }
+            if (data.archived_document_id) {
+                setArchiveResult({ doc_id: data.archived_document_id });
             }
 
             return data;
@@ -87,8 +148,7 @@ export default function MeetingDetailPage() {
             const response = await meetingApi.getTranscript(id);
             const data = response.data;
             setTranscript(data);
-            setSegments(data?.segments || []);
-            setSpeakerMapping(data?.speaker_mapping || {});
+            setSegments(Array.isArray(data) ? data : (data?.segments || []));
         } catch (err) {
             console.error('Error loading transcript:', err);
         }
@@ -117,10 +177,7 @@ export default function MeetingDetailPage() {
             setLoading(true);
             const data = await loadMeeting();
             if (data) {
-                // Load audio for all states
                 loadAudio();
-
-                // Load transcript if available
                 if (['transcribed', 'summarized', 'summarizing', 'archived'].includes(data.status)) {
                     loadTranscript();
                 }
@@ -162,10 +219,52 @@ export default function MeetingDetailPage() {
         };
     }, [meeting?.status, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleSeek = (startTime) => {
+    const segmentEndRef = useRef(null);
+
+    const stopSegmentPlayback = () => {
         if (audioRef.current) {
-            audioRef.current.currentTime = startTime;
-            audioRef.current.play();
+            audioRef.current.pause();
+            if (audioRef.current._segListener) {
+                audioRef.current.removeEventListener('timeupdate', audioRef.current._segListener);
+                audioRef.current._segListener = null;
+            }
+        }
+        segmentEndRef.current = null;
+        setPlayingSegmentIndex(null);
+    };
+
+    const handleSeek = (startTime, endTime, segIndex) => {
+        if (!audioRef.current) return;
+
+        // If clicking the same segment that's playing, stop it
+        if (playingSegmentIndex === segIndex) {
+            stopSegmentPlayback();
+            return;
+        }
+
+        // Stop any current segment playback
+        stopSegmentPlayback();
+
+        audioRef.current.currentTime = startTime;
+        audioRef.current.play();
+        setPlayingSegmentIndex(segIndex);
+
+        if (endTime && endTime > startTime) {
+            segmentEndRef.current = endTime;
+            const onTimeUpdate = () => {
+                if (audioRef.current && audioRef.current.currentTime >= segmentEndRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.removeEventListener('timeupdate', onTimeUpdate);
+                    audioRef.current._segListener = null;
+                    segmentEndRef.current = null;
+                    setPlayingSegmentIndex(null);
+                }
+            };
+            if (audioRef.current._segListener) {
+                audioRef.current.removeEventListener('timeupdate', audioRef.current._segListener);
+            }
+            audioRef.current._segListener = onTimeUpdate;
+            audioRef.current.addEventListener('timeupdate', onTimeUpdate);
         }
     };
 
@@ -176,13 +275,15 @@ export default function MeetingDetailPage() {
     const handleSaveTranscript = async () => {
         try {
             setSavingTranscript(true);
+            const updatePayload = [];
             const updatedSegments = segments.map((seg, idx) => {
                 if (editedSegments[idx] !== undefined) {
-                    return { ...seg, text: editedSegments[idx] };
+                    updatePayload.push({ id: seg.id, content: editedSegments[idx] });
+                    return { ...seg, content: editedSegments[idx] };
                 }
                 return seg;
             });
-            await meetingApi.updateTranscript(id, { segments: updatedSegments });
+            await meetingApi.updateTranscript(id, { segments: updatePayload });
             setSegments(updatedSegments);
             setEditedSegments({});
             alert('转录文本已保存');
@@ -197,11 +298,17 @@ export default function MeetingDetailPage() {
         try {
             setSavingSpeakers(true);
             await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
-            alert('说话人映射已更新');
+            setSavingSpeakers(false);
         } catch (err) {
             alert(err.message || '保存失败');
-        } finally {
             setSavingSpeakers(false);
+        }
+    };
+
+    const handleSpeakerKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSaveSpeakers();
         }
     };
 
@@ -239,12 +346,11 @@ export default function MeetingDetailPage() {
                         if (data === '[DONE]') continue;
                         try {
                             const parsed = JSON.parse(data);
-                            if (parsed.content) {
-                                accumulated += parsed.content;
+                            if (parsed.text) {
+                                accumulated += parsed.text;
                                 setSummary(accumulated);
                             }
                         } catch {
-                            // Could be plain text SSE
                             accumulated += data;
                             setSummary(accumulated);
                         }
@@ -252,7 +358,6 @@ export default function MeetingDetailPage() {
                 }
             }
 
-            // Reload meeting to get updated status
             await loadMeeting();
         } catch (err) {
             alert(err.message || '生成会议纪要失败');
@@ -326,11 +431,12 @@ export default function MeetingDetailPage() {
                     </span>
                 </div>
                 <div className="meeting-detail-meta">
+                    <span className="meeting-type-tag">{MEETING_TYPE_MAP[meeting.meeting_type] || '早会'}</span>
                     {meeting.created_at && (
                         <span>创建时间: {format(new Date(meeting.created_at), 'yyyy-MM-dd HH:mm')}</span>
                     )}
                     {meeting.creator_name && <span>创建人: {meeting.creator_name}</span>}
-                    {meeting.duration && <span>时长: {formatTime(meeting.duration)}</span>}
+                    {meeting.duration_seconds && <span>时长: {formatTime(meeting.duration_seconds)}</span>}
                 </div>
             </div>
 
@@ -368,14 +474,6 @@ export default function MeetingDetailPage() {
                     <div className="section-header">
                         <h2 className="section-title">转录文本</h2>
                         <div className="section-actions">
-                            <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => setShowSpeakerPanel(!showSpeakerPanel)}
-                            >
-                                <Users size={16} />
-                                说话人映射
-                                {showSpeakerPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            </button>
                             {hasEdits && (
                                 <button
                                     className="btn btn-primary btn-sm"
@@ -389,38 +487,42 @@ export default function MeetingDetailPage() {
                         </div>
                     </div>
 
-                    {/* Speaker Mapping Panel */}
-                    {showSpeakerPanel && (
+                    {/* Speaker Mapping - always visible when there are speakers */}
+                    {speakerIds.length > 0 && (
                         <div className="speaker-mapping-panel">
-                            <h3>说话人名称映射</h3>
-                            <div className="speaker-mapping-grid">
-                                {Object.entries(speakerMapping).map(([speakerId, name]) => (
-                                    <div key={speakerId} className="speaker-mapping-item">
-                                        <label className="speaker-id-label">{speakerId}</label>
-                                        <input
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) =>
-                                                setSpeakerMapping(prev => ({
-                                                    ...prev,
-                                                    [speakerId]: e.target.value
-                                                }))
-                                            }
-                                            className="speaker-name-input"
-                                            placeholder="输入姓名"
-                                        />
-                                    </div>
-                                ))}
+                            <div className="speaker-mapping-header">
+                                <Users size={16} />
+                                <span>说话人识别</span>
+                                {savingSpeakers && <Loader2 size={14} className="spin" />}
+                                {!savingSpeakers && <span className="speaker-hint">输入姓名后回车确认</span>}
                             </div>
-                            <button
-                                className="btn btn-primary btn-sm"
-                                onClick={handleSaveSpeakers}
-                                disabled={savingSpeakers}
-                                style={{ marginTop: '0.75rem' }}
-                            >
-                                {savingSpeakers ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
-                                更新说话人
-                            </button>
+                            <div className="speaker-mapping-grid">
+                                {speakerIds.map((sid) => {
+                                    const sc = getSpeakerColor(sid, speakerIds);
+                                    return (
+                                        <div key={sid} className="speaker-mapping-item">
+                                            <span className="speaker-color-dot" style={{ background: sc.dot }} />
+                                            <label className="speaker-id-label" style={{ background: sc.bg, color: sc.color }}>
+                                                {sid}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={speakerMapping[sid] || ''}
+                                                onChange={(e) =>
+                                                    setSpeakerMapping(prev => ({
+                                                        ...prev,
+                                                        [sid]: e.target.value
+                                                    }))
+                                                }
+                                                onKeyDown={handleSpeakerKeyDown}
+                                                className="speaker-name-input"
+                                                placeholder="输入姓名，回车保存"
+                                                style={{ borderColor: sc.border + '60' }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
 
@@ -429,34 +531,49 @@ export default function MeetingDetailPage() {
                         {segments.length === 0 ? (
                             <div className="no-segments">暂无转录内容</div>
                         ) : (
-                            segments.map((segment, index) => (
-                                <div
-                                    key={index}
-                                    className={`segment-item ${index % 2 === 0 ? 'segment-even' : 'segment-odd'}`}
-                                >
-                                    <div className="segment-meta">
-                                        <span className="segment-speaker">
-                                            {getSpeakerName(segment.speaker_id || segment.speaker)}
-                                        </span>
-                                        <button
-                                            className="segment-time"
-                                            onClick={() => handleSeek(segment.start_time || segment.start)}
-                                            title="点击跳转到此时间"
-                                        >
-                                            <Play size={12} />
-                                            {formatTime(segment.start_time || segment.start)}
-                                            {' - '}
-                                            {formatTime(segment.end_time || segment.end)}
-                                        </button>
+                            segments.map((segment, index) => {
+                                const sid = segment.speaker_id || segment.speaker || '';
+                                const sc = getSpeakerColor(sid, speakerIds);
+                                return (
+                                    <div
+                                        key={index}
+                                        className="segment-item"
+                                        style={{ borderLeft: `3px solid ${sc.border}` }}
+                                    >
+                                        <div className="segment-meta">
+                                            <span
+                                                className="segment-speaker"
+                                                style={{ background: sc.bg, color: sc.color }}
+                                            >
+                                                {getSpeakerName(sid)}
+                                            </span>
+                                            <button
+                                                className={`segment-time ${playingSegmentIndex === index ? 'segment-time-playing' : ''}`}
+                                                onClick={() => handleSeek(
+                                                    segment.start_time || segment.start,
+                                                    segment.end_time || segment.end,
+                                                    index
+                                                )}
+                                                title={playingSegmentIndex === index ? '点击停止' : '点击播放此片段'}
+                                            >
+                                                {playingSegmentIndex === index
+                                                    ? <Square size={10} fill="currentColor" />
+                                                    : <Play size={12} />
+                                                }
+                                                {formatTime(segment.start_time || segment.start)}
+                                                {' - '}
+                                                {formatTime(segment.end_time || segment.end)}
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            className="segment-text"
+                                            value={editedSegments[index] !== undefined ? editedSegments[index] : (segment.content || '')}
+                                            onChange={(e) => handleSegmentEdit(index, e.target.value)}
+                                            rows={Math.max(1, Math.ceil((segment.content || '').length / 80))}
+                                        />
                                     </div>
-                                    <textarea
-                                        className="segment-text"
-                                        value={editedSegments[index] !== undefined ? editedSegments[index] : segment.text}
-                                        onChange={(e) => handleSegmentEdit(index, e.target.value)}
-                                        rows={Math.max(1, Math.ceil((segment.text || '').length / 80))}
-                                    />
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -510,7 +627,7 @@ export default function MeetingDetailPage() {
 
                     {summary ? (
                         <div className="summary-content">
-                            <ReactMarkdown>{summary}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
                         </div>
                     ) : (
                         !summaryStreaming && (

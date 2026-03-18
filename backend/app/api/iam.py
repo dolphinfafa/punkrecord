@@ -2,6 +2,7 @@
 IAM API endpoints (Users, Roles, Entities, Departments, Job Titles, Org Chart)
 """
 from typing import List, Optional
+from app.models.base import now_cn
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -722,7 +723,7 @@ async def reset_user_leave_balances(
     user.leave_marriage_remaining = 3.0
     user.leave_personal_remaining = 3.0
     user.leave_sick_remaining = 3.0
-    user.leave_balance_reset_year = datetime.utcnow().year
+    user.leave_balance_reset_year = now_cn().year
 
     session.add(user)
     session.commit()
@@ -742,7 +743,7 @@ async def reset_all_users_leave_balances(
     if current_level != 0:
         raise ForbiddenException("仅 L0 级别员工可重置假期余额")
 
-    current_year = datetime.utcnow().year
+    current_year = now_cn().year
     for user in all_users:
         user.leave_annual_remaining = 5.0
         user.leave_maternity_remaining = 15.0

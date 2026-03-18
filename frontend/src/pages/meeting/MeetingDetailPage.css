@@ -55,6 +55,17 @@
     flex-wrap: wrap;
 }
 
+/* Meeting type tag */
+.meeting-type-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #edf2f7;
+    color: #4a5568;
+}
+
 /* Status Badges (shared with list) */
 .meeting-status-badge {
     display: inline-flex;
@@ -191,17 +202,27 @@
     margin-bottom: 1rem;
 }
 
-.speaker-mapping-panel h3 {
-    font-size: 0.95rem;
+.speaker-mapping-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #4a5568;
-    margin: 0 0 0.75rem 0;
+    margin-bottom: 0.75rem;
+}
+
+.speaker-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #a0aec0;
+    margin-left: auto;
 }
 
 .speaker-mapping-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.6rem;
 }
 
 .speaker-mapping-item {
@@ -210,30 +231,42 @@
     gap: 0.5rem;
 }
 
+.speaker-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 .speaker-id-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #718096;
     min-width: 80px;
-    background: #edf2f7;
     padding: 4px 8px;
     border-radius: 4px;
     text-align: center;
+    white-space: nowrap;
 }
 
 .speaker-name-input {
     flex: 1;
     padding: 6px 10px;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 6px;
     font-size: 0.875rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
+    background: #fff;
 }
 
 .speaker-name-input:focus {
     border-color: #1a73e8;
     box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+
+.speaker-name-input::placeholder {
+    color: #cbd5e0;
+    font-size: 0.8rem;
 }
 
 /* Segments */
@@ -245,36 +278,33 @@
 }
 
 .segment-item {
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
     border-bottom: 1px solid #f0f0f0;
+    border-left: 3px solid transparent;
+    transition: background 0.15s;
+}
+
+.segment-item:hover {
+    background: #f8fafc;
 }
 
 .segment-item:last-child {
     border-bottom: none;
 }
 
-.segment-even {
-    background: #ffffff;
-}
-
-.segment-odd {
-    background: #fafbfc;
-}
-
 .segment-meta {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 0.4rem;
+    gap: 0.75rem;
+    margin-bottom: 0.3rem;
 }
 
 .segment-speaker {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
-    color: #1a73e8;
-    background: #e8f0fe;
     padding: 2px 8px;
     border-radius: 4px;
+    white-space: nowrap;
 }
 
 .segment-time {
@@ -295,6 +325,16 @@
 .segment-time:hover {
     background: #edf2f7;
     color: #1a73e8;
+}
+
+.segment-time-playing {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.segment-time-playing:hover {
+    background: #fecaca;
+    color: #b91c1c;
 }
 
 .segment-text {
@@ -383,6 +423,124 @@
     color: #718096;
     background: #fff;
     border-radius: 0 4px 4px 0;
+}
+
+/* Tables (GFM) */
+.summary-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    overflow-x: auto;
+    display: block;
+}
+
+.summary-content thead {
+    background: #edf2f7;
+}
+
+.summary-content th {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #2d3748;
+    border: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.summary-content td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    color: #4a5568;
+}
+
+.summary-content tbody tr:nth-child(even) {
+    background: #f7fafc;
+}
+
+.summary-content tbody tr:hover {
+    background: #edf2f7;
+}
+
+/* Task list / Checkboxes (GFM) */
+.summary-content ul.contains-task-list,
+.summary-content .task-list-item {
+    list-style: none;
+}
+
+.summary-content ul.contains-task-list {
+    padding-left: 0.5rem;
+}
+
+.summary-content .task-list-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+    width: 15px;
+    height: 15px;
+    accent-color: #1a73e8;
+    vertical-align: middle;
+}
+
+/* Horizontal Rule */
+.summary-content hr {
+    border: none;
+    border-top: 2px solid #e2e8f0;
+    margin: 1.5rem 0;
+}
+
+/* Strong / Bold */
+.summary-content strong {
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+/* Strikethrough (GFM) */
+.summary-content del {
+    color: #a0aec0;
+}
+
+/* Pre / Code block */
+.summary-content pre {
+    background: #1a1a2e;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.summary-content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
+/* Nested lists */
+.summary-content ul ul,
+.summary-content ol ol,
+.summary-content ul ol,
+.summary-content ol ul {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+/* H4 / H5 for sub-sections */
+.summary-content h4 {
+    color: #2d3748;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+}
+
+.summary-content h5 {
+    color: #4a5568;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: 0.75rem;
+    margin-bottom: 0.3rem;
 }
 
 .summary-empty {

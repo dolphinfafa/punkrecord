@@ -6,7 +6,7 @@ from typing import Optional, List
 from uuid import UUID
 from enum import Enum
 from sqlmodel import Field, Relationship, SQLModel
-from app.models.base import BaseDBModel
+from app.models.base import BaseDBModel, now_cn
 
 
 # Enums
@@ -126,7 +126,7 @@ class User(BaseDBModel, table=True):
     leave_marriage_remaining: float = Field(default=3.0, nullable=False)
     leave_personal_remaining: float = Field(default=3.0, nullable=False)
     leave_sick_remaining: float = Field(default=3.0, nullable=False)
-    leave_balance_reset_year: int = Field(default=datetime.utcnow().year, nullable=False)
+    leave_balance_reset_year: int = Field(default=now_cn().year, nullable=False)
     beili_balance: float = Field(default=0.0, nullable=False)
 
     # Relationships

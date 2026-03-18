@@ -1,10 +1,11 @@
 import client from './client';
 
 export const meetingApi = {
-    createMeeting: (file, title) => {
+    createMeeting: (file, title, meetingType = 'morning') => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('title', title);
+        formData.append('meeting_type', meetingType);
         return client.post('/meeting/records', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });

@@ -110,6 +110,8 @@
     outline: none;
     transition: all 0.2s;
     box-sizing: border-box;
+    background-color: #fff;
+    color: #1a1a2e;
 }
 
 .form-input:focus {

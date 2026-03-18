@@ -2,6 +2,7 @@
 Meeting Record API endpoints
 """
 import asyncio
+from app.models.base import now_cn
 import json
 import logging
 from typing import Optional
@@ -21,7 +22,7 @@ from app.core.response import success_response
 from app.core.config import settings
 from app.core.storage import save_file, get_file, delete_file, get_download_url
 from app.models.iam import User
-from app.models.meeting import MeetingRecord, MeetingTranscriptSegment, MeetingStatus
+from app.models.meeting import MeetingRecord, MeetingTranscriptSegment, MeetingStatus, MeetingType
 from app.models.kb import KBDocument, KBDocumentStatus
 from app.schemas.meeting import (
     MeetingCreateResponse, MeetingResponse, MeetingListResponse,
@@ -54,12 +55,8 @@ async def _run_asr(meeting_id: UUID):
                 logger.error("Meeting %s not found for ASR", meeting_id)
                 return
 
-            # Read audio from storage
-            audio_data, _ = get_file("meeting-audio", meeting.audio_stored_name)
-            content_type = meeting.audio_content_type
-
-            # Call ASR service
-            result = await submit_asr_task(audio_data, content_type)
+            # Call ASR service with stored filename (it will construct the public URL)
+            result = await submit_asr_task(meeting.audio_stored_name, meeting.audio_content_type)
 
             if result.get("error"):
                 logger.error("ASR failed for meeting %s: %s", meeting_id, result["error"])
@@ -105,6 +102,7 @@ async def _run_asr(meeting_id: UUID):
 async def create_meeting(
     file: UploadFile = File(...),
     title: str = Form(...),
+    meeting_type: str = Form(default="morning"),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.write")),
 ):
@@ -112,6 +110,11 @@ async def create_meeting(
     file_data = await file.read()
     if not file_data:
         raise AtlasException("音频文件不能为空")
+
+    # Validate meeting_type
+    valid_types = [t.value for t in MeetingType]
+    if meeting_type not in valid_types:
+        meeting_type = MeetingType.MORNING.value
 
     original_name = file.filename or "audio"
     content_type = file.content_type or "audio/mpeg"
@@ -122,6 +125,7 @@ async def create_meeting(
 
     meeting = MeetingRecord(
         title=title,
+        meeting_type=meeting_type,
         audio_file_name=original_name,
         audio_stored_name=stored_name,
         audio_content_type=content_type,
@@ -152,6 +156,7 @@ async def list_meetings(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
+    meeting_type: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.read")),
 ):
@@ -159,6 +164,8 @@ async def list_meetings(
     query = select(MeetingRecord)
     if status:
         query = query.where(MeetingRecord.status == status)
+    if meeting_type:
+        query = query.where(MeetingRecord.meeting_type == meeting_type)
     query = query.order_by(MeetingRecord.created_at.desc())
 
     total = len(session.exec(query).all())
@@ -296,7 +303,7 @@ async def update_speakers(
         raise NotFoundException("未找到会议记录")
 
     meeting.speaker_mapping = data.speaker_mapping
-    meeting.updated_at = datetime.utcnow()
+    meeting.updated_at = now_cn()
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
@@ -340,16 +347,23 @@ async def summarize_meeting(
 
     async def generate():
         full_text = ""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key={settings.GEMINI_API_KEY}"
+        url = f"{settings.LITELLM_BASE_URL}/chat/completions"
         payload = {
-            "contents": [
-                {"role": "user", "parts": [{"text": f"{system_prompt}\n\n会议转写文稿：\n{transcript_text}"}]}
+            "model": settings.LITELLM_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"会议转写文稿：\n{transcript_text}"},
             ],
+            "stream": True,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.LITELLM_API_KEY}",
         }
 
         try:
             async with httpx.AsyncClient(verify=False, timeout=120.0) as client:
-                async with client.stream("POST", url, json=payload) as resp:
+                async with client.stream("POST", url, json=payload, headers=headers) as resp:
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):
                             continue
@@ -358,14 +372,15 @@ async def summarize_meeting(
                             break
                         try:
                             chunk = json.loads(raw)
-                            text = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            text = delta.get("content", "")
                             if text:
                                 full_text += text
                                 yield f"data: {json.dumps({'text': text}, ensure_ascii=False)}\n\n"
                         except (json.JSONDecodeError, IndexError, KeyError):
                             continue
         except Exception as e:
-            logger.exception("Gemini streaming failed: %s", e)
+            logger.exception("LLM streaming failed: %s", e)
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
         # Save summary to DB
@@ -375,7 +390,7 @@ async def summarize_meeting(
                 if m:
                     m.summary = full_text
                     m.status = MeetingStatus.SUMMARIZED
-                    m.updated_at = datetime.utcnow()
+                    m.updated_at = now_cn()
                     db.add(m)
                     db.commit()
         except Exception as e:
@@ -447,7 +462,7 @@ async def archive_meeting(
     # Update meeting
     meeting.status = MeetingStatus.ARCHIVED
     meeting.archived_document_id = kb_doc.id
-    meeting.updated_at = datetime.utcnow()
+    meeting.updated_at = now_cn()
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
@@ -458,7 +473,27 @@ async def archive_meeting(
     return success_response(_enrich_meeting(meeting, session).model_dump())
 
 
-# ─── 11. Serve audio file ────────────────────────────────────────────────────
+# ─── 11. Temp audio for ASR (no auth, UUID-based access) ─────────────────────
+
+@router.get("/asr-audio/{stored_name}")
+async def serve_asr_audio(stored_name: str):
+    """Serve audio file for ASR service to fetch. No auth required —
+    stored_name is a UUID so it's unguessable."""
+    if not stored_name or "/" in stored_name or ".." in stored_name:
+        raise NotFoundException("Invalid filename")
+
+    try:
+        _, local_path = get_file("meeting-audio", stored_name)
+    except FileNotFoundError:
+        raise NotFoundException("音频文件不存在")
+
+    return FileResponse(
+        path=local_path,
+        media_type="application/octet-stream",
+    )
+
+
+# ─── 12. Serve audio file ────────────────────────────────────────────────────
 
 @router.get("/records/{meeting_id}/audio")
 async def get_audio(

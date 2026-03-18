@@ -2,6 +2,7 @@
 Contract API endpoints
 """
 from typing import Optional
+from app.models.base import now_cn
 from uuid import UUID
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query
@@ -210,7 +211,7 @@ async def update_contract(
     if data.expire_date is not None:
         contract.expire_date = data.expire_date
     
-    contract.updated_at = datetime.utcnow()
+    contract.updated_at = now_cn()
     session.add(contract)
     session.commit()
     session.refresh(contract)
@@ -254,7 +255,7 @@ async def submit_contract_for_approval(
         raise ValidationException("只有草稿状态的合同才能提交")
     
     contract.status = ContractStatus.IN_APPROVAL
-    contract.updated_at = datetime.utcnow()
+    contract.updated_at = now_cn()
     
     session.add(contract)
     session.commit()
