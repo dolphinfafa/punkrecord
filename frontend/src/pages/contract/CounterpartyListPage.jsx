@@ -13,6 +13,7 @@ export default function CounterpartyListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingCounterparty, setEditingCounterparty] = useState(null);
 
     useEffect(() => {
         loadCounterparties();
@@ -101,7 +102,11 @@ export default function CounterpartyListPage() {
                                         </div>
                                     </td>
                                     <td>
-                                        <button className="btn-link" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <button
+                                            className="btn-link"
+                                            style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                            onClick={() => setEditingCounterparty(cp)}
+                                        >
                                             <Edit size={14} />
                                             编辑
                                         </button>
@@ -118,6 +123,15 @@ export default function CounterpartyListPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={loadCounterparties}
             />
+
+            {editingCounterparty && (
+                <CreateCounterpartyModal
+                    isOpen={true}
+                    onClose={() => setEditingCounterparty(null)}
+                    onSuccess={() => { setEditingCounterparty(null); loadCounterparties(); }}
+                    initialData={editingCounterparty}
+                />
+            )}
         </div>
     );
 }

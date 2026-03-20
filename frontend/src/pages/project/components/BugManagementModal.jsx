@@ -269,10 +269,6 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
         }
 
         const currentUserId = String(user?.id || '');
-        if (String(form.tester_user_id) !== currentUserId) {
-            setMessage('请由所选测试员本人创建 Bug（创建人和审核人需为测试员）');
-            return;
-        }
 
         try {
             setSubmitting(true);
@@ -308,7 +304,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     stage_code: 'testing',
                     tester_user_id: form.tester_user_id,
                     developer_user_id: form.developer_user_id,
-                    reviewer_user_id: form.tester_user_id,
+                    reviewer_user_id: currentUserId,
                     actual_result: form.actual_result?.trim() || '',
                     expected_result: form.expected_result?.trim() || '',
                     reproduce_steps: form.reproduce_steps?.trim() || '',

@@ -52,6 +52,28 @@ async def create_counterparty(
     return success_response(CounterpartyResponse.model_validate(counterparty))
 
 
+@router.patch("/counterparties/{counterparty_id}", response_model=dict)
+async def update_counterparty(
+    counterparty_id: UUID,
+    data: CounterpartyCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.write"))
+):
+    """Update counterparty"""
+    cp = session.get(Counterparty, counterparty_id)
+    if not cp:
+        raise NotFoundException("交易方不存在")
+    for field in ["name", "type", "identifier", "address", "phone", "bank_name", "bank_account"]:
+        val = getattr(data, field, None)
+        if val is not None:
+            setattr(cp, field, val)
+    cp.updated_at = now_cn()
+    session.add(cp)
+    session.commit()
+    session.refresh(cp)
+    return success_response(CounterpartyResponse.model_validate(cp))
+
+
 @router.get("/counterparties", response_model=dict)
 async def list_counterparties(
     type: Optional[str] = Query(None),

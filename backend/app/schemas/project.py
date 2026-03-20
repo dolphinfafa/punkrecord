@@ -2,7 +2,7 @@
 Project module Pydantic schemas
 """
 from datetime import date, datetime
-from typing import Optional, Any
+from typing import Optional, Any, Dict, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(BaseModel):
     """Project response schema"""
     id: UUID
-    our_entity_id: UUID
+    our_entity_id: Optional[UUID] = None
     project_no: str
     name: str
     project_type: str
@@ -53,7 +53,7 @@ class ProjectResponse(BaseModel):
     description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -74,9 +74,9 @@ class ProjectStageResponse(BaseModel):
     skip_reason: Optional[str] = None
     deliverables: Optional[str] = None
     feature_list: Optional[str] = None
-    attachments: Optional[list[dict[str, Any]]] = Field(default_factory=list)
+    attachments: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -111,7 +111,7 @@ class ProjectMemberCreate(BaseModel):
 
 class ProjectMemberBatchCreate(BaseModel):
     """Project member batch creation schema"""
-    user_ids: list[UUID]
+    user_ids: List[UUID]
     role_in_project: Optional[str] = None
 
 
@@ -149,7 +149,7 @@ class ProjectTaskResponse(BaseModel):
     blocked_reason: Optional[str] = None
     review_comment: Optional[str] = None
     dismiss_reason: Optional[str] = None
-    link: Optional[dict[str, Any]] = None
+    link: Optional[Dict[str, Any]] = None
     tags: list = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -175,5 +175,5 @@ class ProjectTaskPlanUpdateRequest(BaseModel):
 
 class ProjectTaskBatchAssignRequest(BaseModel):
     """Batch assign project tasks to one assignee"""
-    todo_ids: list[UUID]
+    todo_ids: List[UUID]
     assignee_user_id: UUID

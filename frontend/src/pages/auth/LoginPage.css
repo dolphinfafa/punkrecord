@@ -74,12 +74,30 @@
     flex: 1;
     width: 100%;
     padding: 12px;
+    padding-right: 40px;
     background-color: #1e1e2e;
     border: 1px solid #45475a;
     border-radius: 8px;
     color: #cdd6f4;
     font-size: 15px;
     transition: all 0.2s;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #7f849c;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: #cdd6f4;
 }
 
 .login-form .form-group .input-with-icon input {

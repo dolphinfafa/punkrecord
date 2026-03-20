@@ -216,8 +216,7 @@ async def create_project(
         default_entity = session.exec(select(OurEntity)).first()
         if default_entity:
             our_entity_id = default_entity.id
-        else:
-            raise NotFoundException("未找到可用的我方主体")
+        # For B2C projects, our_entity_id can be None
             
     project = Project(
         our_entity_id=our_entity_id,
@@ -1187,12 +1186,21 @@ async def sync_dev_tasks_from_feature_list(
     default_assignee = project.pm_user_id or project.owner_user_id or current_user.id
     default_due_at = datetime.combine(project.due_at, datetime.min.time()) if project.due_at else None
 
+    # Resolve our_entity_id: use project's value, or fall back to first available entity
+    resolved_entity_id = project.our_entity_id
+    if not resolved_entity_id:
+        default_entity = session.exec(select(OurEntity)).first()
+        if default_entity:
+            resolved_entity_id = default_entity.id
+    if not resolved_entity_id:
+        raise ValidationException("未找到可用的我方主体，无法同步任务")
+
     created = 0
     for row in expected_rows:
         feature_key = row["feature_key"]
         keep = preserved.get(feature_key, {})
         todo = TodoItem(
-            our_entity_id=project.our_entity_id,
+            our_entity_id=resolved_entity_id,
             assignee_user_id=keep.get("assignee_user_id") or default_assignee,
             creator_user_id=project.pm_user_id or current_user.id,
             title=row["title"],
@@ -1229,7 +1237,7 @@ async def sync_dev_tasks_from_feature_list(
 
 
 def sync_project_progress(session, project_id: UUID):
-    """Recalculates and saves project progress percentage."""
+    """Recalculates and saves project progress (0.0 ~ 1.0)."""
     from app.models.todo import TodoItem, TodoSourceType
     project = session.get(Project, project_id)
     if not project:
@@ -1237,11 +1245,11 @@ def sync_project_progress(session, project_id: UUID):
     if project.project_type and project.project_type.lower() == "b2b":
         stages = session.exec(select(ProjectStage).where(ProjectStage.project_id == project_id)).all()
         if not stages:
-            project.progress_percentage = 0
+            project.progress = 0.0
         else:
             done = sum(1 for s in stages if s.status == StageStatus.DONE)
             skipped = sum(1 for s in stages if s.status == StageStatus.SKIPPED)
-            project.progress_percentage = int(((done + skipped) / len(stages)) * 100)
+            project.progress = round((done + skipped) / len(stages), 4)
     else:
         todos = session.exec(
             select(TodoItem)
@@ -1249,10 +1257,10 @@ def sync_project_progress(session, project_id: UUID):
             .where(TodoItem.source_id == str(project_id))
         ).all()
         if not todos:
-            project.progress_percentage = 0
+            project.progress = 0.0
         else:
             done = sum(1 for t in todos if t.status == 'done')
-            project.progress_percentage = int((done / len(todos)) * 100)
+            project.progress = round(done / len(todos), 4)
     session.add(project)
     session.commit()
 
@@ -1605,6 +1613,189 @@ async def export_quote_excel(
     return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"})
 
 
+# ─── Feature List Template & Export (styled Excel) ────────────────────────────
+
+@router.get("/feature-list-template")
+async def download_feature_list_template():
+    """Download an empty styled feature list template (.xlsx) matching the quote export style."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "功能清单模板"
+
+    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+    white_font = Font(color="FFFFFF", bold=True)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    sample_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
+    # Title row
+    ws.merge_cells("A1:J1")
+    ws["A1"] = "功能清单模板"
+    ws["A1"].fill = header_fill
+    ws["A1"].font = Font(color="FFFFFF", bold=True, size=14)
+    ws["A1"].alignment = center_align
+    ws.row_dimensions[1].height = 32
+
+    # Header row
+    headers = ["序号", "产品", "板块", "一级功能", "二级功能", "新增功能说明", "后端开发", "前端开发", "UI设计", "产品规划"]
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=ci, value=h)
+        cell.fill = header_fill
+        cell.font = white_font
+        cell.alignment = center_align
+        cell.border = thin_border
+    ws.row_dimensions[2].height = 24
+
+    # Column widths
+    for col_letter, width in zip("ABCDEFGHIJ", [8, 15, 15, 20, 20, 50, 12, 12, 12, 12]):
+        ws.column_dimensions[col_letter].width = width
+
+    # Sample data row
+    sample = ["1", "小程序", "订单中心", "订单管理", "订单列表", "支持按状态筛选、搜索、分页", "8", "6", "2", "1"]
+    for ci, val in enumerate(sample, 1):
+        cell = ws.cell(row=3, column=ci, value=val)
+        cell.alignment = center_align if ci != 6 else left_align
+        cell.border = thin_border
+        cell.fill = sample_fill
+
+    # Empty row for user to start filling
+    for ci in range(1, 11):
+        cell = ws.cell(row=4, column=ci, value="")
+        cell.border = thin_border
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    filename = "功能清单导入模板.xlsx"
+    encoded_filename = urllib.parse.quote(filename)
+    return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"})
+
+
+@router.post("/export-feature-list-excel")
+async def export_feature_list_excel(
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Export feature list as a styled Excel file, matching the quote export style."""
+    project_name = payload.get("project_name", "项目")
+    feature_list = payload.get("feature_list", [])
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "功能清单"
+
+    header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+    subtotal_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    total_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    white_font = Font(color="FFFFFF", bold=True)
+    bold_font = Font(bold=True)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    even_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+
+    COL_COUNT = 10
+
+    # Title row
+    ws.merge_cells("A1:J1")
+    ws["A1"] = f"{project_name}功能清单"
+    ws["A1"].fill = header_fill
+    ws["A1"].font = Font(color="FFFFFF", bold=True, size=14)
+    ws["A1"].alignment = center_align
+    ws.row_dimensions[1].height = 32
+
+    # Header row
+    headers = ["序号", "产品", "板块", "一级功能", "二级功能", "新增功能说明", "后端开发", "前端开发", "UI设计", "产品规划"]
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=ci, value=h)
+        cell.fill = header_fill
+        cell.font = white_font
+        cell.alignment = center_align
+        cell.border = thin_border
+    ws.row_dimensions[2].height = 24
+
+    # Column widths
+    for col_letter, width in zip("ABCDEFGHIJ", [8, 15, 15, 20, 20, 50, 12, 12, 12, 12]):
+        ws.column_dimensions[col_letter].width = width
+
+    # Data rows
+    feat_data_end = 2
+    for row_i, f in enumerate(feature_list, 3):
+        for ci, key in enumerate(["index", "product", "module", "l1_feature", "l2_feature", "description"], 1):
+            cell = ws.cell(row=row_i, column=ci, value=f.get(key, ""))
+            cell.alignment = left_align if ci == 6 else center_align
+            cell.border = thin_border
+            if (row_i - 3) % 2 == 1:
+                cell.fill = even_fill
+        for ci, key in enumerate(["dev_backend", "dev_frontend", "dev_ui", "dev_product"], 7):
+            val = f.get(key, "")
+            try:
+                val = float(val) if val else None
+            except (ValueError, TypeError):
+                pass
+            cell = ws.cell(row=row_i, column=ci, value=val)
+            cell.alignment = center_align
+            cell.border = thin_border
+            if (row_i - 3) % 2 == 1:
+                cell.fill = even_fill
+        feat_data_end = row_i
+
+    # Footer summary rows
+    def apply_feat_footer(r, label, fg, fh=None, fi=None, fj=None, fill=subtotal_fill, font=None):
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        cell = ws.cell(row=r, column=1, value=label)
+        cell.alignment = center_align
+        cell.font = font or bold_font
+        for ci in range(1, COL_COUNT + 1):
+            ws.cell(row=r, column=ci).border = thin_border
+            ws.cell(row=r, column=ci).fill = fill
+        ws.cell(row=r, column=7, value=fg).alignment = center_align
+        if fh is not None:
+            ws.cell(row=r, column=8, value=fh).alignment = center_align
+        if fi is not None:
+            ws.cell(row=r, column=9, value=fi).alignment = center_align
+        if fj is not None:
+            ws.cell(row=r, column=10, value=fj).alignment = center_align
+
+    dev_row = feat_data_end + 1
+    apply_feat_footer(dev_row, "系统开发工时",
+                      f"=SUM(G3:G{feat_data_end})",
+                      f"=SUM(H3:H{feat_data_end})",
+                      f"=SUM(I3:I{feat_data_end})",
+                      f"=SUM(J3:J{feat_data_end})")
+
+    test_row = dev_row + 1
+    ws.merge_cells(start_row=test_row, start_column=7, end_row=test_row, end_column=10)
+    apply_feat_footer(test_row, "系统测试工时", f"=ROUNDUP(SUM(G{dev_row}:J{dev_row})*0.1,0)")
+
+    mgmt_row = dev_row + 2
+    ws.merge_cells(start_row=mgmt_row, start_column=7, end_row=mgmt_row, end_column=10)
+    apply_feat_footer(mgmt_row, "项目管理工时", f"=ROUNDUP(SUM(G{dev_row}:J{dev_row})*0.1,0)")
+
+    total_row = dev_row + 3
+    ws.merge_cells(start_row=total_row, start_column=7, end_row=total_row, end_column=10)
+    apply_feat_footer(total_row, "总计工时",
+                      f"=SUM(G{dev_row}:J{dev_row})+G{test_row}+G{mgmt_row}",
+                      fill=total_fill,
+                      font=Font(bold=True, color="C00000"))
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    filename = f"{project_name}_功能清单.xlsx"
+    encoded_filename = urllib.parse.quote(filename)
+    return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"})
+
+
 # ─── Dev Task Generation Endpoints ───────────────────────────────────────────
 
 @router.get("/projects/{project_id}/feature-list", response_model=dict)
@@ -1678,6 +1869,15 @@ async def generate_dev_tasks(
     if not project:
         raise NotFoundException("未找到项目")
 
+    # Resolve our_entity_id
+    gen_entity_id = project.our_entity_id
+    if not gen_entity_id:
+        default_entity = session.exec(select(OurEntity)).first()
+        if default_entity:
+            gen_entity_id = default_entity.id
+    if not gen_entity_id:
+        raise ValidationException("未找到可用的我方主体，无法生成任务")
+
     created_ids = []
     for item in payload.tasks:
         # Parse due_at
@@ -1694,7 +1894,7 @@ async def generate_dev_tasks(
         source_id = str(project_id)
 
         todo = TodoItem(
-            our_entity_id=project.our_entity_id,
+            our_entity_id=gen_entity_id,
             assignee_user_id=item.assignee_user_id,
             # PM is the unified reviewer for development tasks.
             creator_user_id=project.pm_user_id or current_user.id,

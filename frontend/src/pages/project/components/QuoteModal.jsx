@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Download, Plus, Trash2, CheckCircle } from 'lucide-react';
-import client from '../../../api/client';
 import projectApi from '../../../api/project';
 
 const CHINESE_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
@@ -126,23 +125,35 @@ export default function QuoteModal({ isOpen, onClose, stage, allStages, onSave, 
                 } catch (e) { featureList = []; }
             }
 
-            const response = await client.post('/project/export_quote_excel', {
-                project_name: stage.project_name || '项目',
-                rows,
-                notes,
-                total_price: totalPrice,
-                total_final: totalFinal,
-                final_confirmed: finalConfirmed,
-                feature_list: featureList
-            }, { responseType: 'blob' });
+            const token = localStorage.getItem('token');
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const response = await fetch(`${baseUrl}/project/export_quote_excel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    project_name: stage.project_name || '项目',
+                    rows,
+                    notes,
+                    total_price: totalPrice,
+                    total_final: totalFinal,
+                    final_confirmed: finalConfirmed,
+                    feature_list: featureList,
+                }),
+            });
+            if (!response.ok) throw new Error('导出失败');
 
-            const url = window.URL.createObjectURL(new Blob([response]));
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
             link.setAttribute('download', `${stage.project_name || '项目'}_报价单.xlsx`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('Export error:', err);
             alert('导出失败，请检查后端服务。');

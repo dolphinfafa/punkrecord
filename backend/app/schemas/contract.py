@@ -3,7 +3,7 @@ Contract module Pydantic schemas
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -80,7 +80,7 @@ class ContractCreate(BaseModel):
     expire_date: Optional[date] = None
     summary: Optional[str] = None
     content_doc: Optional[str] = None
-    payment_plans: list[PaymentPlanCreate] = []
+    payment_plans: List[PaymentPlanCreate] = []
 
 
 class ContractUpdate(BaseModel):

@@ -206,8 +206,16 @@ async def create_todo(
     import uuid as _uuid
     source_id = todo_data.source_id or str(_uuid.uuid4())
 
+    our_entity_id = todo_data.our_entity_id
+    if not our_entity_id:
+        default_entity = session.exec(select(OurEntity)).first()
+        if default_entity:
+            our_entity_id = default_entity.id
+    if not our_entity_id:
+        raise ValidationException("未找到可用主体，无法创建任务")
+
     new_todo = TodoItem(
-        our_entity_id=todo_data.our_entity_id,
+        our_entity_id=our_entity_id,
         assignee_user_id=todo_data.assignee_user_id,
         creator_user_id=current_user.id,
         title=todo_data.title,
@@ -289,18 +297,8 @@ async def get_team_todos(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.read"))
 ):
-    """Get direct subordinates' todos (one level only)."""
-    # Find direct subordinates
-    subordinates = session.exec(
-        select(User).where(User.manager_user_id == current_user.id)
-    ).all()
-    subordinate_ids = [u.id for u in subordinates]
-
-    if not subordinate_ids:
-        return success_response({"items": [], "total": 0, "page": page, "page_size": page_size, "pages": 0})
-
-    from sqlmodel import col
-    query = select(TodoItem).where(col(TodoItem.assignee_user_id).in_(subordinate_ids))
+    """Get todos created by current user (i.e. tasks the user created/assigned to others)."""
+    query = select(TodoItem).where(TodoItem.creator_user_id == current_user.id)
 
     if status:
         query = query.where(TodoItem.status == status)
@@ -317,7 +315,6 @@ async def get_team_todos(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size,
-        "subordinates": [{"id": str(u.id), "display_name": u.display_name} for u in subordinates]
     })
 
 
@@ -368,6 +365,36 @@ async def create_leave_request(
     session.add(leave)
     session.commit()
     session.refresh(leave)
+
+    # Create a TodoItem for the approver (applicant's direct manager)
+    manager = session.get(User, current_user.manager_user_id)
+    if manager:
+        leave_type_labels = {
+            LeaveType.ANNUAL: "年假",
+            LeaveType.MATERNITY: "产假",
+            LeaveType.MARRIAGE: "婚假",
+            LeaveType.PERSONAL: "事假",
+            LeaveType.SICK: "病假",
+        }
+        leave_label = leave_type_labels.get(leave_type, str(leave_type))
+        approval_todo = TodoItem(
+            our_entity_id=our_entity_id,
+            assignee_user_id=manager.id,
+            creator_user_id=current_user.id,
+            title=f"请假审批：{current_user.display_name} 申请{leave_label} {leave_days}天",
+            description=data.reason or None,
+            source_type=TodoSourceType.APPROVAL_STEP,
+            source_id=str(leave.id),
+            action_type=TodoActionType.APPROVE,
+            priority="p1",
+            status=TodoStatus.PENDING_REVIEW,
+            due_at=data.start_at,
+            tags=["leave_approval"],
+            link={"leave_id": str(leave.id), "leave_type": data.leave_type},
+        )
+        session.add(approval_todo)
+        session.commit()
+
     return success_response(_enrich_leave(leave, session))
 
 
@@ -402,18 +429,34 @@ async def list_team_pending_leave_requests(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.read"))
 ):
-    """List pending leave requests where current user is the direct manager approver."""
-    subordinates = session.exec(
-        select(User).where(User.manager_user_id == current_user.id)
-    ).all()
-    subordinate_ids = [u.id for u in subordinates]
-    if not subordinate_ids:
+    """List pending leave requests where current user is in the applicant's manager chain."""
+    # Find all users where current_user is somewhere in their manager chain
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+
+    managed_user_ids = []
+    for u in all_users:
+        if u.id == current_user.id:
+            continue
+        # Walk up the manager chain to see if current_user is a manager
+        current = u
+        visited = set()
+        while current.manager_user_id and current.manager_user_id not in visited:
+            if current.manager_user_id == current_user.id:
+                managed_user_ids.append(u.id)
+                break
+            visited.add(current.id)
+            current = user_map.get(current.manager_user_id)
+            if not current:
+                break
+
+    if not managed_user_ids:
         return success_response([])
 
     from sqlmodel import col
     requests = session.exec(
         select(LeaveRequest)
-        .where(col(LeaveRequest.applicant_user_id).in_(subordinate_ids))
+        .where(col(LeaveRequest.applicant_user_id).in_(managed_user_ids))
         .where(LeaveRequest.status == LeaveStatus.PENDING)
         .order_by(LeaveRequest.created_at.desc())
     ).all()
@@ -426,7 +469,7 @@ async def approve_leave_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Approve leave request by direct manager and deduct leave balance."""
+    """Approve leave request by manager in the applicant's manager chain and deduct leave balance."""
     leave = session.get(LeaveRequest, leave_id)
     if not leave:
         raise NotFoundException("未找到请假申请")
@@ -436,8 +479,23 @@ async def approve_leave_request(
     applicant = session.get(User, leave.applicant_user_id)
     if not applicant:
         raise NotFoundException("未找到请假申请人")
-    if applicant.manager_user_id != current_user.id:
-        raise ValidationException("仅直属主管可审批此请假申请")
+
+    # Check if current_user is in the applicant's manager chain
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    is_manager = False
+    current = applicant
+    visited = set()
+    while current.manager_user_id and current.manager_user_id not in visited:
+        if current.manager_user_id == current_user.id:
+            is_manager = True
+            break
+        visited.add(current.id)
+        current = user_map.get(current.manager_user_id)
+        if not current:
+            break
+    if not is_manager:
+        raise ValidationException("仅上级主管可审批此请假申请")
 
     leave_days = _calc_leave_days(leave.start_at, leave.end_at)
     balance_field = _resolve_leave_balance_field(leave.leave_type)
@@ -466,7 +524,7 @@ async def reject_leave_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Reject leave request by direct manager."""
+    """Reject leave request by manager in the applicant's manager chain."""
     leave = session.get(LeaveRequest, leave_id)
     if not leave:
         raise NotFoundException("未找到请假申请")
@@ -476,8 +534,23 @@ async def reject_leave_request(
     applicant = session.get(User, leave.applicant_user_id)
     if not applicant:
         raise NotFoundException("未找到请假申请人")
-    if applicant.manager_user_id != current_user.id:
-        raise ValidationException("仅直属主管可审批此请假申请")
+
+    # Check if current_user is in the applicant's manager chain
+    all_users = session.exec(select(User)).all()
+    user_map = {u.id: u for u in all_users}
+    is_manager = False
+    current = applicant
+    visited = set()
+    while current.manager_user_id and current.manager_user_id not in visited:
+        if current.manager_user_id == current_user.id:
+            is_manager = True
+            break
+        visited.add(current.id)
+        current = user_map.get(current.manager_user_id)
+        if not current:
+            break
+    if not is_manager:
+        raise ValidationException("仅上级主管可审批此请假申请")
 
     leave.status = LeaveStatus.REJECTED
     leave.approved_by_user_id = current_user.id
@@ -698,8 +771,9 @@ async def start_todo(
     if not todo:
         raise NotFoundException("未找到待办事项")
 
-    if todo.assignee_user_id != current_user.id:
-        raise NotFoundException("只有被分配人才能开始任务")
+    # Allow assignee or creator (for bugs, tester is creator) to start
+    if todo.assignee_user_id != current_user.id and todo.creator_user_id != current_user.id:
+        raise NotFoundException("只有被分配人或创建人才能开始任务")
     # Idempotent start: duplicate drag/drop or click should not fail.
     if todo.status == TodoStatus.IN_PROGRESS:
         return success_response(_enrich_todo(todo, session))
@@ -739,8 +813,9 @@ async def submit_todo(
     if not todo:
         raise NotFoundException("未找到待办事项")
 
-    if todo.assignee_user_id != current_user.id:
-        raise NotFoundException("只有被分配人才能提交完成")
+    # Allow assignee or creator (for bugs, tester is creator) to submit
+    if todo.assignee_user_id != current_user.id and todo.creator_user_id != current_user.id:
+        raise NotFoundException("只有被分配人或创建人才能提交完成")
 
     # Idempotent submit: duplicate drag/drop or click should not fail.
     if todo.status in (TodoStatus.PENDING_REVIEW, TodoStatus.DONE):

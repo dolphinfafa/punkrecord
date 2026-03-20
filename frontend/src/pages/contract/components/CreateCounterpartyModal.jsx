@@ -3,7 +3,8 @@ import { Clipboard, ArrowDown } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import contractApi from '@/api/contract';
 
-export default function CreateCounterpartyModal({ isOpen, onClose, onSuccess }) {
+export default function CreateCounterpartyModal({ isOpen, onClose, onSuccess, initialData = null }) {
+    const isEditing = !!initialData;
     const [formData, setFormData] = useState({
         name: '',
         type: 'individual',
@@ -19,19 +20,31 @@ export default function CreateCounterpartyModal({ isOpen, onClose, onSuccess }) 
 
     useEffect(() => {
         if (isOpen) {
-            setFormData({
-                name: '',
-                type: 'individual',
-                identifier: '',
-                address: '',
-                phone: '',
-                bank_name: '',
-                bank_account: ''
-            });
+            if (initialData) {
+                setFormData({
+                    name: initialData.name || '',
+                    type: initialData.type || 'individual',
+                    identifier: initialData.identifier || '',
+                    address: initialData.address || '',
+                    phone: initialData.phone || '',
+                    bank_name: initialData.bank_name || '',
+                    bank_account: initialData.bank_account || ''
+                });
+            } else {
+                setFormData({
+                    name: '',
+                    type: 'individual',
+                    identifier: '',
+                    address: '',
+                    phone: '',
+                    bank_name: '',
+                    bank_account: ''
+                });
+            }
             setSmartPasteContent('');
             setShowSmartPaste(false);
         }
-    }, [isOpen]);
+    }, [isOpen, initialData]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -87,12 +100,16 @@ export default function CreateCounterpartyModal({ isOpen, onClose, onSuccess }) 
         e.preventDefault();
         try {
             setLoading(true);
-            await contractApi.createCounterparty(formData);
+            if (isEditing) {
+                await contractApi.updateCounterparty(initialData.id, formData);
+            } else {
+                await contractApi.createCounterparty(formData);
+            }
             onSuccess();
             onClose();
         } catch (error) {
             console.error('Failed to create counterparty', error);
-            alert('创建交易方失败: ' + (error.message || '未知错误'));
+            alert((isEditing ? '更新' : '创建') + '交易方失败: ' + (error.message || '未知错误'));
         } finally {
             setLoading(false);
         }
@@ -111,7 +128,7 @@ export default function CreateCounterpartyModal({ isOpen, onClose, onSuccess }) 
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="添加新交易方"
+            title={isEditing ? '编辑交易方' : '添加新交易方'}
             footer={footer}
         >
             <div style={{ marginBottom: '1.5rem' }}>

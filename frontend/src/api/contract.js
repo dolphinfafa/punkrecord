@@ -41,6 +41,10 @@ export const contractApi = {
     createCounterparty: async (counterpartyData) => {
         return client.post('/contract/counterparties', counterpartyData);
     },
+
+    updateCounterparty: async (id, counterpartyData) => {
+        return client.patch(`/contract/counterparties/${id}`, counterpartyData);
+    },
 };
 
 export default contractApi;

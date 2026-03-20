@@ -11,7 +11,7 @@ from app.core.database import get_session
 from app.core.auth import require_permission
 from app.core.exceptions import NotFoundException
 from app.core.response import success_response
-from app.models.iam import User
+from app.models.iam import User, OurEntity, OurEntityStatus
 from app.models.finance import (
     FinanceAccount, FinanceTransaction, FinanceInvoice, Reimbursement,
     AccountCategory, AccountStatus, TransactionDirection, TransactionType,
@@ -37,15 +37,25 @@ async def create_account(
     current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create finance account"""
+    # Mask account number for display: show last 4 digits
+    account_no_masked = None
+    if data.account_no:
+        if len(data.account_no) > 4:
+            account_no_masked = '*' * (len(data.account_no) - 4) + data.account_no[-4:]
+        else:
+            account_no_masked = data.account_no
+
     account = FinanceAccount(
         entity_id=data.entity_id,
         account_category=AccountCategory(data.account_category),
         account_name=data.account_name,
         bank_name=data.bank_name,
         bank_branch=data.bank_branch,
+        account_no_masked=account_no_masked,
         currency=data.currency,
         initial_balance=data.initial_balance,
         status=AccountStatus.ACTIVE,
+        is_default=data.is_default,
         shareholder_user_id=data.shareholder_user_id
     )
     
@@ -121,7 +131,12 @@ async def update_account(
         account.is_default = data.is_default
     if data.status is not None:
         account.status = AccountStatus(data.status)
-    if data.account_no_masked is not None:
+    if data.account_no is not None and data.account_no:
+        if len(data.account_no) > 4:
+            account.account_no_masked = '*' * (len(data.account_no) - 4) + data.account_no[-4:]
+        else:
+            account.account_no_masked = data.account_no
+    elif data.account_no_masked is not None:
         account.account_no_masked = data.account_no_masked
 
     account.updated_at = now_cn()
@@ -141,6 +156,21 @@ async def create_transaction(
     current_user: User = Depends(require_permission("finance.write"))
 ):
     """Create transaction"""
+    # Resolve our_entity_id: if provided, validate it; otherwise, use the first active OurEntity
+    our_entity_id = data.our_entity_id
+    if our_entity_id:
+        entity = session.get(OurEntity, our_entity_id)
+        if not entity:
+            # Provided ID is not a valid OurEntity (likely a counterparty ID from account.entity_id)
+            our_entity_id = None
+    if not our_entity_id:
+        default_entity = session.exec(
+            select(OurEntity).where(OurEntity.status == OurEntityStatus.ACTIVE).limit(1)
+        ).first()
+        if not default_entity:
+            raise NotFoundException("未找到可用的主体实体，请先创建主体")
+        our_entity_id = default_entity.id
+
     txn_type = TransactionType(data.txn_type)
     txn_direction = TransactionDirection(data.txn_direction)
     if txn_type == TransactionType.RECEIPT:
@@ -149,7 +179,7 @@ async def create_transaction(
         txn_direction = TransactionDirection.OUT
 
     transaction = FinanceTransaction(
-        our_entity_id=data.our_entity_id,
+        our_entity_id=our_entity_id,
         account_id=data.account_id,
         txn_type=txn_type,
         txn_direction=txn_direction,

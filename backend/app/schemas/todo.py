@@ -2,14 +2,14 @@
 Todo module Pydantic schemas
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel
 
 
 class TodoCreate(BaseModel):
     """Todo creation schema"""
-    our_entity_id: UUID
+    our_entity_id: Optional[UUID] = None
     assignee_user_id: UUID
     title: str
     description: Optional[str] = None
@@ -19,7 +19,7 @@ class TodoCreate(BaseModel):
     priority: str = "p2"
     due_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
-    tags: list[str] = []
+    tags: List[str] = []
     link: Optional[dict] = None
 
 
@@ -30,7 +30,7 @@ class TodoUpdate(BaseModel):
     priority: Optional[str] = None
     due_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
-    tags: Optional[list[str]] = None
+    tags: Optional[List[str]] = None
 
 
 class TodoStatusUpdate(BaseModel):

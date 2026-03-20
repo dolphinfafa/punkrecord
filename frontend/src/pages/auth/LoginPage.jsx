@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Loader2 } from 'lucide-react';
+import { User, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -9,6 +9,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -25,7 +26,14 @@ export default function LoginPage() {
                 navigate('/');
             }
         } catch (err) {
-            setError('用户名或密码错误');
+            const msg = err?.response?.data?.message || err?.message || '';
+            if (msg.includes('停用')) {
+                setError('该账号已停用，请联系管理员');
+            } else if (msg.includes('密码') || msg.includes('用户')) {
+                setError(msg);
+            } else {
+                setError('用户名或密码错误，请检查后重试');
+            }
         } finally {
             setLoading(false);
         }
@@ -61,12 +69,20 @@ export default function LoginPage() {
                             <Lock size={18} className="input-icon" />
                             <input
                                 id="password"
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="请输入密码"
                                 required
                             />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </div>
                     </div>
 

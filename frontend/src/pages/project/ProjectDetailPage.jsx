@@ -212,8 +212,8 @@ export default function ProjectDetailPage() {
                                                 <th className="col-name">阶段</th>
                                                 <th className="col-status">状态</th>
                                                 <th className="col-date">计划结束日期</th>
-                                                <th className="col-note">备注/交付物</th>
                                                 <th className="col-action">操作</th>
+                                                <th className="col-note">备注/交付物</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -259,23 +259,6 @@ export default function ProjectDetailPage() {
                                                                 }}
                                                             />
                                                         </td>
-                                                        <td className="col-note">
-                                                            <input
-                                                                type="text"
-                                                                value={stage.deliverables || ''}
-                                                                placeholder="备注或交付物链接..."
-                                                                onChange={(e) => setStages(prev => prev.map(s => s.id === stage.id ? { ...s, deliverables: e.target.value } : s))}
-                                                                onBlur={(e) => handleUpdateStage(stage.id, 'deliverables', e.target.value)}
-                                                                style={{
-                                                                    width: '100%',
-                                                                    padding: '4px 8px',
-                                                                    border: 'none',
-                                                                    borderBottom: '1px dashed #cbd5e1',
-                                                                    backgroundColor: 'transparent',
-                                                                    outline: 'none'
-                                                                }}
-                                                            />
-                                                        </td>
                                                         <td className="col-action">
                                                             <div className="stage-action-wrap" style={{ display: 'flex', gap: '10px' }}>
                                                                 {(
@@ -308,7 +291,7 @@ export default function ProjectDetailPage() {
                                                                         <PenTool size={14} /> AI生成合同
                                                                     </button>
                                                                 )}
-                                                                {stage?.stage_code?.toLowerCase() === 'prototype_confirmed' && (
+                                                                {project?.project_type?.toLowerCase() === 'b2b' && stage?.stage_code?.toLowerCase() === 'prototype_confirmed' && (
                                                                     <button
                                                                         className="btn-link text-primary"
                                                                         onClick={() => setPrototypeConfirmStage({ ...stage, project_name: project.name })}
@@ -347,7 +330,6 @@ export default function ProjectDetailPage() {
                                                                 {project?.project_type?.toLowerCase() === 'b2c' &&
                                                                     stage?.stage_code?.toLowerCase() !== 'project_initiation' &&
                                                                     stage?.stage_code?.toLowerCase() !== 'contract_signed' &&
-                                                                    stage?.stage_code?.toLowerCase() !== 'prototype_confirmed' &&
                                                                     stage?.stage_code?.toLowerCase() !== 'testing' &&
                                                                     stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                                 {project?.project_type?.toLowerCase() === 'b2b' &&
@@ -359,6 +341,23 @@ export default function ProjectDetailPage() {
                                                                     stage?.stage_code?.toLowerCase() !== 'delivery' &&
                                                                     stage?.stage_code?.toLowerCase() !== 'development' && '-'}
                                                             </div>
+                                                        </td>
+                                                        <td className="col-note">
+                                                            <input
+                                                                type="text"
+                                                                value={stage.deliverables || ''}
+                                                                placeholder="备注或交付物链接..."
+                                                                onChange={(e) => setStages(prev => prev.map(s => s.id === stage.id ? { ...s, deliverables: e.target.value } : s))}
+                                                                onBlur={(e) => handleUpdateStage(stage.id, 'deliverables', e.target.value)}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '4px 8px',
+                                                                    border: 'none',
+                                                                    borderBottom: '1px dashed #cbd5e1',
+                                                                    backgroundColor: 'transparent',
+                                                                    outline: 'none'
+                                                                }}
+                                                            />
                                                         </td>
                                                     </tr>
                                                 );

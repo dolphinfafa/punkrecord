@@ -42,13 +42,15 @@ export default function DashboardPage() {
             try {
                 setLoading(true);
                 // Fetch user's todos
-                const [todoRes, leaveRes, profileRes, teamPendingRes] = await Promise.all([
+                const [todoRes, teamPendingReviewRes, leaveRes, profileRes, teamPendingRes] = await Promise.all([
                     todoApi.list({ page_size: 100 }),
+                    todoApi.listTeam({ status: 'pending_review', page_size: 100 }),
                     todoApi.listMyLeaves({ page_size: 5 }),
                     user?.id ? iamApi.getUser(user.id) : Promise.resolve({ data: null }),
                     todoApi.listTeamPendingLeaves()
                 ]);
                 const todos = todoRes.data?.items || [];
+                const teamPendingReviewCount = teamPendingReviewRes.data?.total || 0;
                 setLeaves(leaveRes.data?.items || []);
                 setMyProfile(profileRes?.data || null);
                 setTeamPendingLeaves(teamPendingRes?.data || []);
@@ -57,7 +59,7 @@ export default function DashboardPage() {
                 const newStats = {
                     open: todos.filter(t => t.status === 'open').length,
                     in_progress: todos.filter(t => t.status === 'in_progress').length,
-                    pending_review: todos.filter(t => t.status === 'pending_review').length,
+                    pending_review: teamPendingReviewCount,
                     done: todos.filter(t => t.status === 'done').length,
                     total: todos.length
                 };

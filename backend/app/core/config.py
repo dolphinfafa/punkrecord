@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # LiteLLM (meeting summary LLM)
     LITELLM_BASE_URL: str = "http://212.50.233.55:4000/v1"
-    LITELLM_API_KEY: str = "sk-9SNEoaU6eUFuJnMW76-clg"
+    LITELLM_API_KEY: str = "sk-TzLTEohDg_5CxoRaqBOJpQ"
     LITELLM_MODEL: str = "gemini/gemini-3.1-flash-lite-preview"
 
     # Knowledge Base

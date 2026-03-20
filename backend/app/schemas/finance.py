@@ -15,8 +15,10 @@ class FinanceAccountCreate(BaseModel):
     account_name: str
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    account_no: Optional[str] = None  # Bank account number, will be stored as masked
     currency: str = "CNY"
     initial_balance: Decimal = 0
+    is_default: bool = False
     shareholder_user_id: Optional[UUID] = None  # Required for private accounts
 
 
@@ -27,6 +29,7 @@ class FinanceAccountUpdate(BaseModel):
     account_name: Optional[str] = None
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    account_no: Optional[str] = None  # Bank account number, will be stored as masked
     currency: Optional[str] = None
     initial_balance: Optional[Decimal] = None
     shareholder_user_id: Optional[UUID] = None
@@ -40,6 +43,8 @@ class FinanceAccountResponse(BaseModel):
     account_category: str
     account_name: str
     bank_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    account_no_masked: Optional[str] = None
     currency: str
     initial_balance: Decimal
     balance: Decimal = 0 # Computed field
@@ -47,14 +52,14 @@ class FinanceAccountResponse(BaseModel):
     is_default: bool
     shareholder_user_id: Optional[UUID] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class TransactionCreate(BaseModel):
     """Transaction creation schema"""
-    our_entity_id: UUID
+    our_entity_id: Optional[UUID] = None
     account_id: UUID
     txn_type: str = "payment"  # receipt / payment / reimbursement
     txn_direction: str  # in or out

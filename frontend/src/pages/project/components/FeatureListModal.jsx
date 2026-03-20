@@ -124,44 +124,53 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const exportToExcel = async () => {
         if (tableData.length === 0) return;
         try {
-            const rows = tableData.map((row) => {
-                const out = {};
-                FEATURE_COLUMNS.forEach((col) => {
-                    out[col.label] = row[col.key] ?? '';
-                });
-                return out;
+            const token = localStorage.getItem('token');
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const response = await fetch(`${baseUrl}/project/export-feature-list-excel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    project_name: stage?.project_name || '当前项目',
+                    feature_list: tableData,
+                }),
             });
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, '功能清单');
-            XLSX.writeFile(wb, `${stage?.project_name || '当前项目'}_功能清单.xlsx`);
+            if (!response.ok) throw new Error('导出失败');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${stage?.project_name || '当前项目'}_功能清单.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Failed to export Excel:', error);
-            alert('导出 Excel 失败，请检查文件权限。');
+            alert('导出 Excel 失败，请检查后端服务。');
         }
     };
 
-    const downloadTemplate = () => {
-        const templateHeader = FEATURE_COLUMNS.reduce((acc, cur) => {
-            acc[cur.label] = '';
-            return acc;
-        }, {});
-        const sample = {
-            序号: '1',
-            产品: '小程序',
-            模块: '订单中心',
-            一级功能: '订单管理',
-            二级功能: '订单列表',
-            功能说明: '支持按状态筛选、搜索、分页',
-            后端: '8',
-            前端: '6',
-            UI设计: '2',
-            产品工时: '1',
-        };
-        const ws = XLSX.utils.json_to_sheet([templateHeader, sample], { skipHeader: false });
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '功能清单模板');
-        XLSX.writeFile(wb, '功能清单导入模板.xlsx');
+    const downloadTemplate = async () => {
+        try {
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const response = await fetch(`${baseUrl}/project/feature-list-template`);
+            if (!response.ok) throw new Error('下载失败');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', '功能清单导入模板.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to download template:', error);
+            alert('下载模板失败，请检查后端服务。');
+        }
     };
 
     const handleImportFile = async (event) => {

@@ -98,7 +98,7 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess, initia
         <>
             <button className="btn btn-secondary" onClick={onClose} disabled={loading}>取消</button>
             <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-                {loading ? '保存' : '保存中...'}
+                {loading ? '保存中...' : '保存'}
             </button>
         </>
     );
