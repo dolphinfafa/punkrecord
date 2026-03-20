@@ -81,7 +81,7 @@
 
 **AI Agent 工作流**：状态接口支持 `ai_fixing` 和 `ai_fixed` 状态，用于 AI 驱动的 Bug 修复流程。
 
-**团队任务访问规则**：直属上级可以查看和编辑下属的任务。
+**团队任务访问规则**：按 `creator_user_id` 过滤，即当前用户创建/审核的任务全部展示，与组织层级无关。
 
 #### 请假相关
 
@@ -97,7 +97,7 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST/GET | `/api/v1/contract/counterparties` | 对手方 CRUD |
+| POST/GET/PATCH | `/api/v1/contract/counterparties` | 对手方 CRUD（含编辑） |
 | POST/GET | `/api/v1/contract/contracts` | 合同创建/列表 |
 | GET/PATCH | `/api/v1/contract/contracts/{id}` | 合同详情/更新 |
 | POST | `/api/v1/contract/contracts/{id}/submit` | 提交合同 |
@@ -123,6 +123,8 @@
 | GET | `/api/v1/project/projects/{id}/contract-context` | 合同上下文 |
 | GET | `/api/v1/project/projects/{id}/acceptance-report/download` | 下载验收报告 |
 | POST | `/api/v1/project/export_quote_excel` | 导出报价单 |
+| GET | `/api/v1/project/feature-list-template` | 下载功能清单模板（带样式 Excel） |
+| POST | `/api/v1/project/export-feature-list-excel` | 导出功能清单 Excel（带样式） |
 | POST | `/api/v1/project/export-contract-docx` | 导出合同文档 |
 
 ### 财务管理
@@ -185,4 +187,4 @@
 
 ---
 
-*最后更新：2026-03-18*
+*最后更新：2026-03-20*

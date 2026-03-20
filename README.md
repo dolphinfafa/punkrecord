@@ -2,14 +2,51 @@
 
 PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含后端 API、Web 管理后台和微信小程序三个客户端。
 
+## 功能模块
+
+| 模块 | 说明 |
+|------|------|
+| 认证与权限 | JWT 认证、双通道 RBAC（角色权限 + 职位权限）、首次登录档案完善 |
+| 组织管理（IAM） | 用户、部门（树形）、职位、权限、实体、组织架构图、Beli 积分 |
+| 任务管理（Todo） | 个人/团队任务、状态机、图片附件、请假申请与审批（自动创建审批任务） |
+| 合同管理 | 合同 CRUD、交易方管理（含编辑）、付款计划、AI 生成合同 |
+| 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、Bug 管理、验收报告 |
+| 财务管理 | 账户、交易记录、发票、报销 |
+| AI 能力 | AI 对话、功能清单生成、合同起草（LiteLLM/Gemini） |
+| 企业大脑（KB） | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
+| 会议记录 | 音频上传、ASR 转写（豆包）、说话人标注/切换、会议日期、参会人、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
+
+## 技术栈
+
+- **后端**：Python / FastAPI / SQLModel / MySQL 8.0 / ChromaDB
+- **前端**：React 19 / Vite / React Router / Axios
+- **小程序**：原生微信小程序框架
+- **AI**：LiteLLM (Gemini) / 豆包 ASR / ChromaDB 向量检索
+
 ## Project Structure
 
--   `/backend`: 后端 API (Python / FastAPI)
--   `/frontend`: Web 管理后台 (React / Vite)
--   `/miniprogram`: 微信小程序 (原生框架)
--   `/prd`: 产品需求文档
--   `/milestone`: 项目里程碑记录
--   `/.agent/workflows`: 项目工作流文档与索引
+```
+punkrecord/
+├── backend/                 # FastAPI 后端服务
+│   ├── app/
+│   │   ├── api/             # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting）
+│   │   ├── core/            # 配置、数据库、认证、响应、异常处理、文件存储
+│   │   ├── models/          # SQLModel ORM 模型
+│   │   ├── schemas/         # Pydantic 请求/响应 Schema
+│   │   └── services/        # 业务服务（导出、AI、文档解析、Embedding、RAG、ASR）
+│   ├── db_migrations/       # Alembic 数据库迁移
+│   └── tests/
+├── frontend/                # React Web 前端
+│   └── src/
+│       ├── api/             # API 请求封装
+│       ├── components/      # 共享组件（common/, layout/, todo/）
+│       ├── contexts/        # AuthContext 认证状态
+│       └── pages/           # 按业务域划分的页面
+├── miniprogram/             # 微信小程序客户端
+├── milestone/               # 里程碑工作记录
+├── prd/                     # 产品需求文档
+└── .agent/workflows/        # Agent 工作流文档与索引
+```
 
 ## 分支说明
 
@@ -22,95 +59,63 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 
 ## 环境要求
 
-- **Node.js**: v16+ (用于前端)
-- **Python**: 3.8+ (用于后端)
-- **MySQL**: 5.7+ 或 8.0+
+- **Node.js**: v16+
+- **Python**: 3.9+（Deploy 服务器为 3.9，不支持 `X | None` 语法）
+- **MySQL**: 8.0+
 - **Conda**: 用于 Python 环境管理（推荐）
 
 ## 快速开始
 
 ### 1. 数据库配置
 
-确保 MySQL 数据库已创建并配置：
-
-```bash
-# 数据库名称: punkrecord
-# 用户名: admin
-# 密码: Cc123456@123456
-```
+确保 MySQL 数据库已创建，配置在 `backend/.env` 中。
 
 ### 2. 后端服务启动
 
-#### 安装依赖
-
 ```bash
-# 进入后端目录
 cd backend
+conda activate punk            # 激活 conda 环境
+pip install -r requirements.txt # 安装依赖
+python init_database.py         # 初始化数据库（首次）
 
-# 激活 conda 环境（如果使用 conda）
-conda activate punkrecord
-
-# 安装 Python 依赖
-pip install -r requirements.txt
-```
-
-#### 配置环境变量
-
-后端目录下的 `.env` 文件已包含默认配置，如需修改请编辑 `backend/.env` 文件。
-
-#### 初始化数据库
-
-```bash
-# 在 backend 目录下运行
-python init_database.py
-```
-
-#### 启动后端服务
-
-```bash
-# main 分支（生产环境）
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
-
-# dev 分支（开发环境）
+# dev 分支
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8086
+
+# main 分支
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
 ```
 
 ### 3. 前端服务启动
 
-#### 安装依赖
-
 ```bash
-# 进入前端目录
 cd frontend
-
-# 安装 npm 依赖
 npm install
-```
 
-#### 启动前端服务
-
-```bash
-# main 分支（生产环境）
-npm run dev -- --port 5173
-
-# dev 分支（开发环境）
+# dev 分支
 npm run dev -- --port 5174
+
+# main 分支
+npm run dev -- --port 5173
 ```
 
 ### 4. 访问应用
 
-#### main 分支（生产环境）
+| 环境 | 前端 | 后端 API | API 文档 |
+|------|------|----------|----------|
+| dev | http://localhost:5174/punkrecord/ | http://localhost:8086 | http://localhost:8086/docs |
+| main | http://localhost:5173/punkrecord/ | http://localhost:8085 | http://localhost:8085/docs |
 
-- **前端界面**: http://localhost:5173/punkrecord/
-- **后端 API**: http://localhost:8085
-- **API 文档**: http://localhost:8085/docs
+### 5. 便捷启停（dev 环境）
 
-#### dev 分支（开发环境）
-
-- **前端界面**: http://localhost:5174/punkrecord/
-- **后端 API**: http://localhost:8086
-- **API 文档**: http://localhost:8086/docs
+```bash
+./dev.sh start    # 启动前后端
+./dev.sh stop     # 停止
+./dev.sh restart  # 重启
+./dev.sh status   # 查看状态
+```
 
 ## 更多信息
 
-请参考 `TODO.md` 了解更多开发任务和详细说明。
+- 详细技术文档：`.agent/workflows/project-index.md`
+- 里程碑记录：`milestone/` 目录
+- 产品需求文档：`prd/` 目录
