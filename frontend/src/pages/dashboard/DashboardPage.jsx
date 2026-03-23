@@ -239,7 +239,7 @@ export default function DashboardPage() {
                             <div className="empty-state">暂无活动记录</div>
                         ) : (
                             recentActivity.map(todo => (
-                                <div key={todo.id} className="activity-item" onClick={() => navigate('/todo')}>
+                                <div key={todo.id} className="activity-item" onClick={() => { if (window.getSelection().toString()) return; navigate('/todo'); }}>
                                     <div className={clsx('activity-icon', `status-${todo.status}`)}>
                                         {todo.status === 'done' ? <CheckSquare size={16} /> : <Activity size={16} />}
                                     </div>

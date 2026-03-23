@@ -377,18 +377,24 @@ async def create_leave_request(
             LeaveType.SICK: "病假",
         }
         leave_label = leave_type_labels.get(leave_type, str(leave_type))
+        today_end = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
+        leave_desc = (
+            f"请假类型：{leave_label}\n"
+            f"请假时间：{data.start_at.strftime('%Y-%m-%d')} 至 {data.end_at.strftime('%Y-%m-%d')}\n"
+            f"请假原因：{data.reason or '未填写'}"
+        )
         approval_todo = TodoItem(
             our_entity_id=our_entity_id,
             assignee_user_id=manager.id,
             creator_user_id=current_user.id,
-            title=f"请假审批：{current_user.display_name} 申请{leave_label} {leave_days}天",
-            description=data.reason or None,
+            title=f"{current_user.display_name} - 请假申请",
+            description=leave_desc,
             source_type=TodoSourceType.APPROVAL_STEP,
             source_id=str(leave.id),
             action_type=TodoActionType.APPROVE,
             priority="p1",
             status=TodoStatus.PENDING_REVIEW,
-            due_at=data.start_at,
+            due_at=today_end,
             tags=["leave_approval"],
             link={"leave_id": str(leave.id), "leave_type": data.leave_type},
         )

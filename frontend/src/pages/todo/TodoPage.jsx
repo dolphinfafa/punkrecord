@@ -3,7 +3,8 @@ import { todoApi } from '@/api/todo';
 import { useAuth } from '@/contexts/AuthContext';
 import client from '@/api/client';
 import {
-    Plus, Check, Clock, AlertCircle, Calendar, Users, User, LayoutGrid, List
+    Plus, Check, Clock, AlertCircle, Calendar, Users, User, LayoutGrid, List,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -84,6 +85,9 @@ export default function TodoPage() {
     const [draggedTodo, setDraggedTodo] = useState(null);
     const [taskTypeFilter, setTaskTypeFilter] = useState('all');
     const [assigneeFilter, setAssigneeFilter] = useState('all');
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const pageSize = 20;
     const actioningTodoIdsRef = useRef(new Set());
 
     // Fetch entity and check if user has subordinates
@@ -112,18 +116,24 @@ export default function TodoPage() {
         try {
             setLoading(true);
             let response;
-            if (viewMode === 'team') {
-                // If filter is 'board', fetch all active tasks (or rely on backend logic for 'open')
-                // Backend 'open' usually returns OPEN, IN_PROGRESS, BLOCKED. 
-                // We need DONE and PENDING_REVIEW too for the board.
-                // Let's use 'all' for board fetching and filter/group in client.
-                const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
-                response = await todoApi.listTeam({ status: statusParam, page_size: 100 });
+            const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
+            if (filter === 'board') {
+                // Board view: fetch all tasks (no pagination) for kanban columns
+                if (viewMode === 'team') {
+                    response = await todoApi.listTeam({ status: statusParam, page_size: 100 });
+                } else {
+                    response = await todoApi.list({ status: statusParam, page_size: 100 });
+                }
+                setTotalCount(0); // not used in board view
             } else {
-                const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
-                response = await todoApi.list({ status: statusParam, page_size: 100 });
+                // List view: use pagination
+                if (viewMode === 'team') {
+                    response = await todoApi.listTeam({ status: statusParam, page: page, page_size: pageSize });
+                } else {
+                    response = await todoApi.list({ status: statusParam, page: page, page_size: pageSize });
+                }
+                setTotalCount(response.data?.total || 0);
             }
-            // For board view, we might want to filter out dismissed or very old done tasks if not done by backend
             setTodos(response.data?.items || []);
         } catch {
             showNotification('获取任务列表失败', 'error');
@@ -132,7 +142,7 @@ export default function TodoPage() {
         }
     };
 
-    useEffect(() => { fetchTodos(); }, [filter, viewMode]);
+    useEffect(() => { fetchTodos(); }, [filter, viewMode, page]);
 
     const assigneeOptions = useMemo(() => {
         const map = new Map();
@@ -426,13 +436,13 @@ export default function TodoPage() {
             <div className="todo-view-tabs">
                 <button
                     className={clsx('view-tab', { active: viewMode === 'my' })}
-                    onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); }}
+                    onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); setPage(1); }}
                 >
                     <User size={15} /> 我的任务
                 </button>
                 <button
                     className={clsx('view-tab', { active: viewMode === 'team' })}
-                    onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); }}
+                    onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); setPage(1); }}
                 >
                     <Users size={15} /> 团队任务
                 </button>
@@ -442,13 +452,13 @@ export default function TodoPage() {
             <div className="todo-filters">
                 <button
                     className={clsx('filter-btn', { active: filter === 'board' })}
-                    onClick={() => setFilter('board')}
+                    onClick={() => { setFilter('board'); setPage(1); }}
                 >
                     <LayoutGrid size={13} /> 看板视图
                 </button>
                 <button
                     className={clsx('filter-btn', { active: filter === 'all' })}
-                    onClick={() => setFilter('all')}
+                    onClick={() => { setFilter('all'); setPage(1); }}
                 >
                     <List size={13} /> 全部列表
                 </button>
@@ -546,6 +556,7 @@ export default function TodoPage() {
                             })}
                         </div>
                     ) : (
+                        <>
                         <div className="todo-list">
                             {filteredTodos.length === 0 ? (
                                 <div className="empty-state">暂无任务</div>
@@ -604,6 +615,33 @@ export default function TodoPage() {
                                 ))
                             )}
                         </div>
+                        {totalCount > pageSize && (
+                            <div className="todo-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: '8px' }}>
+                                <span style={{ fontSize: '13px', color: '#64748b' }}>共 {totalCount} 条记录</span>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                        className="filter-btn"
+                                        disabled={page <= 1}
+                                        onClick={() => setPage((p) => p - 1)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <ChevronLeft size={16} /> 上一页
+                                    </button>
+                                    <span style={{ fontSize: '13px', color: '#475569' }}>
+                                        {page} / {Math.ceil(totalCount / pageSize)}
+                                    </span>
+                                    <button
+                                        className="filter-btn"
+                                        disabled={page >= Math.ceil(totalCount / pageSize)}
+                                        onClick={() => setPage((p) => p + 1)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        下一页 <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        </>
                     )}
                 </>
             )}

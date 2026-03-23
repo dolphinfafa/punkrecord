@@ -4,7 +4,7 @@ Project API endpoints
 from typing import Optional, Dict, Any, List, Union, Tuple
 from app.models.base import now_cn
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, date
 import io
 import urllib.parse
 from pathlib import Path
@@ -210,17 +210,32 @@ async def create_project(
     current_user: User = Depends(require_permission("project.write"))
 ):
     """Create project with automatic stage generation"""
-    # Fetch default our_entity if not provided
+    # Validate and resolve our_entity_id
     our_entity_id = data.our_entity_id
-    if not our_entity_id:
+    if our_entity_id:
+        entity = session.get(OurEntity, our_entity_id)
+        if not entity:
+            # Provided entity doesn't exist, fall back to default
+            default_entity = session.exec(select(OurEntity)).first()
+            our_entity_id = default_entity.id if default_entity else None
+    else:
         default_entity = session.exec(select(OurEntity)).first()
-        if default_entity:
-            our_entity_id = default_entity.id
-        # For B2C projects, our_entity_id can be None
-            
+        our_entity_id = default_entity.id if default_entity else None
+
+    # Auto-generate project_no if not provided: PR-YYYYMMDD-NNN
+    project_no = data.project_no
+    if not project_no:
+        today_str = date.today().strftime("%Y%m%d")
+        prefix = f"PR-{today_str}-"
+        existing = session.exec(
+            select(Project).where(Project.project_no.startswith(prefix))
+        ).all()
+        seq = len(existing) + 1
+        project_no = f"{prefix}{seq:03d}"
+
     project = Project(
         our_entity_id=our_entity_id,
-        project_no=data.project_no,
+        project_no=project_no,
         name=data.name,
         project_type=ProjectType(data.project_type),
         status=ProjectStatus.DRAFT,

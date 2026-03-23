@@ -177,7 +177,7 @@ export default function MeetingListPage() {
                                 {meetings.map((meeting) => {
                                     const statusInfo = getStatusInfo(meeting.status);
                                     return (
-                                        <tr key={meeting.id} onClick={() => handleRowClick(meeting.id)} className="meeting-row">
+                                        <tr key={meeting.id} onClick={() => { if (window.getSelection().toString()) return; handleRowClick(meeting.id); }} className="meeting-row">
                                             <td className="col-id" title={meeting.id} onClick={(e) => e.stopPropagation()}>
                                                 {meeting.id?.substring(0, 8)}
                                             </td>

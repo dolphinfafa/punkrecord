@@ -224,7 +224,7 @@ export default function DocumentListPage() {
                                     const IconComponent = FILE_TYPE_ICONS[ext] || File;
                                     const statusCfg = STATUS_CONFIG[doc.status] || STATUS_CONFIG.processing;
                                     return (
-                                        <tr key={doc.id} onClick={() => handleRowClick(doc.id)} className="kb-table-row-clickable">
+                                        <tr key={doc.id} onClick={() => { if (window.getSelection().toString()) return; handleRowClick(doc.id); }} className="kb-table-row-clickable">
                                             <td>
                                                 <div className="kb-doc-title-cell">
                                                     <IconComponent size={18} className="kb-doc-type-icon" />

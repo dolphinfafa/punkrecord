@@ -32,7 +32,10 @@ client.interceptors.response.use(
             // Clear token and redirect to login if 401
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/punkrecord/login';
+            // Don't redirect if already on the login page (avoid reload loop on login failure)
+            if (!window.location.pathname.endsWith('/login')) {
+                window.location.href = '/punkrecord/login';
+            }
         }
         return Promise.reject(error);
     }

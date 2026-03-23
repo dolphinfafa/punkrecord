@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class ProjectCreate(BaseModel):
     """Project creation schema"""
     our_entity_id: Optional[UUID] = None
-    project_no: str
+    project_no: Optional[str] = None
     name: str
     project_type: str  # b2b or b2c
     pm_user_id: UUID
