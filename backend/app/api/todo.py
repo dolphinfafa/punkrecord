@@ -385,8 +385,9 @@ async def create_leave_request(
         )
         approval_todo = TodoItem(
             our_entity_id=our_entity_id,
-            assignee_user_id=manager.id,
+            assignee_user_id=current_user.id,
             creator_user_id=current_user.id,
+            reviewed_by_user_id=manager.id,
             title=f"{current_user.display_name} - 请假申请",
             description=leave_desc,
             source_type=TodoSourceType.APPROVAL_STEP,
@@ -518,6 +519,22 @@ async def approve_leave_request(
     session.add(applicant)
     session.add(leave)
 
+    # Sync the corresponding TodoItem status
+    from sqlmodel import col
+    leave_todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.APPROVAL_STEP)
+        .where(TodoItem.source_id == str(leave.id))
+        .where(col(TodoItem.tags).contains("leave_approval"))
+    ).all()
+    for t in leave_todos:
+        t.status = TodoStatus.DONE
+        t.done_at = now_cn()
+        t.done_by_user_id = current_user.id
+        t.review_comment = "请假已批准"
+        t.updated_at = now_cn()
+        session.add(t)
+
     session.commit()
     session.refresh(leave)
     return success_response(_enrich_leave(leave, session))
@@ -564,6 +581,20 @@ async def reject_leave_request(
     leave.review_comment = data.comment or "请假申请未通过"
     leave.updated_at = now_cn()
     session.add(leave)
+
+    # Sync the corresponding TodoItem status
+    from sqlmodel import col
+    leave_todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.APPROVAL_STEP)
+        .where(TodoItem.source_id == str(leave.id))
+        .where(col(TodoItem.tags).contains("leave_approval"))
+    ).all()
+    for t in leave_todos:
+        t.status = TodoStatus.DISMISSED
+        t.review_comment = data.comment or "请假申请未通过"
+        t.updated_at = now_cn()
+        session.add(t)
 
     session.commit()
     session.refresh(leave)

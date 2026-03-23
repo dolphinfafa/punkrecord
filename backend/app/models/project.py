@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 from enum import Enum
-from sqlmodel import Field, SQLModel, Column, JSON
+from sqlmodel import Field, SQLModel, Column, JSON, TEXT
 from app.models.base import BaseDBModel
 
 
@@ -77,7 +77,7 @@ class ProjectStage(BaseDBModel, table=True):
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
     deliverables: Optional[str] = None
-    feature_list: Optional[str] = None
+    feature_list: Optional[str] = Field(default=None, sa_column=Column(TEXT))
     attachments: list = Field(default=[], sa_column=Column(JSON))
 
 

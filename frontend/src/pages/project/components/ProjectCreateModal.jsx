@@ -5,8 +5,17 @@ import contractApi from '@/api/contract';
 import Modal from '@/components/common/Modal';
 
 export default function ProjectCreateModal({ onClose, onSuccess }) {
+    const generateProjectNo = () => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const rand = String(Math.floor(Math.random() * 900) + 100);
+        return `PR-${y}${m}${d}-${rand}`;
+    };
+
     const [formData, setFormData] = useState({
-        project_no: '',
+        project_no: generateProjectNo(),
         name: '',
         project_type: 'b2b',
         pm_user_id: '',
@@ -98,8 +107,7 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
                         name="project_no"
                         value={formData.project_no}
                         onChange={handleChange}
-                        required
-                        placeholder="例如: PROJ-2023-001"
+                        placeholder="自动生成，可手动修改"
                     />
                 </div>
 
