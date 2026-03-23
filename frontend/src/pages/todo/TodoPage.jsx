@@ -88,6 +88,9 @@ export default function TodoPage() {
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const pageSize = 20;
+    const [doneExpanded, setDoneExpanded] = useState(false);
+    const [doneTodos, setDoneTodos] = useState([]);
+    const [doneLoading, setDoneLoading] = useState(false);
     const actioningTodoIdsRef = useRef(new Set());
 
     // Fetch entity and check if user has subordinates
@@ -112,19 +115,40 @@ export default function TodoPage() {
         init();
     }, []);
 
+    const fetchDoneTodos = async () => {
+        try {
+            setDoneLoading(true);
+            const api = viewMode === 'team' ? todoApi.listTeam : todoApi.list;
+            const response = await api({ status: 'done', page_size: 100 });
+            setDoneTodos(response.data?.items || []);
+        } catch {
+            // silent
+        } finally {
+            setDoneLoading(false);
+        }
+    };
+
     const fetchTodos = async () => {
         try {
             setLoading(true);
             let response;
             const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
             if (filter === 'board') {
-                // Board view: fetch all tasks (no pagination) for kanban columns
-                if (viewMode === 'team') {
-                    response = await todoApi.listTeam({ status: statusParam, page_size: 100 });
-                } else {
-                    response = await todoApi.list({ status: statusParam, page_size: 100 });
-                }
-                setTotalCount(0); // not used in board view
+                // Board view: fetch active tasks only (exclude done), done loaded on expand
+                const statuses = ['open', 'in_progress', 'pending_review', 'blocked'];
+                const results = await Promise.all(
+                    statuses.map(s => {
+                        const api = viewMode === 'team' ? todoApi.listTeam : todoApi.list;
+                        return api({ status: s, page_size: 100 });
+                    })
+                );
+                const allItems = results.flatMap(r => r.data?.items || []);
+                setTodos(allItems);
+                setTotalCount(0);
+                setDoneTodos([]);
+                setDoneExpanded(false);
+                setLoading(false);
+                return;
             } else {
                 // List view: use pagination
                 if (viewMode === 'team') {
@@ -499,19 +523,42 @@ export default function TodoPage() {
                     {filter === 'board' ? (
                         <div className="todo-board">
                             {['open', 'in_progress', 'pending_review', 'done'].map(status => {
-                                const columnTodos = filteredTodos.filter(t => t.status === status);
+                                const isDoneCol = status === 'done';
+                                const columnTodos = isDoneCol
+                                    ? doneTodos
+                                    : filteredTodos.filter(t => t.status === status);
                                 return (
                                     <div
                                         key={status}
-                                        className="board-column"
+                                        className={clsx('board-column', { 'board-column-collapsed': isDoneCol && !doneExpanded })}
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDrop(e, status)}
                                     >
-                                        <div className="column-header">
+                                        <div
+                                            className="column-header"
+                                            style={isDoneCol ? { cursor: 'pointer' } : undefined}
+                                            onClick={isDoneCol ? () => {
+                                                const next = !doneExpanded;
+                                                setDoneExpanded(next);
+                                                if (next && doneTodos.length === 0) fetchDoneTodos();
+                                            } : undefined}
+                                        >
                                             <span className={clsx('status-dot', `status-${status}`)}></span>
                                             <h3>{STATUS_LABELS[status]}</h3>
-                                            <span className="count-badge">{columnTodos.length}</span>
+                                            {isDoneCol && !doneExpanded
+                                                ? <span className="count-badge" style={{ fontSize: '11px' }}>点击展开</span>
+                                                : <span className="count-badge">{columnTodos.length}</span>
+                                            }
                                         </div>
+                                        {isDoneCol && !doneExpanded ? (
+                                            <div className="column-body" style={{ opacity: 0.5, textAlign: 'center', padding: '2rem 0', fontSize: '13px', color: '#94a3b8' }}>
+                                                已折叠
+                                            </div>
+                                        ) : isDoneCol && doneLoading ? (
+                                            <div className="column-body" style={{ textAlign: 'center', padding: '2rem 0', fontSize: '13px', color: '#94a3b8' }}>
+                                                加载中...
+                                            </div>
+                                        ) : (
                                         <div className="column-body">
                                             {columnTodos.map(todo => (
                                                 <div
@@ -551,6 +598,7 @@ export default function TodoPage() {
                                                 </div>
                                             ))}
                                         </div>
+                                        )}
                                     </div>
                                 );
                             })}
