@@ -35,10 +35,11 @@ AI Agent 工作流：
 
 ### 1.3 请假审批
 
-1. 员工提交请假申请
-2. 系统自动为审批人（申请人的 manager）创建一条待办任务（source_type='approval_step'，status='pending_review'）
+1. 员工 A 提交请假申请
+2. 系统自动创建待办任务：creator=A，assignee=A，reviewed_by=A 的上级，标题为 "A - 请假申请"，描述含请假类型/时间/原因，截止当天 23:59
 3. 经理在待审批列表中审批/驳回（遍历 manager 链，不限于直属）
-4. 批准后自动更新假期余额
+4. 审批/驳回时同步更新对应 TodoItem 状态（done/dismissed）
+5. 批准后自动更新假期余额
 4. 小程序 `pages/todo` 包含请假提交、历史记录、经理审批功能
 
 ### 1.4 项目执行

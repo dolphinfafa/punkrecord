@@ -81,7 +81,7 @@
 
 **AI Agent 工作流**：状态接口支持 `ai_fixing` 和 `ai_fixed` 状态，用于 AI 驱动的 Bug 修复流程。
 
-**团队任务访问规则**：按 `creator_user_id` 过滤，即当前用户创建/审核的任务全部展示，与组织层级无关。
+**团队任务访问规则**：显示当前用户创建但分配给他人的任务，或当前用户是审核员的任务。自指派任务（creator==assignee 且无审核员）不在团队列表展示。
 
 #### 请假相关
 
@@ -90,8 +90,8 @@
 | POST | `/api/v1/todo/leaves` | 提交请假 |
 | GET | `/api/v1/todo/leaves/my` | 我的请假记录 |
 | GET | `/api/v1/todo/leaves/team/pending` | 待审批请假 |
-| POST | `/api/v1/todo/leaves/{id}/approve` | 批准请假 |
-| POST | `/api/v1/todo/leaves/{id}/reject` | 驳回请假 |
+| POST | `/api/v1/todo/leaves/{id}/approve` | 批准请假（同步 TodoItem 状态为 done） |
+| POST | `/api/v1/todo/leaves/{id}/reject` | 驳回请假（同步 TodoItem 状态为 dismissed） |
 
 ### 合同管理
 
@@ -187,4 +187,4 @@
 
 ---
 
-*最后更新：2026-03-20*
+*最后更新：2026-03-23*

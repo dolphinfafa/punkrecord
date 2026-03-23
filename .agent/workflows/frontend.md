@@ -19,7 +19,7 @@
 | `/login` | 登录页（`pages/auth/LoginPage`）- 含密码显示切换、详细错误提示 |
 | `/profile-setup` | 首次登录档案完善页（`pages/auth/ProfileSetupPage`） |
 | `/` | 仪表盘 |
-| `/todo` | 任务管理 |
+| `/todo` | 任务管理（看板/列表双视图，看板已完成列懒加载折叠，列表分页） |
 | `/iam/users` | 用户管理 |
 | `/iam/entities` | 实体管理 |
 | `/iam/departments` | 部门管理 |
@@ -125,4 +125,4 @@
 
 ---
 
-*最后更新：2026-03-20*
+*最后更新：2026-03-23*
