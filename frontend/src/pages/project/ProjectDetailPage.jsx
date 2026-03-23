@@ -412,8 +412,11 @@ export default function ProjectDetailPage() {
                     projectId={project.id}
                     allStages={stages}
                     onClose={() => setQuoteStage(null)}
-                    onSave={async () => {
-                        loadData();
+                    onSave={async (savedData) => {
+                        await loadData();
+                        if (savedData?.feature_list) {
+                            setQuoteStage(prev => prev ? { ...prev, feature_list: savedData.feature_list } : prev);
+                        }
                     }}
                 />
             )}

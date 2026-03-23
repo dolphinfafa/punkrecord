@@ -297,8 +297,19 @@ async def get_team_todos(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.read"))
 ):
-    """Get todos created by current user (i.e. tasks the user created/assigned to others)."""
-    query = select(TodoItem).where(TodoItem.creator_user_id == current_user.id)
+    """Get todos where current user is the reviewer or created for others."""
+    from sqlalchemy import or_, and_
+    query = select(TodoItem).where(
+        or_(
+            # Tasks created by me but assigned to someone else
+            and_(
+                TodoItem.creator_user_id == current_user.id,
+                TodoItem.assignee_user_id != current_user.id,
+            ),
+            # Tasks where I am the reviewer
+            TodoItem.reviewed_by_user_id == current_user.id,
+        )
+    )
 
     if status:
         query = query.where(TodoItem.status == status)
