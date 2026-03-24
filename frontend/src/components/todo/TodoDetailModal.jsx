@@ -35,7 +35,9 @@ export default function TodoDetailModal({
     if (!isOpen || !todo) return null;
 
     const isAssignee = todo.assignee_user_id === currentUserId;
-    const isReviewer = todo.reviewed_by_user_id === currentUserId || todo.creator_user_id === currentUserId;
+    const isReviewer = todo.reviewed_by_user_id
+        ? todo.reviewed_by_user_id === currentUserId
+        : todo.creator_user_id === currentUserId;
     const reviewerName = todo.reviewer_name
         ? todo.reviewer_name
         : (todo.creator_user_id === todo.assignee_user_id && !todo.reviewed_by_user_id)

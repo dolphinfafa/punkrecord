@@ -934,11 +934,10 @@ async def approve_todo(
         from app.core.exceptions import ValidationException
         raise ValidationException("只有上报完成的任务才能审核")
 
-    # Must be the creator (or possibly a super admin, but sticking to creator for now)
-    if todo.creator_user_id != current_user.id:
-        # Check if it was "L0/Manager" logic before? 
-        # Requirement: "A created for B -> A reviews"
-        raise NotFoundException("只有任务创建人才能审核")
+    # Reviewer has priority; fall back to creator
+    reviewer_id = todo.reviewed_by_user_id or todo.creator_user_id
+    if reviewer_id != current_user.id:
+        raise NotFoundException("只有审核员才能审核此任务")
 
     todo.status = TodoStatus.DONE
     todo.done_at = now_cn()
@@ -988,8 +987,9 @@ async def reject_todo(
         from app.core.exceptions import ValidationException
         raise ValidationException("只有上报完成的任务才能退回")
 
-    if todo.creator_user_id != current_user.id:
-        raise NotFoundException("只有任务创建人才能退回")
+    reviewer_id = todo.reviewed_by_user_id or todo.creator_user_id
+    if reviewer_id != current_user.id:
+        raise NotFoundException("只有审核员才能退回此任务")
 
     todo.status = TodoStatus.OPEN
     todo.reviewed_by_user_id = current_user.id
