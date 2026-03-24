@@ -41,6 +41,9 @@ def _enrich_todo(todo: TodoItem, session: Session) -> TodoResponse:
     data = TodoResponse.model_validate(todo)
     data.assignee_name = assignee.display_name if assignee else None
     data.creator_name = creator.display_name if creator else None
+    if todo.reviewed_by_user_id:
+        reviewer = session.get(User, todo.reviewed_by_user_id)
+        data.reviewer_name = reviewer.display_name if reviewer else None
     return data
 
 

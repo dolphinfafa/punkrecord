@@ -35,10 +35,12 @@ export default function TodoDetailModal({
     if (!isOpen || !todo) return null;
 
     const isAssignee = todo.assignee_user_id === currentUserId;
-    const isReviewer = todo.creator_user_id === currentUserId;
-    const reviewerName = todo.creator_user_id === todo.assignee_user_id
-        ? '无需审核（创建人本人）'
-        : (todo.creator_name || '—');
+    const isReviewer = todo.reviewed_by_user_id === currentUserId || todo.creator_user_id === currentUserId;
+    const reviewerName = todo.reviewer_name
+        ? todo.reviewer_name
+        : (todo.creator_user_id === todo.assignee_user_id && !todo.reviewed_by_user_id)
+            ? '无需审核（创建人本人）'
+            : (todo.creator_name || '—');
     const canStart = isAssignee && todo.status === 'open';
     const canSubmit = isAssignee && ['open', 'in_progress', 'blocked'].includes(todo.status);
     const canApproveReject = isReviewer && todo.status === 'pending_review';

@@ -70,6 +70,7 @@ class TodoResponse(BaseModel):
     dismiss_reason: Optional[str] = None
     review_comment: Optional[str] = None
     reviewed_by_user_id: Optional[UUID] = None
+    reviewer_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
