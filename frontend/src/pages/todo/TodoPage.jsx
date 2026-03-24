@@ -145,8 +145,10 @@ export default function TodoPage() {
                 const allItems = results.flatMap(r => r.data?.items || []);
                 setTodos(allItems);
                 setTotalCount(0);
-                setDoneTodos([]);
-                setDoneExpanded(false);
+                // Refresh done todos if expanded, don't collapse
+                if (doneExpanded) {
+                    fetchDoneTodos();
+                }
                 setLoading(false);
                 return;
             } else {
@@ -713,7 +715,7 @@ export default function TodoPage() {
 
             <TodoDetailModal
                 isOpen={detailModalOpen}
-                onClose={() => { setDetailModalOpen(false); setSelectedTodo(null); }}
+                onClose={() => { setDetailModalOpen(false); setSelectedTodo(null); fetchTodos(); }}
                 todo={selectedTodo}
                 onEdit={handleEditClick}
                 onStart={handleStart}
