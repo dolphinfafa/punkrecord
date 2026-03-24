@@ -715,7 +715,7 @@ export default function TodoPage() {
 
             <TodoDetailModal
                 isOpen={detailModalOpen}
-                onClose={() => { setDetailModalOpen(false); setSelectedTodo(null); fetchTodos(); }}
+                onClose={() => { setDetailModalOpen(false); setSelectedTodo(null); }}
                 todo={selectedTodo}
                 onEdit={handleEditClick}
                 onStart={handleStart}

@@ -966,6 +966,27 @@ async def approve_todo(
         except ValueError:
             pass
 
+    # If this is a leave approval todo, sync the LeaveRequest status
+    if todo.source_type == TodoSourceType.APPROVAL_STEP and todo.source_id:
+        try:
+            leave = session.get(LeaveRequest, UUID(todo.source_id))
+            if leave and leave.status == LeaveStatus.PENDING:
+                applicant = session.get(User, leave.applicant_user_id)
+                if applicant:
+                    leave_days = _calc_leave_days(leave.start_at, leave.end_at)
+                    balance_field = _resolve_leave_balance_field(leave.leave_type)
+                    current_balance = float(getattr(applicant, balance_field, 0.0) or 0.0)
+                    setattr(applicant, balance_field, max(0, current_balance - leave_days))
+                    session.add(applicant)
+                leave.status = LeaveStatus.APPROVED
+                leave.approved_by_user_id = current_user.id
+                leave.approved_at = now_cn()
+                leave.updated_at = now_cn()
+                session.add(leave)
+                session.commit()
+        except (ValueError, Exception):
+            pass
+
     return success_response(_enrich_todo(todo, session))
 
 
@@ -1004,6 +1025,21 @@ async def reject_todo(
         try:
             sync_project_progress(session, UUID(todo.source_id))
         except ValueError:
+            pass
+
+    # If this is a leave approval todo, sync the LeaveRequest status to rejected
+    if todo.source_type == TodoSourceType.APPROVAL_STEP and todo.source_id:
+        try:
+            leave = session.get(LeaveRequest, UUID(todo.source_id))
+            if leave and leave.status == LeaveStatus.PENDING:
+                leave.status = LeaveStatus.REJECTED
+                leave.approved_by_user_id = current_user.id
+                leave.approved_at = now_cn()
+                leave.review_comment = data.comment or "请假申请未通过"
+                leave.updated_at = now_cn()
+                session.add(leave)
+                session.commit()
+        except (ValueError, Exception):
             pass
 
     return success_response(_enrich_todo(todo, session))
