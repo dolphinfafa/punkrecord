@@ -873,8 +873,13 @@ async def submit_todo(
         from app.core.exceptions import ValidationException
         raise ValidationException(f"当前状态 {todo.status} 不能提交完成")
 
-    # Check if creator is assignee (Self-assigned)
-    if todo.creator_user_id == current_user.id:
+    # Check if creator is assignee (Self-assigned) AND no separate reviewer
+    is_self_assigned = (
+        todo.creator_user_id == current_user.id
+        and todo.assignee_user_id == current_user.id
+        and not todo.reviewed_by_user_id
+    )
+    if is_self_assigned:
         todo.status = TodoStatus.DONE
         todo.done_at = now_cn()
         todo.done_by_user_id = current_user.id

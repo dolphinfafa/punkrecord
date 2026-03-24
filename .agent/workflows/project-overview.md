@@ -52,7 +52,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 
 | 技术 | 版本 | 选型理由 |
 |------|------|---------|
-| **Python** | 3.10+ | 团队熟悉度高，生态丰富，AI 集成天然优势 |
+| **Python** | 3.9+（Deploy 服务器 3.9，Dev 服务器 3.10+） | 团队熟悉度高，生态丰富，AI 集成天然优势。注意：不可使用 `X | None` 语法，须用 `Optional[X]` |
 | **FastAPI** | 0.109.0 | 异步高性能，自动生成 OpenAPI 文档，类型安全，开发效率高 |
 | **SQLModel** | 0.0.14 | 融合 SQLAlchemy ORM 与 Pydantic 校验，一套模型同时用于数据库和 API |
 | **Alembic** | 1.13.1 | SQLAlchemy 生态的标准迁移工具，支持版本化和回滚 |
@@ -93,10 +93,10 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 
 | 方案 | 场景 | 说明 |
 |------|------|------|
-| **SQLite** | 本地开发 | 零配置启动，无需安装数据库服务 |
-| **MySQL 9.x** | 生产环境 | 成熟稳定，适合中小规模业务数据 |
+| **MySQL 8.0** | 开发/生产环境 | 成熟稳定，适合中小规模业务数据 |
+| **SQLite** | 本地快速启动（可选） | 零配置，通过 `DB_TYPE=sqlite` 切换 |
 
-通过 `DB_TYPE` 环境变量实现零侵入切换，开发与生产共享同一套 ORM 代码。
+通过 `DB_TYPE` 环境变量实现零侵入切换。实际开发和生产环境均使用 MySQL 8.0（`14.103.133.34:13306`）。
 
 ---
 
@@ -129,7 +129,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
               |                    |                    |
     +---------v--------+  +-------v--------+  +--------v---------+
     |  Router Layer    |  |  Service Layer |  |  Core Layer       |
-    |  (7 API 模块)    |  |  (业务逻辑)    |  |  (Auth/DB/Config) |
+    |  (9 API 模块)    |  |  (业务逻辑)    |  |  (Auth/DB/Config) |
     +---------+--------+  +-------+--------+  +--------+---------+
               |                    |                    |
               +--------------------+--------------------+
@@ -138,12 +138,11 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
                         |  SQLModel ORM       |
                         +----------+----------+
                                    |
-                     +-------------+-------------+
-                     |                           |
-              +------v------+           +--------v--------+
-              |   SQLite    |           |     MySQL       |
-              |  (开发环境)  |           |   (生产环境)    |
-              +-------------+           +-----------------+
+                                   |
+                        +----------v----------+
+                        |     MySQL 8.0       |
+                        |  (开发/生产环境)     |
+                        +---------------------+
 ```
 
 ---
@@ -180,7 +179,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 
 | 顺序 | 中间件 | 职责 |
 |------|--------|------|
-| 1 | CORS | 处理跨域，允许 `localhost:5173` 和 `localhost:3000` |
+| 1 | CORS | 处理跨域，允许 `localhost:5173`/`5174`/`3000` 及部署域名 |
 | 2 | 请求日志 | 记录请求方法、路径，响应状态码，捕获异常堆栈 |
 
 ### 4.4 异常处理体系
@@ -225,6 +224,9 @@ AtlasException (基类, code=400)
 | `KB_CHUNK_SIZE` | `1000` | 知识库文档切片大小（字符） |
 | `KB_CHUNK_OVERLAP` | `200` | 切片重叠长度 |
 | `KB_RAG_TOP_K` | `5` | RAG 检索返回的 top-k 数量 |
+| `LITELLM_BASE_URL` | `http://212.50.233.55:4000/v1` | LiteLLM 代理地址（会议纪要/AI 对话） |
+| `LITELLM_API_KEY` | (已配置) | LiteLLM API 密钥 |
+| `LITELLM_MODEL` | `gemini/gemini-3.1-flash-lite-preview` | LiteLLM 使用的模型 |
 | `VOLC_ASR_APP_KEY` | (已配置) | 豆包 ASR 应用 Key |
 | `VOLC_ASR_ACCESS_KEY` | (已配置) | 豆包 ASR 访问 Key |
 
@@ -332,30 +334,39 @@ Meeting 模块（会议记录）
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
+| `our_entity_id` | FK -> OurEntity | 必填 | 所属主体 |
 | `title` | str | 必填 | 任务标题 |
 | `description` | str | 可选 | 详细描述 |
-| `assignee_user_id` | FK -> User | 必填，索引 | 执行人 |
+| `assignee_user_id` | FK -> User | 必填，索引 | 执行人/负责人 |
 | `creator_user_id` | FK -> User | 必填 | 创建者 |
-| `source_type` | TodoSourceType | 必填，索引 | 来源类型 |
+| `source_type` | TodoSourceType | 必填，索引 | 来源类型（project_task/approval_step/custom 等） |
 | `source_id` | str | 必填，索引 | 来源对象 ID |
-| `action_type` | TodoActionType | 必填 | 操作类型 |
+| `action_type` | TodoActionType | 必填 | 操作类型（do/approve/review/ack） |
 | `priority` | TodoPriority | 默认 P2 | 优先级（P0-P3） |
 | `status` | TodoStatus | 默认 OPEN，索引 | 状态 |
 | `due_at` | datetime | 可选 | 截止时间 |
 | `start_at` | datetime | 可选 | 开始时间 |
-| `tags` | JSON | 默认 [] | 标签列表 |
-| `link` | JSON | 可选 | 关联对象链接 |
-| `blocked_reason` | str | 可选 | 阻塞原因 |
+| `done_at` | datetime | 可选 | 完成时间 |
+| `done_by_user_id` | FK -> User | 可选 | 完成操作人 |
+| `reviewed_by_user_id` | FK -> User | 可选 | 审核员 |
 | `review_comment` | str | 可选 | 审核评语 |
+| `tags` | JSON | 默认 [] | 标签列表 |
+| `link` | JSON | 可选 | 关联对象链接（project_id、leave_id 等） |
+| `blocked_reason` | str | 可选 | 阻塞原因 |
 | `dismiss_reason` | str | 可选 | 忽略原因 |
 
-**状态流转**：`OPEN -> IN_PROGRESS -> PENDING_REVIEW -> DONE`（也支持 BLOCKED / DISMISSED 分支）
+**状态流转**：`OPEN -> IN_PROGRESS -> PENDING_REVIEW -> DONE`（也支持 BLOCKED / DISMISSED / AI_FIXING / AI_FIXED 分支）
+
+**团队任务规则**：显示 `(creator==me AND assignee!=me) OR (reviewed_by==me)` 的任务，排除自指派。
+
+**请假审批待办**：请假提交后自动创建 TodoItem（creator=assignee=申请人，reviewed_by=上级，source_type=approval_step）。审批/驳回时同步更新 TodoItem 状态为 done/dismissed。
 
 #### Project（项目）
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
-| `project_no` | str | 唯一，索引 | 项目编号 |
+| `our_entity_id` | FK -> OurEntity | 可选（nullable），索引 | 所属主体（B2C 可为空） |
+| `project_no` | str | 唯一，索引 | 项目编号（自动生成 PR-YYYYMMDD-NNN） |
 | `name` | str | 必填 | 项目名称 |
 | `project_type` | ProjectType | 必填 | B2B / B2C |
 | `status` | ProjectStatus | 默认 DRAFT，索引 | 项目状态 |
@@ -363,9 +374,14 @@ Meeting 模块（会议记录）
 | `pm_user_id` | FK -> User | 必填 | 项目经理 |
 | `customer_id` | FK -> Counterparty | 可选 | 客户 |
 | `contract_id` | FK -> Contract | 可选 | 关联合同 |
+| `start_at` | date | 可选 | 项目开始日期 |
+| `due_at` | date | 可选 | 项目截止日期 |
 | `current_stage_code` | str | 必填 | 当前阶段代码 |
 | `progress` | float | 0.0 ~ 1.0 | 进度百分比 |
+| `description` | str | 可选 | 项目描述 |
 | `attachments` | JSON | 默认 [] | 项目附件 |
+
+**阶段 feature_list**：`ProjectStage.feature_list` 类型为 LONGTEXT，存储功能清单/报价单/原型确认单等 JSON 数据。
 
 #### Contract（合同）
 
@@ -393,6 +409,64 @@ Meeting 模块（会议记录）
 | `reconcile_status` | ReconcileStatus | 默认 UNRECONCILED | 对账状态 |
 | `attachments` | JSON | 默认 [] | 交易凭证 |
 
+#### FinanceAccount（财务账户）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `entity_id` | FK -> Counterparty | 必填，索引 | 账户所属实体 |
+| `account_category` | AccountCategory | 必填 | 账户类别 |
+| `account_name` | str | 必填 | 账户名称 |
+| `bank_name` | str | 可选 | 开户银行 |
+| `bank_branch` | str | 可选 | 开户支行 |
+| `account_no_encrypted` | str | 可选 | 银行账号（加密存储） |
+| `account_no_masked` | str | 可选 | 银行账号（脱敏显示） |
+| `currency` | str | 默认 CNY | 币种 |
+| `initial_balance` | Decimal | 默认 0 | 初始余额 |
+| `status` | AccountStatus | 必填 | 账户状态 |
+| `is_default` | bool | 默认 False | 是否默认账户 |
+
+#### ProjectStage（项目阶段）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `project_id` | FK -> Project | 必填，索引 | 所属项目 |
+| `stage_code` | str | 必填 | 阶段代码 |
+| `stage_name` | str | 必填 | 阶段名称 |
+| `sequence_no` | int | 必填 | 排序序号 |
+| `status` | StageStatus | 默认 NOT_STARTED | 阶段状态 |
+| `planned_start_at` / `planned_end_at` | date | 可选 | 计划起止日期 |
+| `actual_start_at` / `actual_end_at` | date | 可选 | 实际起止日期 |
+| `deliverables` | str | 可选 | 备注/交付物 |
+| `feature_list` | LONGTEXT | 可选 | 功能清单/报价单/原型确认单 JSON |
+| `attachments` | JSON | 默认 [] | 阶段附件 |
+
+#### LeaveRequest（请假申请）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `our_entity_id` | FK -> OurEntity | 可选 | 所属主体 |
+| `applicant_user_id` | FK -> User | 必填，索引 | 申请人 |
+| `leave_type` | LeaveType | 必填，索引 | 请假类型（年假/产假/婚假/事假/病假） |
+| `status` | LeaveStatus | 默认 PENDING，索引 | 审批状态 |
+| `start_at` | datetime | 必填 | 请假开始时间 |
+| `end_at` | datetime | 必填 | 请假结束时间 |
+| `reason` | str | 可选 | 请假原因 |
+| `approved_by_user_id` | FK -> User | 可选 | 审批人 |
+| `approved_at` | datetime | 可选 | 审批时间 |
+| `review_comment` | str | 可选 | 审批评语 |
+
+#### Counterparty（交易方）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `name` | str | 必填 | 交易方名称 |
+| `type` | str | 必填 | 类型（individual/organization） |
+| `identifier` | str | 可选 | 税号/统一社会信用代码 |
+| `address` | str | 可选 | 地址 |
+| `phone` | str | 可选 | 联系电话 |
+| `bank_name` | str | 可选 | 开户银行 |
+| `bank_account` | str | 可选 | 银行账号 |
+
 ### 5.4 枚举类型汇总
 
 | 模块 | 枚举 | 可选值 |
@@ -401,12 +475,14 @@ Meeting 模块（会议记录）
 | IAM | OurEntityType | `COMPANY`, `BRANCH`, `STUDIO`, `OTHER` |
 | IAM | ScopeType | `GLOBAL`, `OUR_ENTITY`, `ALL_ENTITIES` |
 | IAM | BeliRuleType | `TASK_TIMELINESS` |
-| Todo | TodoStatus | `OPEN`, `IN_PROGRESS`, `BLOCKED`, `PENDING_REVIEW`, `DONE`, `DISMISSED` |
+| Todo | TodoStatus | `OPEN`, `IN_PROGRESS`, `BLOCKED`, `PENDING_REVIEW`, `DONE`, `DISMISSED`, `AI_FIXING`, `AI_FIXED` |
 | Todo | TodoPriority | `P0`, `P1`, `P2`, `P3` |
 | Todo | TodoSourceType | `PROJECT_TASK`, `APPROVAL_STEP`, `CONTRACT_REMINDER`, `FINANCE_ACTION`, `CUSTOM` |
 | Todo | TodoActionType | `DO`, `APPROVE`, `REVIEW`, `ACK` |
-| Todo | LeaveType | `ANNUAL`, `MATERNITY`, `MARRIAGE`, `PERSONAL`, `SICK` |
+| Todo | LeaveType | `ANNUAL`(年假), `MATERNITY`(产假), `MARRIAGE`(婚假), `PERSONAL`(事假), `SICK`(病假) |
 | Todo | LeaveStatus | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` |
+| Finance | AccountCategory | 账户类别枚举 |
+| Finance | AccountStatus | 账户状态枚举 |
 | Project | ProjectType | `B2B`, `B2C` |
 | Project | ProjectStatus | `DRAFT`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELLED` |
 | Project | StageStatus | `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `SKIPPED` |
@@ -418,6 +494,7 @@ Meeting 模块（会议记录）
 | Finance | InvoiceKind | `OUTPUT`(销项), `INPUT`(进项) |
 | Approval | ApprovalStatus | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` |
 | KB | KBDocumentStatus | `PROCESSING`, `READY`, `FAILED` |
+| Meeting | MeetingType | `MORNING`, `WEEKLY`, `PROJECT`, `REVIEW`, `BRAINSTORM`, `OTHER` |
 | Meeting | MeetingStatus | `UPLOADING`, `TRANSCRIBING`, `TRANSCRIBED`, `SUMMARIZED`, `ARCHIVED`, `FAILED` |
 
 ### 5.5 关键关联关系
@@ -480,7 +557,7 @@ ApprovalInstance
 ### 6.1 技术栈
 
 - **框架**：React 19.2.0 + React Router 7.12.0
-- **构建**：Vite 7.2.4（路径别名 `@` -> `./src`，开发代理 `/api` -> `localhost:8085`）
+- **构建**：Vite 7.x（路径别名 `@` -> `./src`，dev 分支代理 `/punkrecord/api` -> `localhost:8086`，main 分支 -> `localhost:8085`）
 - **状态管理**：React Context API（AuthContext 管理登录态）
 - **HTTP 客户端**：Axios 1.13.2（拦截器统一注入 Token、处理 401）
 - **样式**：Tailwind CSS 原子化类名 + 页面级作用域
@@ -546,7 +623,7 @@ pages/
 
 ### 7.2 设计原则
 
-- 与 Web 端保持统一的视觉语言（`slate + indigo` 企业主题）
+- 与 Web 端保持统一的视觉语言（亮色主题，白底深字，蓝色主色调）
 - 用户可见标签使用中文，后端枚举值在 JS 逻辑层映射
 - 响应式布局采用 `rpx` 单位
 - 自定义 TabBar 支持大字号标签，提升可读性
@@ -646,9 +723,9 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要 |
 | 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
-**AI 技术栈**：Gemini（对话/摘要/Vision） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
+**AI 技术栈**：LiteLLM 代理（统一调用 Gemini 等模型） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
 
-通过 `httpx` 调用外部 AI API，使用 REST 代理绕过 SSL 限制。前端使用 `react-markdown` 渲染 Markdown。
+通过 LiteLLM 代理（`http://212.50.233.55:4000/v1`）统一调用 AI 模型，支持 OpenAI 兼容接口。会议纪要、AI 对话等功能均通过 LiteLLM 路由。前端使用 `react-markdown` 渲染 Markdown。
 
 ---
 
@@ -678,4 +755,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-03-16*
+*最后更新：2026-03-24*
