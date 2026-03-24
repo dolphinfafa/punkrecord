@@ -396,7 +396,7 @@ export default function TodoPage() {
             } else if (targetStatus === 'done') {
                 if (todo.status === 'pending_review') {
                     // Manager Approve
-                    if (isManagerOfTodo(todo) || todo.assignee_user_id === user?.id || todo.creator_user_id === user?.id) {
+                    if (isManagerOfTodo(todo) || todo.assignee_user_id === user?.id || todo.creator_user_id === user?.id || todo.reviewed_by_user_id === user?.id) {
                         await todoApi.approve(todo.id);
                         showNotification('已审核通过');
                     } else {
