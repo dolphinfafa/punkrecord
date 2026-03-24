@@ -72,7 +72,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
+    const [selectedModel, setSelectedModel] = useState('gemini/gemini-3.1-pro-preview');
     const messagesEndRef = useRef(null);
     const uploadInputRef = useRef(null);
 
@@ -443,10 +443,8 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
                                     fontSize: '0.85rem', backgroundColor: '#f1f5f9', cursor: 'pointer', outline: 'none'
                                 }}
                             >
-                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (最新)</option>
-                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                                <option value="gemini/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
                             </select>
                         </div>
 

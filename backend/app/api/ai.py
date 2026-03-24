@@ -1,6 +1,7 @@
-import os
+import json
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -12,15 +13,17 @@ from app.core.exceptions import AtlasException
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
+
 class ChatMessage(BaseModel):
     role: str  # 'user' or 'model'
     parts: List[str]
 
+
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    model_name: Optional[str] = "gemini-3.1-pro-preview"
-    system_instruction: Optional[str] = """You are a helpful software product manager assistant. Help the user break down their requests into a structured, clear feature list (功能清单). 
-    
+    model_name: Optional[str] = None
+    system_instruction: Optional[str] = """You are a helpful software product manager assistant. Help the user break down their requests into a structured, clear feature list (功能清单).
+
     You MUST output ONLY a valid JSON array of feature objects matching the following exact keys for the table mapping.
     Return an array `[]` of these objects:
     {
@@ -37,65 +40,53 @@ class ChatRequest(BaseModel):
     }
     """
 
+
+def _build_openai_messages(request: ChatRequest) -> list:
+    """Convert Gemini-style messages to OpenAI format."""
+    messages = []
+    if request.system_instruction:
+        messages.append({"role": "system", "content": request.system_instruction})
+    for msg in request.messages:
+        role = "assistant" if msg.role == "model" else "user"
+        messages.append({"role": role, "content": "\n".join(msg.parts)})
+    return messages
+
+
 @router.post("/chat", response_model=dict)
 async def ai_chat(
     request: ChatRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Chat with Gemini AI to generate feature lists in JSON format using httpx for robust proxy support"""
+    """Chat with AI to generate feature lists in JSON format via LiteLLM."""
     try:
-        api_key = settings.GEMINI_API_KEY if hasattr(settings, 'GEMINI_API_KEY') else os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise AtlasException("Gemini API key is not configured in environment variables.", code=500)
+        model = request.model_name or settings.LITELLM_MODEL
+        # Ensure model has provider prefix for LiteLLM
+        if "/" not in model:
+            model = f"gemini/{model}"
 
-        # Use dynamically passed model_name or fallback to default
-        model = request.model_name or "gemini-3.1-pro-preview"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        
-        # Build contents array
-        gemini_contents = []
-        for msg in request.messages:
-            gemini_contents.append({
-                "role": msg.role, 
-                "parts": [{"text": part} for part in msg.parts]
-            })
-
+        url = f"{settings.LITELLM_BASE_URL}/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.LITELLM_API_KEY}",
+        }
         payload = {
-            "contents": gemini_contents,
-            "systemInstruction": {
-                "role": "user",
-                "parts": [{"text": request.system_instruction}]
-            },
-            "generationConfig": {
-                "responseMimeType": "application/json"
-            }
+            "model": model,
+            "messages": _build_openai_messages(request),
+            "response_format": {"type": "json_object"},
         }
 
-        # Setup httpx client (disabling SSL verification to avoid common local proxy cert issues)
-        async with httpx.AsyncClient(verify=False, timeout=60.0) as client:
-            response = await client.post(url, json=payload)
+        async with httpx.AsyncClient(verify=False, timeout=120.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            
+
             data = response.json()
-            
-            # Extract text
-            candidates = data.get("candidates", [])
-            if not candidates:
-                raise Exception("No response candidates returned from Gemini.")
-                
-            ai_text = candidates[0].get("content", {}).get("parts", [])[0].get("text", "")
-            
-            return success_response({
-                "text": ai_text
-            })
-            
+            ai_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            return success_response({"text": ai_text})
+
     except httpx.HTTPError as he:
-        import traceback
-        traceback.print_exc()
-        raise AtlasException(f"AI Network Error: Failed to reach Gemini API. Please check your proxy settings. Details: {str(he)}", code=502)
+        raise AtlasException(f"AI Network Error: {str(he)}", code=502)
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise AtlasException(f"AI Service Error: {str(e)}", code=500)
 
 
@@ -104,51 +95,50 @@ async def ai_chat_stream(
     request: ChatRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Chat with Gemini AI using server-sent events (SSE) for streaming responses"""
-    from fastapi.responses import StreamingResponse
-    import json
-    
+    """Chat with AI using SSE streaming via LiteLLM."""
+
     async def generate_chunks():
         try:
-            api_key = settings.GEMINI_API_KEY if hasattr(settings, 'GEMINI_API_KEY') else os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                yield f"data: {json.dumps({'error': 'Gemini API key is not configured'})}\n\n"
-                return
+            model = request.model_name or settings.LITELLM_MODEL
+            if "/" not in model:
+                model = f"gemini/{model}"
 
-            model = request.model_name or "gemini-3.1-pro-preview"
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
-            
-            gemini_contents = []
-            for msg in request.messages:
-                gemini_contents.append({
-                    "role": msg.role, 
-                    "parts": [{"text": part} for part in msg.parts]
-                })
-
-            payload = {
-                "contents": gemini_contents,
-                "systemInstruction": {
-                    "role": "user",
-                    "parts": [{"text": request.system_instruction or "You are a helpful AI assistant."}]
-                }
+            url = f"{settings.LITELLM_BASE_URL}/chat/completions"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {settings.LITELLM_API_KEY}",
             }
-            
+            payload = {
+                "model": model,
+                "messages": _build_openai_messages(request),
+                "stream": True,
+            }
+
             async with httpx.AsyncClient(verify=False, timeout=300.0) as client:
-                async with client.stream("POST", url, json=payload) as response:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
                     if response.status_code != 200:
                         error_text = await response.aread()
                         yield f"data: {json.dumps({'error': f'API Error {response.status_code}: {error_text.decode()}'})}\n\n"
                         return
-                        
+
                     async for line in response.aiter_lines():
-                        if line:
-                            # Forward the SSE data structure directly
-                            # Gemini's stream format is usually data: {...}
-                            yield f"{line}\n\n"
-                            
+                        if not line.startswith("data: "):
+                            continue
+                        raw = line[6:]
+                        if raw.strip() == "[DONE]":
+                            yield "data: [DONE]\n\n"
+                            break
+                        try:
+                            chunk = json.loads(raw)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            text = delta.get("content", "")
+                            if text:
+                                # Forward as Gemini-compatible SSE for frontend
+                                yield f"data: {json.dumps({'candidates': [{'content': {'parts': [{'text': text}]}}]})}\n\n"
+                        except (json.JSONDecodeError, IndexError, KeyError):
+                            continue
+
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             yield f"data: {json.dumps({'error': f'Stream failed: {str(e)}'})}\n\n"
 
     return StreamingResponse(
