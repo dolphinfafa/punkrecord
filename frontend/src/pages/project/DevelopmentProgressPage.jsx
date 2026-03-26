@@ -196,8 +196,10 @@ export default function DevelopmentProgressPage() {
     }, [orderedTasks, project?.start_at]);
 
     const reviewerName = project?.pm_name || '项目经理';
+    const isL0 = (user?.job_title_name || '').toUpperCase().includes('L0');
     const canManage = normalizeId(user?.id) === normalizeId(project?.pm_user_id)
-        || normalizeId(user?.id) === normalizeId(project?.owner_user_id);
+        || normalizeId(user?.id) === normalizeId(project?.owner_user_id)
+        || isL0;
     const allTaskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
     const allChecked = allTaskIds.length > 0 && selectedTaskIds.length === allTaskIds.length;
 

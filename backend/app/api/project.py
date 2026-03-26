@@ -132,12 +132,12 @@ def _extract_feature_list_for_project(project_id: UUID, session: Session) -> Tup
 
 
 def _feature_row_dev_types(row: dict) -> List[str]:
+    """Only create tasks for frontend and backend dev types."""
     types = []
-    for key in ["dev_backend", "dev_frontend", "dev_ui", "dev_product"]:
+    for key in ["dev_backend", "dev_frontend"]:
         value = str(row.get(key, "")).strip()
         if value and value != "-" and value != "0":
             types.append(key)
-    # Keep behavior consistent with frontend generation: rows with no dev split default to backend.
     return types if types else ["dev_backend"]
 
 
@@ -193,12 +193,21 @@ def _collect_related_todos_for_project_todo(session: Session, todo: TodoItem) ->
     return related
 
 
+def _delete_todo_and_notifications(session: Session, todo: TodoItem) -> None:
+    """Delete a single todo and its notification logs."""
+    from app.models.todo import NotificationLog
+    notifs = session.exec(select(NotificationLog).where(NotificationLog.todo_id == todo.id)).all()
+    for n in notifs:
+        session.delete(n)
+    session.delete(todo)
+
+
 def _delete_project_todo_with_related(session: Session, todo: TodoItem) -> int:
     count = 0
     for related in _collect_related_todos_for_project_todo(session, todo):
-        session.delete(related)
+        _delete_todo_and_notifications(session, related)
         count += 1
-    session.delete(todo)
+    _delete_todo_and_notifications(session, todo)
     count += 1
     return count
 
@@ -481,9 +490,9 @@ async def update_project(
         project.start_at = data.start_at
     if data.due_at is not None:
         project.due_at = data.due_at
-    if data.our_entity_id is not None:
+    if 'our_entity_id' in data.model_fields_set:
         project.our_entity_id = data.our_entity_id
-    if data.customer_id is not None:
+    if 'customer_id' in data.model_fields_set:
         project.customer_id = data.customer_id
     
     project.updated_at = now_cn()
@@ -555,6 +564,10 @@ async def update_stage_status(
     session.add(stage)
     session.commit()
     session.refresh(stage)
+
+    # Sync project progress when stage status changes
+    if data.status is not None:
+        sync_project_progress(session, project_id)
 
     if stage.attachments is None:
         stage.attachments = []
@@ -693,11 +706,24 @@ async def delete_project(
     if not project:
         raise NotFoundException("未找到项目")
     
-    # Check if there are related todos or stages?
-    # For now, cascading delete is handled by database or we just delete
-    # But usually we should check. Pydantic/SQLAlchemy might handle cascade if configured
-    # For simplicity, we just delete the project and rely on DB cascade
-    
+    # Delete related project todos (and their notification logs)
+    from app.models.todo import NotificationLog
+    project_todos = session.exec(
+        select(TodoItem)
+        .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
+        .where(TodoItem.source_id == str(project_id))
+    ).all()
+    for todo in project_todos:
+        _delete_todo_and_notifications(session, todo)
+
+    # Delete related stages and members
+    stages = session.exec(select(ProjectStage).where(ProjectStage.project_id == project_id)).all()
+    for stage in stages:
+        session.delete(stage)
+    members = session.exec(select(ProjectMember).where(ProjectMember.project_id == project_id)).all()
+    for member in members:
+        session.delete(member)
+
     session.delete(project)
     session.commit()
     
@@ -878,8 +904,12 @@ async def list_project_todos(
             resp.assignee_name = assignee.display_name
         if creator:
             resp.creator_name = creator.display_name
+        if t.reviewed_by_user_id:
+            reviewer = session.get(User, t.reviewed_by_user_id)
+            if reviewer:
+                resp.reviewer_name = reviewer.display_name
         result.append(resp)
-        
+
     return success_response(result)
 
 
@@ -928,6 +958,10 @@ async def assign_project_todo(
     creator = session.get(User, todo.creator_user_id)
     if creator:
         resp.creator_name = creator.display_name
+    if todo.reviewed_by_user_id:
+        reviewer = session.get(User, todo.reviewed_by_user_id)
+        if reviewer:
+            resp.reviewer_name = reviewer.display_name
     return success_response(resp)
 
 
@@ -1031,6 +1065,10 @@ async def update_project_todo_plan(
     creator = session.get(User, todo.creator_user_id)
     if creator:
         resp.creator_name = creator.display_name
+    if todo.reviewed_by_user_id:
+        reviewer = session.get(User, todo.reviewed_by_user_id)
+        if reviewer:
+            resp.reviewer_name = reviewer.display_name
     return success_response(resp)
 
 
@@ -1192,10 +1230,11 @@ async def sync_dev_tasks_from_feature_list(
         }
 
     deleted = 0
-    for todo in existing_todos:
-        if session.get(TodoItem, todo.id) is None:
-            continue
-        deleted += _delete_project_todo_with_related(session, todo)
+    with session.no_autoflush:
+        for todo in existing_todos:
+            if session.get(TodoItem, todo.id) is None:
+                continue
+            deleted += _delete_project_todo_with_related(session, todo)
     session.flush()
 
     default_assignee = project.pm_user_id or project.owner_user_id or current_user.id
@@ -1252,30 +1291,16 @@ async def sync_dev_tasks_from_feature_list(
 
 
 def sync_project_progress(session, project_id: UUID):
-    """Recalculates and saves project progress (0.0 ~ 1.0)."""
-    from app.models.todo import TodoItem, TodoSourceType
+    """Recalculates and saves project progress (0.0 ~ 1.0) based on stages."""
     project = session.get(Project, project_id)
     if not project:
         return
-    if project.project_type and project.project_type.lower() == "b2b":
-        stages = session.exec(select(ProjectStage).where(ProjectStage.project_id == project_id)).all()
-        if not stages:
-            project.progress = 0.0
-        else:
-            done = sum(1 for s in stages if s.status == StageStatus.DONE)
-            skipped = sum(1 for s in stages if s.status == StageStatus.SKIPPED)
-            project.progress = round((done + skipped) / len(stages), 4)
+    stages = session.exec(select(ProjectStage).where(ProjectStage.project_id == project_id)).all()
+    if not stages:
+        project.progress = 0.0
     else:
-        todos = session.exec(
-            select(TodoItem)
-            .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
-            .where(TodoItem.source_id == str(project_id))
-        ).all()
-        if not todos:
-            project.progress = 0.0
-        else:
-            done = sum(1 for t in todos if t.status == 'done')
-            project.progress = round(done / len(todos), 4)
+        done = sum(1 for s in stages if s.status in (StageStatus.DONE, StageStatus.SKIPPED))
+        project.progress = round(done / len(stages), 4)
     session.add(project)
     session.commit()
 
@@ -1908,11 +1933,12 @@ async def generate_dev_tasks(
 
         source_id = str(project_id)
 
+        reviewer_id = project.pm_user_id or current_user.id
         todo = TodoItem(
             our_entity_id=gen_entity_id,
             assignee_user_id=item.assignee_user_id,
-            # PM is the unified reviewer for development tasks.
-            creator_user_id=project.pm_user_id or current_user.id,
+            creator_user_id=current_user.id,
+            reviewed_by_user_id=reviewer_id,
             title=item.title,
             description=item.description or "",
             source_type=TodoSourceType.PROJECT_TASK,
@@ -1928,6 +1954,7 @@ async def generate_dev_tasks(
                 "dev_type": item.dev_type or "",
                 "feature_key": item.feature_key or "",
                 "generated_from_feature_list": True if item.feature_key else False,
+                "reviewer_user_id": str(reviewer_id),
             }
         )
         session.add(todo)

@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     PUBLIC_BASE_URL: str = "https://dev-cn-01.yios.cn/punkrecord"
     
     # CORS
-    BACKEND_CORS_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: list = ["http://localhost:15173", "http://localhost:15030"]
     
     # File storage
     STORAGE_BACKEND: str = "local"  # "local" or "tos"

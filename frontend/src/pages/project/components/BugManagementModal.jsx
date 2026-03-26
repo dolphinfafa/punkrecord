@@ -304,7 +304,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     stage_code: 'testing',
                     tester_user_id: form.tester_user_id,
                     developer_user_id: form.developer_user_id,
-                    reviewer_user_id: currentUserId,
+                    reviewer_user_id: form.tester_user_id || currentUserId,
                     actual_result: form.actual_result?.trim() || '',
                     expected_result: form.expected_result?.trim() || '',
                     reproduce_steps: form.reproduce_steps?.trim() || '',
@@ -601,7 +601,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                    {['标题', '状态', '优先级', '开发人员', '截止日期', '待办联动'].map((h) => (
+                                    {['标题', '状态', '优先级', '开发人员', '审核人', '截止日期', '待办联动'].map((h) => (
                                         <th key={h} style={{ textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>{h}</th>
                                     ))}
                                 </tr>
@@ -644,6 +644,9 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                         <option key={m.user_id} value={m.user_id}>{m.user_name}</option>
                                                     ))}
                                                 </select>
+                                            </td>
+                                            <td style={{ padding: '10px 8px', fontSize: '0.85rem', color: '#334155' }}>
+                                                {todo.reviewer_name || '-'}
                                             </td>
                                             <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <input

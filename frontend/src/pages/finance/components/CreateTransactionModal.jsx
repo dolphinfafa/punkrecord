@@ -79,8 +79,8 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
                 contractApi.listContracts(),
                 iamApi.listUsers({ page_size: 100 })
             ]);
-            setAccounts(accRes.data || []);
-            setCounterparties(cpRes.data || []);
+            setAccounts(accRes.data?.items || accRes.data || []);
+            setCounterparties(cpRes.data?.items || cpRes.data || []);
             setContracts(contractRes.data?.items || []);
             setUsers(userRes.data?.items || []);
         } catch (error) {

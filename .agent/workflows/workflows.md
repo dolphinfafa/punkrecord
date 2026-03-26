@@ -88,7 +88,7 @@ AI Agent 工作流：
 
 ```bash
 # 启动开发服务器
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
+uvicorn app.main:app --reload --host 0.0.0.0 --port 15085
 
 # 数据库迁移
 alembic upgrade head
@@ -126,7 +126,7 @@ npm run preview    # 预览构建结果
 ### 健康检查
 
 ```bash
-curl http://localhost:8085/health
+curl http://localhost:15085/health
 ```
 
 ---

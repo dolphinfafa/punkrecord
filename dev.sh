@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ─── PunkRecord Dev 环境启停脚本 ───
-# 固定端口: 后端 8086, 前端 5174
+# 固定端口: 后端 15085, 前端 15173
 
-BACKEND_PORT=8086
-FRONTEND_PORT=5174
+BACKEND_PORT=15085
+FRONTEND_PORT=15173
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_LOG="/tmp/punkrecord-backend-zheyang-dev.log"
 FRONTEND_LOG="/tmp/punkrecord-frontend-zheyang-dev.log"

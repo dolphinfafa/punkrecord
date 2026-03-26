@@ -217,6 +217,14 @@ async def create_todo(
     if not our_entity_id:
         raise ValidationException("未找到可用主体，无法创建任务")
 
+    # Extract reviewed_by_user_id from link if provided
+    reviewed_by = None
+    if todo_data.link and todo_data.link.get("reviewer_user_id"):
+        try:
+            reviewed_by = _uuid.UUID(str(todo_data.link["reviewer_user_id"]))
+        except (ValueError, TypeError):
+            pass
+
     new_todo = TodoItem(
         our_entity_id=our_entity_id,
         assignee_user_id=todo_data.assignee_user_id,
@@ -231,7 +239,8 @@ async def create_todo(
         due_at=todo_data.due_at,
         start_at=todo_data.start_at,
         tags=todo_data.tags,
-        link=todo_data.link
+        link=todo_data.link,
+        reviewed_by_user_id=reviewed_by,
     )
 
     session.add(new_todo)
@@ -450,26 +459,10 @@ async def list_team_pending_leave_requests(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.read"))
 ):
-    """List pending leave requests where current user is in the applicant's manager chain."""
-    # Find all users where current_user is somewhere in their manager chain
+    """List pending leave requests where current user is the applicant's direct manager."""
+    # Only find direct subordinates (users whose manager_user_id == current_user.id)
     all_users = session.exec(select(User)).all()
-    user_map = {u.id: u for u in all_users}
-
-    managed_user_ids = []
-    for u in all_users:
-        if u.id == current_user.id:
-            continue
-        # Walk up the manager chain to see if current_user is a manager
-        current = u
-        visited = set()
-        while current.manager_user_id and current.manager_user_id not in visited:
-            if current.manager_user_id == current_user.id:
-                managed_user_ids.append(u.id)
-                break
-            visited.add(current.id)
-            current = user_map.get(current.manager_user_id)
-            if not current:
-                break
+    managed_user_ids = [u.id for u in all_users if u.manager_user_id == current_user.id]
 
     if not managed_user_ids:
         return success_response([])

@@ -1,6 +1,6 @@
 App({
   globalData: {
-    baseURL: 'http://127.0.0.1:8085/api/v1',
+    baseURL: 'http://127.0.0.1:15085/api/v1',
     user: null,
   },
   onLaunch() {

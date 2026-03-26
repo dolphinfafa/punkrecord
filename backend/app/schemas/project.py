@@ -143,6 +143,8 @@ class ProjectTaskResponse(BaseModel):
     assignee_name: Optional[str] = None
     creator_user_id: UUID
     creator_name: Optional[str] = None
+    reviewed_by_user_id: Optional[UUID] = None
+    reviewer_name: Optional[str] = None
     due_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     done_at: Optional[datetime] = None

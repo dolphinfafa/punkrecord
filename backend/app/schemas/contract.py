@@ -85,7 +85,15 @@ class ContractCreate(BaseModel):
 
 class ContractUpdate(BaseModel):
     """Contract update schema"""
+    contract_no: Optional[str] = None
     name: Optional[str] = None
+    contract_type: Optional[str] = None
+    party_a_id: Optional[UUID] = None
+    party_b_id: Optional[UUID] = None
+    party_c_id: Optional[UUID] = None
+    amount_total: Optional[Decimal] = None
+    currency: Optional[str] = None
+    pm_user_id: Optional[UUID] = None
     summary: Optional[str] = None
     content_doc: Optional[str] = None
     sign_date: Optional[date] = None

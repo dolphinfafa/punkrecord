@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload } from 'lucide-react';
+import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import iamApi from '@/api/iam';
 import './IAMPage.css';
 
@@ -473,6 +473,9 @@ export default function UserListPage() {
     const [search, setSearch] = useState('');
     const [currentUserLevel, setCurrentUserLevel] = useState(null);
     const [resetModalOpen, setResetModalOpen] = useState(false);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const pageSize = 20;
 
     const showNotification = (msg, type = 'success') => {
         setNotification({ msg, type });
@@ -483,12 +486,13 @@ export default function UserListPage() {
         setLoading(true);
         try {
             const [usersRes, jtRes, deptRes] = await Promise.all([
-                iamApi.listUsers({ page_size: 100 }),
+                iamApi.listUsers({ page, page_size: pageSize }),
                 iamApi.listJobTitles(),
                 iamApi.listDepartments(),
             ]);
             const list = usersRes.data?.items || [];
             setUsers(list);
+            setTotal(usersRes.data?.total || 0);
             const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')?.id;
             const me = list.find(u => u.id === currentUserId);
             setCurrentUserLevel(me?.level ?? null);
@@ -501,7 +505,7 @@ export default function UserListPage() {
         }
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [page]);
 
     const handleCreate = async (data) => {
         await iamApi.createUser(data);
@@ -548,7 +552,7 @@ export default function UserListPage() {
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <div className="iam-search">
                         <Search size={14} />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索姓名/用户名/部门/职位" />
+                        <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="搜索姓名/用户名/部门/职位" />
                     </div>
                     <button className="btn-primary" onClick={() => { setEditTarget(null); setModalOpen(true); }}>
                         <Plus size={16} /> 新建员工
@@ -623,6 +627,21 @@ export default function UserListPage() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {total > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>共 {total} 条记录</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ChevronLeft size={16} /> 上一页
+                        </button>
+                        <span style={{ fontSize: '13px', color: '#475569' }}>{page} / {Math.ceil(total / pageSize)}</span>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(p => p + 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            下一页 <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
             )}
 

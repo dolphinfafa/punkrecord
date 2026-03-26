@@ -13,11 +13,11 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 15173,
     strictPort: true,
     proxy: {
       '/punkrecord/api': {
-        target: 'http://localhost:8086',
+        target: 'http://localhost:15085',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/punkrecord/, ''),

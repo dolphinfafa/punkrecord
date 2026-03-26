@@ -211,7 +211,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
 # CORS
-BACKEND_CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+BACKEND_CORS_ORIGINS=["http://localhost:15173","http://localhost:15030"]
 ```
 
 ## Technology Stack

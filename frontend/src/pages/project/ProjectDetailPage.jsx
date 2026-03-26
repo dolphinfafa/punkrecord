@@ -16,6 +16,10 @@ import {
     Calendar, CheckCircle, Clock, Users, ArrowLeft, Trash2, Edit, List, PenTool, BarChart3, Paperclip
 } from 'lucide-react';
 
+const PROJECT_STATUS_MAP = {
+    draft: '草稿', active: '进行中', paused: '已暂停', closed: '已结项', cancelled: '已取消'
+};
+
 export default function ProjectDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -147,7 +151,7 @@ export default function ProjectDetailPage() {
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                                     <Activity size={14} /> 状态
                                 </label>
-                                <div><span className={`status-badge ${project.status}`}>{project.status}</span></div>
+                                <div><span className={`status-badge ${project.status}`}>{PROJECT_STATUS_MAP[project.status] || project.status}</span></div>
                             </div>
                             <div className="info-item">
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
@@ -399,7 +403,11 @@ export default function ProjectDetailPage() {
                     onClose={() => setFeatureListStage(null)}
                     onSave={async (data) => {
                         await projectApi.updateProjectStage(project.id, featureListStage.id, data);
-                        setFeatureListStage(null);
+                        const stagesRes = await projectApi.getProjectStages(project.id);
+                        const updatedStages = stagesRes.data || [];
+                        setStages(updatedStages);
+                        const updated = updatedStages.find(s => s.id === featureListStage.id);
+                        if (updated) setFeatureListStage(updated);
                         loadData();
                     }}
                 />
@@ -442,6 +450,11 @@ export default function ProjectDetailPage() {
                     project={project}
                     onClose={() => setPrototypeConfirmStage(null)}
                     onSave={async () => {
+                        const stagesRes = await projectApi.getProjectStages(project.id);
+                        const updatedStages = stagesRes.data || [];
+                        setStages(updatedStages);
+                        const updated = updatedStages.find(s => s.id === prototypeConfirmStage.id);
+                        if (updated) setPrototypeConfirmStage(updated);
                         loadData();
                     }}
                 />

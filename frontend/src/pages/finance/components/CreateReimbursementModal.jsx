@@ -62,7 +62,7 @@ export default function CreateReimbursementModal({ isOpen, onClose, onSuccess })
                 projectApi.listProjects({ page_size: 200 }),
                 contractApi.listContracts({ page_size: 200 })
             ]);
-            setAccounts(accountsRes.data || []);
+            setAccounts(accountsRes.data?.items || accountsRes.data || []);
             setProjects(projectsRes.data?.items || []);
             setContracts(contractsRes.data?.items || []);
         } catch (error) {

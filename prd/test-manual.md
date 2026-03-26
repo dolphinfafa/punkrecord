@@ -25,10 +25,10 @@
 
 | 项目 | 值 |
 |------|-----|
-| 后端地址 | `http://localhost:8085` |
-| 前端地址 | `http://localhost:5173` |
+| 后端地址 | `http://localhost:15085` |
+| 前端地址 | `http://localhost:15173` |
 | API 前缀 | `/api/v1` |
-| API 基础地址 | `http://localhost:8085/api/v1` |
+| API 基础地址 | `http://localhost:15085/api/v1` |
 | 数据库 | MySQL 8.0（`14.103.133.34:13306/punkrecord_dev`） |
 
 ### 启动服务
@@ -37,7 +37,7 @@
 # 后端
 cd backend
 conda activate punkrecord
-uvicorn app.main:app --reload --port 8085
+uvicorn app.main:app --reload --port 15085
 
 # 前端
 cd frontend
@@ -60,7 +60,7 @@ npm run dev
 
 ```bash
 # 登录获取 Token
-TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:15085/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['access_token'])")
 
@@ -90,7 +90,7 @@ echo $TOKEN
 
 | 步骤 | 操作 | 预期结果 |
 |------|------|---------|
-| 1 | 打开 `http://localhost:5173/login` | 显示登录页面 |
+| 1 | 打开 `http://localhost:15173/login` | 显示登录页面 |
 | 2 | 输入错误的用户名/密码，点击「登录」 | 显示"用户名或密码错误" |
 | 3 | 输入正确的用户名/密码，点击「登录」 | 跳转到工作台 |
 | 4 | 使用新建账号首次登录（`must_change_password=true`） | 跳转到个人档案填写页 |
@@ -102,7 +102,7 @@ echo $TOKEN
 #### POST /auth/login — 登录
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/auth/login \
+curl -X POST http://localhost:15085/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}'
 ```
@@ -124,7 +124,7 @@ curl -X POST http://localhost:8085/api/v1/auth/login \
 #### GET /auth/me — 获取当前用户信息（含权限）
 
 ```bash
-curl http://localhost:8085/api/v1/auth/me \
+curl http://localhost:15085/api/v1/auth/me \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -147,7 +147,7 @@ curl http://localhost:8085/api/v1/auth/me \
 #### POST /auth/change-password — 修改密码
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/auth/change-password \
+curl -X POST http://localhost:15085/api/v1/auth/change-password \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"old_password":"admin123","new_password":"newpass123"}'
@@ -156,7 +156,7 @@ curl -X POST http://localhost:8085/api/v1/auth/change-password \
 #### POST /auth/complete-profile — 首次登录完善档案
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/auth/complete-profile \
+curl -X POST http://localhost:15085/api/v1/auth/complete-profile \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -171,7 +171,7 @@ curl -X POST http://localhost:8085/api/v1/auth/complete-profile \
 #### POST /auth/logout — 退出登录
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/auth/logout \
+curl -X POST http://localhost:15085/api/v1/auth/logout \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -235,7 +235,7 @@ curl -X POST http://localhost:8085/api/v1/auth/logout \
 #### POST /todo — 创建任务
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/todo \
+curl -X POST http://localhost:15085/api/v1/todo \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -251,32 +251,32 @@ curl -X POST http://localhost:8085/api/v1/todo \
 
 ```bash
 # 全部任务
-curl "http://localhost:8085/api/v1/todo/my?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/todo/my?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # 按状态过滤（open 包含 open/in_progress/blocked）
-curl "http://localhost:8085/api/v1/todo/my?status=open" \
+curl "http://localhost:15085/api/v1/todo/my?status=open" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 #### GET /todo/team — 获取团队任务（需有下属）
 
 ```bash
-curl "http://localhost:8085/api/v1/todo/team?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/todo/team?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 #### POST /todo/{todo_id}/start — 开始任务
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/start \
+curl -X POST http://localhost:15085/api/v1/todo/<todo_id>/start \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 #### POST /todo/{todo_id}/submit — 提交完成
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/submit \
+curl -X POST http://localhost:15085/api/v1/todo/<todo_id>/submit \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -285,7 +285,7 @@ curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/submit \
 #### POST /todo/{todo_id}/approve — 审核通过
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/approve \
+curl -X POST http://localhost:15085/api/v1/todo/<todo_id>/approve \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"comment": "做得好"}'
@@ -294,7 +294,7 @@ curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/approve \
 #### POST /todo/{todo_id}/reject — 审核驳回
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/reject \
+curl -X POST http://localhost:15085/api/v1/todo/<todo_id>/reject \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"comment": "需要修改细节"}'
@@ -303,14 +303,14 @@ curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/reject \
 #### POST /todo/{todo_id}/block — 标记阻塞
 
 ```bash
-curl -X POST "http://localhost:8085/api/v1/todo/<todo_id>/block?blocked_reason=等待第三方接口" \
+curl -X POST "http://localhost:15085/api/v1/todo/<todo_id>/block?blocked_reason=等待第三方接口" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 #### POST /todo/{todo_id}/dismiss — 忽略任务
 
 ```bash
-curl -X POST "http://localhost:8085/api/v1/todo/<todo_id>/dismiss?dismiss_reason=需求已取消" \
+curl -X POST "http://localhost:15085/api/v1/todo/<todo_id>/dismiss?dismiss_reason=需求已取消" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -318,16 +318,16 @@ curl -X POST "http://localhost:8085/api/v1/todo/<todo_id>/dismiss?dismiss_reason
 
 ```bash
 # 上传图片
-curl -X POST http://localhost:8085/api/v1/todo/<todo_id>/images \
+curl -X POST http://localhost:15085/api/v1/todo/<todo_id>/images \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@screenshot.png"
 
 # 下载图片
-curl http://localhost:8085/api/v1/todo/<todo_id>/images/<image_id>/download \
+curl http://localhost:15085/api/v1/todo/<todo_id>/images/<image_id>/download \
   -H "Authorization: Bearer $TOKEN" -o image.png
 
 # 删除图片
-curl -X DELETE http://localhost:8085/api/v1/todo/<todo_id>/images/<image_id> \
+curl -X DELETE http://localhost:15085/api/v1/todo/<todo_id>/images/<image_id> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -335,7 +335,7 @@ curl -X DELETE http://localhost:8085/api/v1/todo/<todo_id>/images/<image_id> \
 
 ```bash
 # 创建请假申请
-curl -X POST http://localhost:8085/api/v1/todo/leaves \
+curl -X POST http://localhost:15085/api/v1/todo/leaves \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -346,19 +346,19 @@ curl -X POST http://localhost:8085/api/v1/todo/leaves \
   }'
 
 # 查看我的请假
-curl "http://localhost:8085/api/v1/todo/leaves/my" \
+curl "http://localhost:15085/api/v1/todo/leaves/my" \
   -H "Authorization: Bearer $TOKEN"
 
 # 查看团队待审请假（需是上级）
-curl http://localhost:8085/api/v1/todo/leaves/team/pending \
+curl http://localhost:15085/api/v1/todo/leaves/team/pending \
   -H "Authorization: Bearer $TOKEN"
 
 # 审批通过（扣减假期余额）
-curl -X POST http://localhost:8085/api/v1/todo/leaves/<leave_id>/approve \
+curl -X POST http://localhost:15085/api/v1/todo/leaves/<leave_id>/approve \
   -H "Authorization: Bearer $TOKEN"
 
 # 审批驳回
-curl -X POST http://localhost:8085/api/v1/todo/leaves/<leave_id>/reject \
+curl -X POST http://localhost:15085/api/v1/todo/leaves/<leave_id>/reject \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"comment": "时间冲突"}'
@@ -431,7 +431,7 @@ curl -X POST http://localhost:8085/api/v1/todo/leaves/<leave_id>/reject \
 
 ```bash
 # 创建用户
-curl -X POST http://localhost:8085/api/v1/iam/users \
+curl -X POST http://localhost:15085/api/v1/iam/users \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -444,33 +444,33 @@ curl -X POST http://localhost:8085/api/v1/iam/users \
   }'
 
 # 查询用户列表（支持分页和过滤）
-curl "http://localhost:8085/api/v1/iam/users?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/iam/users?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # 按部门过滤
-curl "http://localhost:8085/api/v1/iam/users?department_id=<UUID>" \
+curl "http://localhost:15085/api/v1/iam/users?department_id=<UUID>" \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取单个用户
-curl http://localhost:8085/api/v1/iam/users/<user_id> \
+curl http://localhost:15085/api/v1/iam/users/<user_id> \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新用户
-curl -X PATCH http://localhost:8085/api/v1/iam/users/<user_id> \
+curl -X PATCH http://localhost:15085/api/v1/iam/users/<user_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"display_name": "新名字", "status": "inactive"}'
 
 # 重置密码（L0）
-curl -X POST http://localhost:8085/api/v1/iam/users/<user_id>/reset-password \
+curl -X POST http://localhost:15085/api/v1/iam/users/<user_id>/reset-password \
   -H "Authorization: Bearer $TOKEN"
 
 # 重置单个用户假期余额（L0）
-curl -X POST http://localhost:8085/api/v1/iam/users/<user_id>/reset-leave-balances \
+curl -X POST http://localhost:15085/api/v1/iam/users/<user_id>/reset-leave-balances \
   -H "Authorization: Bearer $TOKEN"
 
 # 重置所有员工假期余额（L0）
-curl -X POST http://localhost:8085/api/v1/iam/users/reset-leave-balances \
+curl -X POST http://localhost:15085/api/v1/iam/users/reset-leave-balances \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -478,17 +478,17 @@ curl -X POST http://localhost:8085/api/v1/iam/users/reset-leave-balances \
 
 ```bash
 # 上传身份证图片
-curl -X POST http://localhost:8085/api/v1/iam/users/<user_id>/id-card-image \
+curl -X POST http://localhost:15085/api/v1/iam/users/<user_id>/id-card-image \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@id_card.jpg"
 
 # 上传简历（仅 PDF）
-curl -X POST http://localhost:8085/api/v1/iam/users/<user_id>/resume \
+curl -X POST http://localhost:15085/api/v1/iam/users/<user_id>/resume \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@resume.pdf"
 
 # 下载文件
-curl http://localhost:8085/api/v1/iam/users/<user_id>/files/<filename> \
+curl http://localhost:15085/api/v1/iam/users/<user_id>/files/<filename> \
   -H "Authorization: Bearer $TOKEN" -o downloaded_file
 ```
 
@@ -496,29 +496,29 @@ curl http://localhost:8085/api/v1/iam/users/<user_id>/files/<filename> \
 
 ```bash
 # 查看部门树
-curl http://localhost:8085/api/v1/iam/departments \
+curl http://localhost:15085/api/v1/iam/departments \
   -H "Authorization: Bearer $TOKEN"
 
 # 创建部门
-curl -X POST http://localhost:8085/api/v1/iam/departments \
+curl -X POST http://localhost:15085/api/v1/iam/departments \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "测试部门", "description": "描述"}'
 
 # 创建子部门
-curl -X POST http://localhost:8085/api/v1/iam/departments \
+curl -X POST http://localhost:15085/api/v1/iam/departments \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "子部门", "parent_org_unit_id": "<父部门UUID>"}'
 
 # 更新部门
-curl -X PATCH http://localhost:8085/api/v1/iam/departments/<dept_id> \
+curl -X PATCH http://localhost:15085/api/v1/iam/departments/<dept_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "新部门名"}'
 
 # 删除部门
-curl -X DELETE http://localhost:8085/api/v1/iam/departments/<dept_id> \
+curl -X DELETE http://localhost:15085/api/v1/iam/departments/<dept_id> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -526,25 +526,25 @@ curl -X DELETE http://localhost:8085/api/v1/iam/departments/<dept_id> \
 
 ```bash
 # 查看所有职位
-curl http://localhost:8085/api/v1/iam/job-titles \
+curl http://localhost:15085/api/v1/iam/job-titles \
   -H "Authorization: Bearer $TOKEN"
 
 # 创建职位
-curl -X POST http://localhost:8085/api/v1/iam/job-titles \
+curl -X POST http://localhost:15085/api/v1/iam/job-titles \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "测试工程师", "description": "负责测试"}'
 
 # 查看所有权限列表
-curl http://localhost:8085/api/v1/iam/permissions \
+curl http://localhost:15085/api/v1/iam/permissions \
   -H "Authorization: Bearer $TOKEN"
 
 # 查看职位已分配的权限
-curl http://localhost:8085/api/v1/iam/job-titles/<job_title_id>/permissions \
+curl http://localhost:15085/api/v1/iam/job-titles/<job_title_id>/permissions \
   -H "Authorization: Bearer $TOKEN"
 
 # 设置职位权限（全量替换）
-curl -X PUT http://localhost:8085/api/v1/iam/job-titles/<job_title_id>/permissions \
+curl -X PUT http://localhost:15085/api/v1/iam/job-titles/<job_title_id>/permissions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"permission_codes": ["todo.read", "todo.write", "project.read"]}'
@@ -554,11 +554,11 @@ curl -X PUT http://localhost:8085/api/v1/iam/job-titles/<job_title_id>/permissio
 
 ```bash
 # 查看贝利规则
-curl http://localhost:8085/api/v1/iam/beli-rules \
+curl http://localhost:15085/api/v1/iam/beli-rules \
   -H "Authorization: Bearer $TOKEN"
 
 # 创建贝利规则（L0）
-curl -X POST http://localhost:8085/api/v1/iam/beli-rules \
+curl -X POST http://localhost:15085/api/v1/iam/beli-rules \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -573,7 +573,7 @@ curl -X POST http://localhost:8085/api/v1/iam/beli-rules \
   }'
 
 # 查看组织架构树
-curl http://localhost:8085/api/v1/iam/org-chart \
+curl http://localhost:15085/api/v1/iam/org-chart \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -608,7 +608,7 @@ curl http://localhost:8085/api/v1/iam/org-chart \
 
 ```bash
 # 创建交易方
-curl -X POST http://localhost:8085/api/v1/contract/counterparties \
+curl -X POST http://localhost:15085/api/v1/contract/counterparties \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -620,11 +620,11 @@ curl -X POST http://localhost:8085/api/v1/contract/counterparties \
   }'
 
 # 查询交易方列表
-curl "http://localhost:8085/api/v1/contract/counterparties" \
+curl "http://localhost:15085/api/v1/contract/counterparties" \
   -H "Authorization: Bearer $TOKEN"
 
 # 创建合同（含付款计划）
-curl -X POST http://localhost:8085/api/v1/contract/contracts \
+curl -X POST http://localhost:15085/api/v1/contract/contracts \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -647,29 +647,29 @@ curl -X POST http://localhost:8085/api/v1/contract/contracts \
   }'
 
 # 查询合同列表
-curl "http://localhost:8085/api/v1/contract/contracts?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/contract/contracts?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # 按状态和类型过滤
-curl "http://localhost:8085/api/v1/contract/contracts?status=draft&contract_type=sales" \
+curl "http://localhost:15085/api/v1/contract/contracts?status=draft&contract_type=sales" \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取单个合同
-curl http://localhost:8085/api/v1/contract/contracts/<contract_id> \
+curl http://localhost:15085/api/v1/contract/contracts/<contract_id> \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新合同
-curl -X PATCH http://localhost:8085/api/v1/contract/contracts/<contract_id> \
+curl -X PATCH http://localhost:15085/api/v1/contract/contracts/<contract_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"summary": "更新后的摘要"}'
 
 # 获取付款计划
-curl http://localhost:8085/api/v1/contract/contracts/<contract_id>/payment-plans \
+curl http://localhost:15085/api/v1/contract/contracts/<contract_id>/payment-plans \
   -H "Authorization: Bearer $TOKEN"
 
 # 提交审批
-curl -X POST http://localhost:8085/api/v1/contract/contracts/<contract_id>/submit \
+curl -X POST http://localhost:15085/api/v1/contract/contracts/<contract_id>/submit \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -723,7 +723,7 @@ curl -X POST http://localhost:8085/api/v1/contract/contracts/<contract_id>/submi
 
 ```bash
 # 创建 B2B 项目（自动生成 8 个阶段）
-curl -X POST http://localhost:8085/api/v1/project/projects \
+curl -X POST http://localhost:15085/api/v1/project/projects \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -737,21 +737,21 @@ curl -X POST http://localhost:8085/api/v1/project/projects \
   }'
 
 # 查询项目列表
-curl "http://localhost:8085/api/v1/project/projects?page=1&page_size=20&project_type=b2b" \
+curl "http://localhost:15085/api/v1/project/projects?page=1&page_size=20&project_type=b2b" \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取项目详情
-curl http://localhost:8085/api/v1/project/projects/<project_id> \
+curl http://localhost:15085/api/v1/project/projects/<project_id> \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新项目
-curl -X PATCH http://localhost:8085/api/v1/project/projects/<project_id> \
+curl -X PATCH http://localhost:15085/api/v1/project/projects/<project_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "active", "description": "更新描述"}'
 
 # 删除项目
-curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id> \
+curl -X DELETE http://localhost:15085/api/v1/project/projects/<project_id> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -759,17 +759,17 @@ curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id> \
 
 ```bash
 # 获取项目阶段列表
-curl http://localhost:8085/api/v1/project/projects/<project_id>/stages \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/stages \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新阶段状态
-curl -X PATCH http://localhost:8085/api/v1/project/projects/<project_id>/stages/<stage_id> \
+curl -X PATCH http://localhost:15085/api/v1/project/projects/<project_id>/stages/<stage_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "in_progress"}'
 
 # 完成阶段
-curl -X PATCH http://localhost:8085/api/v1/project/projects/<project_id>/stages/<stage_id> \
+curl -X PATCH http://localhost:15085/api/v1/project/projects/<project_id>/stages/<stage_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "done", "deliverables": "交付物说明"}'
@@ -779,23 +779,23 @@ curl -X PATCH http://localhost:8085/api/v1/project/projects/<project_id>/stages/
 
 ```bash
 # 添加单个成员
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/members \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/members \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"user_id": "<成员UUID>", "role_in_project": "前端开发"}'
 
 # 批量添加成员
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/members \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/members \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"user_ids": ["<UUID1>", "<UUID2>"]}'
 
 # 查看成员列表
-curl http://localhost:8085/api/v1/project/projects/<project_id>/members \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/members \
   -H "Authorization: Bearer $TOKEN"
 
 # 移除成员
-curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id>/members/<user_id> \
+curl -X DELETE http://localhost:15085/api/v1/project/projects/<project_id>/members/<user_id> \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -803,21 +803,21 @@ curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id>/member
 
 ```bash
 # 获取项目任务列表
-curl "http://localhost:8085/api/v1/project/projects/<project_id>/todos?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/project/projects/<project_id>/todos?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # 按状态和负责人过滤
-curl "http://localhost:8085/api/v1/project/projects/<project_id>/todos?status=open&assignee_user_id=<UUID>" \
+curl "http://localhost:15085/api/v1/project/projects/<project_id>/todos?status=open&assignee_user_id=<UUID>" \
   -H "Authorization: Bearer $TOKEN"
 
 # 分配任务
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/todos/<todo_id>/assign \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/todos/<todo_id>/assign \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"assignee_user_id": "<用户UUID>"}'
 
 # 规划任务（设置负责人、截止日期、优先级等）
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/todos/<todo_id>/plan \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/todos/<todo_id>/plan \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -828,17 +828,17 @@ curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/todos/<t
   }'
 
 # 批量分配任务
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/todos/batch-assign \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/todos/batch-assign \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"todo_ids": ["<UUID1>", "<UUID2>"], "assignee_user_id": "<UUID>"}'
 
 # 删除单个任务
-curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id>/todos/<todo_id> \
+curl -X DELETE http://localhost:15085/api/v1/project/projects/<project_id>/todos/<todo_id> \
   -H "Authorization: Bearer $TOKEN"
 
 # 批量删除任务（可按状态过滤）
-curl -X DELETE "http://localhost:8085/api/v1/project/projects/<project_id>/todos?status=open" \
+curl -X DELETE "http://localhost:15085/api/v1/project/projects/<project_id>/todos?status=open" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -846,24 +846,24 @@ curl -X DELETE "http://localhost:8085/api/v1/project/projects/<project_id>/todos
 
 ```bash
 # 上传项目附件（最大 20MB）
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/attachments \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/attachments \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@document.pdf"
 
 # 获取附件列表
-curl http://localhost:8085/api/v1/project/projects/<project_id>/attachments \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/attachments \
   -H "Authorization: Bearer $TOKEN"
 
 # 下载附件
-curl http://localhost:8085/api/v1/project/projects/<project_id>/attachments/<attachment_id>/download \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/attachments/<attachment_id>/download \
   -H "Authorization: Bearer $TOKEN" -o file.pdf
 
 # 删除附件
-curl -X DELETE http://localhost:8085/api/v1/project/projects/<project_id>/attachments/<attachment_id> \
+curl -X DELETE http://localhost:15085/api/v1/project/projects/<project_id>/attachments/<attachment_id> \
   -H "Authorization: Bearer $TOKEN"
 
 # 上传阶段附件
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/stages/<stage_id>/attachments \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/stages/<stage_id>/attachments \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@design.png"
 ```
@@ -872,11 +872,11 @@ curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/stages/<
 
 ```bash
 # 获取功能清单
-curl http://localhost:8085/api/v1/project/projects/<project_id>/feature-list \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/feature-list \
   -H "Authorization: Bearer $TOKEN"
 
 # 从功能清单生成开发任务
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/generate-dev-tasks \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/generate-dev-tasks \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -885,7 +885,7 @@ curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/generate
   }'
 
 # 同步开发任务
-curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/sync-dev-tasks \
+curl -X POST http://localhost:15085/api/v1/project/projects/<project_id>/sync-dev-tasks \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"feature_list": [...]}'
@@ -895,19 +895,19 @@ curl -X POST http://localhost:8085/api/v1/project/projects/<project_id>/sync-dev
 
 ```bash
 # 导出报价 Excel
-curl -X POST http://localhost:8085/api/v1/project/export_quote_excel \
+curl -X POST http://localhost:15085/api/v1/project/export_quote_excel \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"project_id": "<UUID>", "feature_list": [...]}' -o quote.xlsx
 
 # 导出合同 Word
-curl -X POST http://localhost:8085/api/v1/project/export-contract-docx \
+curl -X POST http://localhost:15085/api/v1/project/export-contract-docx \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"project_id": "<UUID>", "contract_context": {}}' -o contract.docx
 
 # 下载验收报告
-curl http://localhost:8085/api/v1/project/projects/<project_id>/acceptance-report/download \
+curl http://localhost:15085/api/v1/project/projects/<project_id>/acceptance-report/download \
   -H "Authorization: Bearer $TOKEN" -o report.docx
 ```
 
@@ -948,7 +948,7 @@ curl http://localhost:8085/api/v1/project/projects/<project_id>/acceptance-repor
 
 ```bash
 # 创建账户
-curl -X POST http://localhost:8085/api/v1/finance/accounts \
+curl -X POST http://localhost:15085/api/v1/finance/accounts \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -962,17 +962,17 @@ curl -X POST http://localhost:8085/api/v1/finance/accounts \
   }'
 
 # 查看账户列表（含计算余额）
-curl http://localhost:8085/api/v1/finance/accounts \
+curl http://localhost:15085/api/v1/finance/accounts \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新账户
-curl -X PATCH http://localhost:8085/api/v1/finance/accounts/<account_id> \
+curl -X PATCH http://localhost:15085/api/v1/finance/accounts/<account_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"account_name": "更新后的名称"}'
 
 # 创建收款交易
-curl -X POST http://localhost:8085/api/v1/finance/transactions \
+curl -X POST http://localhost:15085/api/v1/finance/transactions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -988,7 +988,7 @@ curl -X POST http://localhost:8085/api/v1/finance/transactions \
   }'
 
 # 创建付款交易
-curl -X POST http://localhost:8085/api/v1/finance/transactions \
+curl -X POST http://localhost:15085/api/v1/finance/transactions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1002,21 +1002,21 @@ curl -X POST http://localhost:8085/api/v1/finance/transactions \
   }'
 
 # 查询交易列表
-curl "http://localhost:8085/api/v1/finance/transactions?page=1&page_size=20" \
+curl "http://localhost:15085/api/v1/finance/transactions?page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
 
 # 按账户和方向过滤
-curl "http://localhost:8085/api/v1/finance/transactions?account_id=<UUID>&txn_direction=in" \
+curl "http://localhost:15085/api/v1/finance/transactions?account_id=<UUID>&txn_direction=in" \
   -H "Authorization: Bearer $TOKEN"
 
 # 更新对账状态
-curl -X PATCH http://localhost:8085/api/v1/finance/transactions/<txn_id> \
+curl -X PATCH http://localhost:15085/api/v1/finance/transactions/<txn_id> \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"reconcile_status": "reconciled"}'
 
 # 创建发票
-curl -X POST http://localhost:8085/api/v1/finance/invoices \
+curl -X POST http://localhost:15085/api/v1/finance/invoices \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1030,11 +1030,11 @@ curl -X POST http://localhost:8085/api/v1/finance/invoices \
   }'
 
 # 查询发票列表
-curl "http://localhost:8085/api/v1/finance/invoices?invoice_kind=output" \
+curl "http://localhost:15085/api/v1/finance/invoices?invoice_kind=output" \
   -H "Authorization: Bearer $TOKEN"
 
 # 创建报销单
-curl -X POST http://localhost:8085/api/v1/finance/reimbursements \
+curl -X POST http://localhost:15085/api/v1/finance/reimbursements \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1047,7 +1047,7 @@ curl -X POST http://localhost:8085/api/v1/finance/reimbursements \
   }'
 
 # 查询报销列表（仅返回自己的）
-curl "http://localhost:8085/api/v1/finance/reimbursements" \
+curl "http://localhost:15085/api/v1/finance/reimbursements" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -1066,7 +1066,7 @@ curl "http://localhost:8085/api/v1/finance/reimbursements" \
 
 ```bash
 # AI 对话（非流式）
-curl -X POST http://localhost:8085/api/v1/ai/chat \
+curl -X POST http://localhost:15085/api/v1/ai/chat \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1075,7 +1075,7 @@ curl -X POST http://localhost:8085/api/v1/ai/chat \
   }'
 
 # AI 对话（流式 SSE）
-curl -X POST http://localhost:8085/api/v1/ai/chat-stream \
+curl -X POST http://localhost:15085/api/v1/ai/chat-stream \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1117,12 +1117,12 @@ curl -X POST http://localhost:8085/api/v1/ai/chat-stream \
 
 ```bash
 # 用无权限用户的 Token 访问需要权限的接口
-curl http://localhost:8085/api/v1/iam/users \
+curl http://localhost:15085/api/v1/iam/users \
   -H "Authorization: Bearer $NO_PERM_TOKEN"
 # 预期：返回 403 {"code": 403, "message": "Missing permission: iam.read"}
 
 # 无 Token 访问受保护接口
-curl http://localhost:8085/api/v1/iam/users
+curl http://localhost:15085/api/v1/iam/users
 # 预期：返回 401 {"code": 401, "message": "Not authenticated"}
 ```
 

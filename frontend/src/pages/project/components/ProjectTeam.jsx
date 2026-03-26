@@ -133,6 +133,29 @@ export default function ProjectTeam({ project }) {
                                     ))}
                                 </select>
                             </div>
+                            {filteredUsers.length > 0 && (
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                    <button
+                                        type="button"
+                                        className="btn-link"
+                                        style={{ fontSize: '0.85rem', padding: 0 }}
+                                        onClick={() => {
+                                            const allIds = filteredUsers.map(u => u.id);
+                                            const allSelected = allIds.every(id => newMemberIds.includes(id));
+                                            if (allSelected) {
+                                                setNewMemberIds(newMemberIds.filter(id => !allIds.includes(id)));
+                                            } else {
+                                                setNewMemberIds([...new Set([...newMemberIds, ...allIds])]);
+                                            }
+                                        }}
+                                    >
+                                        {filteredUsers.every(u => newMemberIds.includes(u.id)) ? '取消全选' : '全选'}
+                                    </button>
+                                    <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                                        已选 {newMemberIds.length} 人
+                                    </span>
+                                </div>
+                            )}
                             <div className="checkbox-list" style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid #dee2e6', padding: '10px', borderRadius: '4px', backgroundColor: '#fff' }}>
                                 {filteredUsers.length === 0 ? (
                                     <div style={{ color: '#999', textAlign: 'center', padding: '10px' }}>无匹配用户</div>

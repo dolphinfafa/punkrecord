@@ -17,6 +17,7 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
         description: project.description || ''
     });
     const [users, setUsers] = useState([]);
+    const [entities, setEntities] = useState([]);
     const [counterparties, setCounterparties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -27,11 +28,13 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
 
     const loadOptions = async () => {
         try {
-            const [usersRes, counterpartiesRes] = await Promise.all([
+            const [usersRes, entitiesRes, counterpartiesRes] = await Promise.all([
                 iamApi.listUsers({ page_size: 100 }),
+                iamApi.listEntities(),
                 contractApi.listCounterparties()
             ]);
             setUsers(usersRes.data?.items || []);
+            setEntities(entitiesRes.data?.items || entitiesRes.data || []);
             setCounterparties(counterpartiesRes.data?.items || counterpartiesRes.data || []);
         } catch (err) {
             console.error('Failed to load options:', err);
@@ -126,8 +129,8 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
                             <label>我方主体</label>
                             <select name="our_entity_id" value={formData.our_entity_id || ''} onChange={handleChange}>
                                 <option value="">请选择我方主体</option>
-                                {counterparties.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                {entities.map(e => (
+                                    <option key={e.id} value={e.id}>{e.name}</option>
                                 ))}
                             </select>
                         </div>

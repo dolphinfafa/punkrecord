@@ -132,7 +132,13 @@ async def get_me(
     session: Session = Depends(get_session),
 ):
     """Get current authenticated user's profile"""
+    from app.models.iam import JobTitle
     permissions = get_user_permissions(current_user, session)
+    job_title_name = None
+    if current_user.job_title_id:
+        jt = session.get(JobTitle, current_user.job_title_id)
+        if jt:
+            job_title_name = jt.name
     return success_response({
         "id": str(current_user.id),
         "display_name": current_user.display_name,
@@ -142,4 +148,5 @@ async def get_me(
         "profile_completed": current_user.profile_completed,
         "must_change_password": current_user.must_change_password,
         "permissions": permissions,
+        "job_title_name": job_title_name,
     })

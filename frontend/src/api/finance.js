@@ -3,7 +3,8 @@ import client from './client';
 export const financeApi = {
     // Accounts
     listAccounts: async (params = {}) => {
-        return client.get('/finance/accounts', { params });
+        const { page = 1, page_size = 20 } = params;
+        return client.get('/finance/accounts', { params: { page, page_size } });
     },
 
     createAccount: async (accountData) => {

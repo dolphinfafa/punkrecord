@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import financeApi from '@/api/finance';
 import CreateAccountModal from './components/CreateAccountModal';
 
@@ -14,16 +15,20 @@ export default function AccountListPage() {
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const pageSize = 20;
 
     useEffect(() => {
         loadAccounts();
-    }, []);
+    }, [page]);
 
     const loadAccounts = async () => {
         try {
             setLoading(true);
-            const response = await financeApi.listAccounts();
-            setAccounts(response.data || []);
+            const response = await financeApi.listAccounts({ page, page_size: pageSize });
+            setAccounts(response.data?.items || []);
+            setTotal(response.data?.total || 0);
             setError(null);
         } catch (err) {
             setError(err.message || '加载账户失败');
@@ -104,6 +109,21 @@ export default function AccountListPage() {
                     </tbody>
                 </table>
             </div>
+
+            {total > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>共 {total} 条记录</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ChevronLeft size={16} /> 上一页
+                        </button>
+                        <span style={{ fontSize: '13px', color: '#475569' }}>{page} / {Math.ceil(total / pageSize)}</span>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(p => p + 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            下一页 <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <CreateAccountModal
                 isOpen={isCreateModalOpen}

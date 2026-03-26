@@ -6,7 +6,7 @@ import requests
 import json
 import sys
 
-BASE_URL = "http://89.208.247.23:5174/api/v1"
+BASE_URL = "http://89.208.247.23:15085/api/v1"
 PROJECT_ID = "7ae52617-afef-4528-b787-84c1bc8837d0"
 MY_USER_ID = "eaedb7cd-1da3-4150-bdbb-778c46b47cb6"
 

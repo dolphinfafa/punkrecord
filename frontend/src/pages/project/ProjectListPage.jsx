@@ -60,7 +60,7 @@ export default function ProjectListPage() {
             draft: '草稿',
             active: '进行中',
             paused: '已暂停',
-            closed: '已关闭',
+            closed: '已结项',
             cancelled: '已取消'
         };
         return map[status] || status;

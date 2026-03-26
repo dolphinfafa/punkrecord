@@ -77,16 +77,26 @@ async def update_counterparty(
 @router.get("/counterparties", response_model=dict)
 async def list_counterparties(
     type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("contract.read"))
 ):
-    """List counterparties"""
+    """List counterparties with pagination"""
     query = select(Counterparty)
     if type:
         query = query.where(Counterparty.type == type)
-    
-    counterparties = session.exec(query).all()
-    return success_response([CounterpartyResponse.model_validate(c) for c in counterparties])
+
+    all_items = session.exec(query.order_by(Counterparty.created_at.desc())).all()
+    total = len(all_items)
+    start = (page - 1) * page_size
+    items = all_items[start:start + page_size]
+    return success_response({
+        "items": [CounterpartyResponse.model_validate(c) for c in items],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
 
 
 # Contract endpoints
@@ -220,8 +230,24 @@ async def update_contract(
     if not contract:
         raise NotFoundException("未找到合同")
     
+    if data.contract_no is not None:
+        contract.contract_no = data.contract_no
     if data.name is not None:
         contract.name = data.name
+    if data.contract_type is not None:
+        contract.contract_type = data.contract_type
+    if data.party_a_id is not None:
+        contract.party_a_id = data.party_a_id
+    if data.party_b_id is not None:
+        contract.party_b_id = data.party_b_id
+    if data.party_c_id is not None:
+        contract.party_c_id = data.party_c_id
+    if data.amount_total is not None:
+        contract.amount_total = data.amount_total
+    if data.currency is not None:
+        contract.currency = data.currency
+    if data.pm_user_id is not None:
+        contract.pm_user_id = data.pm_user_id
     if data.summary is not None:
         contract.summary = data.summary
     if data.content_doc is not None:

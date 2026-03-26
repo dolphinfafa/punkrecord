@@ -34,14 +34,14 @@ const FEATURE_COLUMNS = [
 const HEADER_ALIASES = {
     index: ['序号', 'index', 'idx'],
     product: ['产品', 'product'],
-    module: ['模块', 'module'],
+    module: ['模块', '板块', 'module'],
     l1_feature: ['一级功能', 'l1功能', 'l1_feature', '一级', '一级模块'],
     l2_feature: ['二级功能', 'l2功能', 'l2_feature', '二级', '二级模块'],
-    description: ['功能说明', '说明', '描述', 'description'],
-    dev_backend: ['后端', '后端工时', 'dev_backend', 'backend'],
-    dev_frontend: ['前端', '前端工时', 'dev_frontend', 'frontend'],
+    description: ['功能说明', '新增功能说明', '说明', '描述', 'description'],
+    dev_backend: ['后端', '后端开发', '后端工时', 'dev_backend', 'backend'],
+    dev_frontend: ['前端', '前端开发', '前端工时', 'dev_frontend', 'frontend'],
     dev_ui: ['ui设计', 'ui', 'ui工时', 'dev_ui'],
-    dev_product: ['产品工时', '产品经理', 'dev_product', 'pm'],
+    dev_product: ['产品工时', '产品规划', '产品经理', 'dev_product', 'pm'],
 };
 
 const normalizeHeader = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '');

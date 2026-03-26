@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, User, Building2, MapPin, FileBadge, Edit } from 'lucide-react';
+import { Plus, Users, User, Building2, MapPin, FileBadge, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import contractApi from '@/api/contract';
 import CreateCounterpartyModal from './components/CreateCounterpartyModal';
 
@@ -14,16 +14,20 @@ export default function CounterpartyListPage() {
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingCounterparty, setEditingCounterparty] = useState(null);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const pageSize = 20;
 
     useEffect(() => {
         loadCounterparties();
-    }, []);
+    }, [page]);
 
     const loadCounterparties = async () => {
         try {
             setLoading(true);
-            const response = await contractApi.listCounterparties();
-            setCounterparties(response.data || []);
+            const response = await contractApi.listCounterparties({ page, page_size: pageSize });
+            setCounterparties(response.data?.items || []);
+            setTotal(response.data?.total || 0);
             setError(null);
         } catch (err) {
             setError(err.message || '加载交易方失败');
@@ -117,6 +121,21 @@ export default function CounterpartyListPage() {
                     </tbody>
                 </table>
             </div>
+
+            {total > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>共 {total} 条记录</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ChevronLeft size={16} /> 上一页
+                        </button>
+                        <span style={{ fontSize: '13px', color: '#475569' }}>{page} / {Math.ceil(total / pageSize)}</span>
+                        <button className="btn btn-sm btn-outline-secondary" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(p => p + 1)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            下一页 <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <CreateCounterpartyModal
                 isOpen={isCreateModalOpen}

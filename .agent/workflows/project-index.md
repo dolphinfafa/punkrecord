@@ -63,8 +63,9 @@ punkrecord/
 
 ## 3. 关键信息速查
 
-- **后端端口**：8085（`uvicorn --port 8085`）
-- **前端代理**：Vite 将 `/api` 代理到 `localhost:8085`
+- **后端端口**：15085（`uvicorn --port 15085`）
+- **前端端口**：15173（Vite 将 `/punkrecord/api` 代理到 `localhost:15085`）
+- **NestJS API 端口**：15030
 - **API 前缀**：所有接口在 `/api/v1` 下
 - **认证方式**：JWT Bearer Token（HS256，24 小时有效）
 - **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）

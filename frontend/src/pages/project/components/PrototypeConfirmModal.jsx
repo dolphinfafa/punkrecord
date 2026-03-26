@@ -87,7 +87,7 @@ export default function PrototypeConfirmModal({ isOpen, onClose, stage, project,
         } catch (err) {
             console.warn('Failed to parse prototype confirmation payload:', err);
         }
-    }, [isOpen, stage]);
+    }, [isOpen, stage, stage?.feature_list]);
 
     if (!isOpen || !stage) return null;
 

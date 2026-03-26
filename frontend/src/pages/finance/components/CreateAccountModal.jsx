@@ -47,8 +47,8 @@ export default function CreateAccountModal({ isOpen, onClose, onSuccess, initial
 
     const loadCounterparties = async () => {
         try {
-            const res = await contractApi.listCounterparties();
-            setCounterparties(res.data || []);
+            const res = await contractApi.listCounterparties({ page_size: 200 });
+            setCounterparties(res.data?.items || res.data || []);
         } catch (error) {
             console.error('Failed to load counterparties', error);
         }

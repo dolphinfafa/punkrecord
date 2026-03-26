@@ -8,4 +8,4 @@ eval "$(conda shell.bash hook)"
 conda activate punk
 
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 15085

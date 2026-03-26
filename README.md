@@ -48,14 +48,15 @@ punkrecord/
 └── .agent/workflows/        # Agent 工作流文档与索引
 ```
 
-## 分支说明
+## 端口分配
 
-| 分支 | 用途 | 后端端口 | 前端端口 |
-|------|------|----------|----------|
-| `main` | 生产/稳定版本 | 8085 | 5173 |
-| `dev` | 日常开发 | 8086 | 5174 |
+| 服务 | 端口 |
+|------|------|
+| 后端 API | 15085 |
+| 前端 Web | 15173 |
+| NestJS API | 15030 |
 
-> **注意**: 两套环境可同时运行，互不影响。dev 分支的前端代理已指向 8086 端口。
+> 端口范围 15000-19999 为用户 zheyang 专用，所有分支使用统一端口。
 
 ## 环境要求
 
@@ -77,12 +78,7 @@ cd backend
 conda activate punk            # 激活 conda 环境
 pip install -r requirements.txt # 安装依赖
 python init_database.py         # 初始化数据库（首次）
-
-# dev 分支
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8086
-
-# main 分支
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
+uvicorn app.main:app --reload --host 0.0.0.0 --port 15085
 ```
 
 ### 3. 前端服务启动
@@ -90,22 +86,16 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8085
 ```bash
 cd frontend
 npm install
-
-# dev 分支
-npm run dev -- --port 5174
-
-# main 分支
-npm run dev -- --port 5173
+npm run dev
 ```
 
 ### 4. 访问应用
 
-| 环境 | 前端 | 后端 API | API 文档 |
-|------|------|----------|----------|
-| dev | http://localhost:5174/punkrecord/ | http://localhost:8086 | http://localhost:8086/docs |
-| main | http://localhost:5173/punkrecord/ | http://localhost:8085 | http://localhost:8085/docs |
+| 前端 | 后端 API | API 文档 |
+|------|----------|----------|
+| http://localhost:15173/punkrecord/ | http://localhost:15085 | http://localhost:15085/docs |
 
-### 5. 便捷启停（dev 环境）
+### 5. 便捷启停
 
 ```bash
 ./dev.sh start    # 启动前后端

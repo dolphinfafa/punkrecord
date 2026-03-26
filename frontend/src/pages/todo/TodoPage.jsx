@@ -143,7 +143,13 @@ export default function TodoPage() {
                     })
                 );
                 const allItems = results.flatMap(r => r.data?.items || []);
-                setTodos(allItems);
+                const seen = new Set();
+                const uniqueItems = allItems.filter(item => {
+                    if (seen.has(item.id)) return false;
+                    seen.add(item.id);
+                    return true;
+                });
+                setTodos(uniqueItems);
                 setTotalCount(0);
                 // Refresh done todos if expanded, don't collapse
                 if (doneExpanded) {
@@ -665,7 +671,7 @@ export default function TodoPage() {
                                 ))
                             )}
                         </div>
-                        {totalCount > pageSize && (
+                        {totalCount > 0 && (
                             <div className="todo-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: '8px' }}>
                                 <span style={{ fontSize: '13px', color: '#64748b' }}>共 {totalCount} 条记录</span>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

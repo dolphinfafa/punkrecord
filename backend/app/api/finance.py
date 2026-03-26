@@ -68,20 +68,21 @@ async def create_account(
 
 @router.get("/accounts", response_model=dict)
 async def list_accounts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("finance.read"))
 ):
-    """List finance accounts"""
+    """List finance accounts with pagination"""
     accounts = session.exec(select(FinanceAccount).where(FinanceAccount.status == AccountStatus.ACTIVE)).all()
-    
+    total = len(accounts)
+    start = (page - 1) * page_size
+    page_accounts = accounts[start:start + page_size]
+
     results = []
-    for account in accounts:
-        # Calculate balance: initial_balance + sum(transactions)
-        # In: +amount, Out: -amount
-        
-        # This is N+1, optimize later if needed
+    for account in page_accounts:
         txns = session.exec(select(FinanceTransaction).where(FinanceTransaction.account_id == account.id)).all()
-        
+
         current_balance = account.initial_balance
         for txn in txns:
             if txn.reconcile_status not in {ReconcileStatus.COMPLETED, ReconcileStatus.RECONCILED}:
@@ -90,13 +91,17 @@ async def list_accounts(
                 current_balance += txn.amount
             else:
                 current_balance -= txn.amount
-                
-        # Create response object and set computed balance
+
         acc_resp = FinanceAccountResponse.model_validate(account)
         acc_resp.balance = current_balance
         results.append(acc_resp)
-        
-    return success_response(results)
+
+    return success_response({
+        "items": results,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
 
 
 @router.patch("/accounts/{account_id}", response_model=dict)

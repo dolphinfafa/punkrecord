@@ -4,6 +4,7 @@ import './Modal.css';
 
 export default function Modal({ isOpen, onClose, title, children, footer, className = '', style = {} }) {
     const modalRef = useRef(null);
+    const mouseDownTarget = useRef(null);
 
     useEffect(() => {
         const handleEscape = (e) => {
@@ -18,20 +19,28 @@ export default function Modal({ isOpen, onClose, title, children, footer, classN
         return () => {
             document.removeEventListener('keydown', handleEscape);
             document.body.style.overflow = 'unset';
-            console.log('Modal unmounted');
         };
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
+    const handleBackdropMouseDown = (e) => {
+        mouseDownTarget.current = e.target;
+    };
+
     const handleBackdropClick = (e) => {
-        if (modalRef.current && !modalRef.current.contains(e.target)) {
+        // Only close if both mousedown and click originated on the backdrop (not from text selection drag)
+        if (
+            modalRef.current
+            && !modalRef.current.contains(e.target)
+            && !modalRef.current.contains(mouseDownTarget.current)
+        ) {
             onClose();
         }
     };
 
     return (
-        <div className="modal-backdrop" onClick={handleBackdropClick}>
+        <div className="modal-backdrop" onMouseDown={handleBackdropMouseDown} onClick={handleBackdropClick}>
             <div className={`modal-container ${className}`} ref={modalRef} style={style}>
                 <div className="modal-header">
                     <h3>{title}</h3>

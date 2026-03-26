@@ -179,7 +179,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 
 | 顺序 | 中间件 | 职责 |
 |------|--------|------|
-| 1 | CORS | 处理跨域，允许 `localhost:5173`/`5174`/`3000` 及部署域名 |
+| 1 | CORS | 处理跨域，允许 `localhost:15173`/`15030` 及部署域名 |
 | 2 | 请求日志 | 记录请求方法、路径，响应状态码，捕获异常堆栈 |
 
 ### 4.4 异常处理体系
@@ -557,7 +557,7 @@ ApprovalInstance
 ### 6.1 技术栈
 
 - **框架**：React 19.2.0 + React Router 7.12.0
-- **构建**：Vite 7.x（路径别名 `@` -> `./src`，dev 分支代理 `/punkrecord/api` -> `localhost:8086`，main 分支 -> `localhost:8085`）
+- **构建**：Vite 7.x（路径别名 `@` -> `./src`，代理 `/punkrecord/api` -> `localhost:15085`）
 - **状态管理**：React Context API（AuthContext 管理登录态）
 - **HTTP 客户端**：Axios 1.13.2（拦截器统一注入 Token、处理 401）
 - **样式**：Tailwind CSS 原子化类名 + 页面级作用域
