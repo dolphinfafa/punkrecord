@@ -27,18 +27,14 @@ export default function ProjectEditModal({ project, onClose, onSuccess }) {
     }, []);
 
     const loadOptions = async () => {
-        try {
-            const [usersRes, entitiesRes, counterpartiesRes] = await Promise.all([
-                iamApi.listUsers({ page_size: 100 }),
-                iamApi.listEntities(),
-                contractApi.listCounterparties()
-            ]);
-            setUsers(usersRes.data?.items || []);
-            setEntities(entitiesRes.data?.items || entitiesRes.data || []);
-            setCounterparties(counterpartiesRes.data?.items || counterpartiesRes.data || []);
-        } catch (err) {
-            console.error('Failed to load options:', err);
-        }
+        const [usersRes, entitiesRes, counterpartiesRes] = await Promise.allSettled([
+            iamApi.listUsers({ page_size: 100 }),
+            iamApi.listEntities(),
+            contractApi.listCounterparties({ page_size: 200 })
+        ]);
+        if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data?.items || []);
+        if (entitiesRes.status === 'fulfilled') setEntities(entitiesRes.value.data?.items || entitiesRes.value.data || []);
+        if (counterpartiesRes.status === 'fulfilled') setCounterparties(counterpartiesRes.value.data?.items || counterpartiesRes.value.data || []);
     };
 
     const handleChange = (e) => {

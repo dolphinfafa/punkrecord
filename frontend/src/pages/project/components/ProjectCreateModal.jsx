@@ -26,6 +26,7 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
         due_at: ''
     });
     const [users, setUsers] = useState([]);
+    const [entities, setEntities] = useState([]);
     const [counterparties, setCounterparties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -35,17 +36,14 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
     }, []);
 
     const loadOptions = async () => {
-        try {
-            const [usersRes, counterpartiesRes] = await Promise.all([
-                iamApi.listUsers({ page_size: 100 }),
-                contractApi.listCounterparties()
-            ]);
-
-            setUsers(usersRes.data?.items || []);
-            setCounterparties(counterpartiesRes.data?.items || counterpartiesRes.data || []);
-        } catch (err) {
-            console.error('Failed to load options:', err);
-        }
+        const [usersRes, entitiesRes, counterpartiesRes] = await Promise.allSettled([
+            iamApi.listUsers({ page_size: 100 }),
+            iamApi.listEntities(),
+            contractApi.listCounterparties({ page_size: 200 })
+        ]);
+        if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data?.items || []);
+        if (entitiesRes.status === 'fulfilled') setEntities(entitiesRes.value.data?.items || entitiesRes.value.data || []);
+        if (counterpartiesRes.status === 'fulfilled') setCounterparties(counterpartiesRes.value.data?.items || counterpartiesRes.value.data || []);
     };
 
     const handleChange = (e) => {
@@ -146,8 +144,8 @@ export default function ProjectCreateModal({ onClose, onSuccess }) {
                             <label>我方主体</label>
                             <select name="our_entity_id" value={formData.our_entity_id || ''} onChange={handleChange}>
                                 <option value="">请选择我方主体</option>
-                                {counterparties.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                {entities.map(e => (
+                                    <option key={e.id} value={e.id}>{e.name}</option>
                                 ))}
                             </select>
                         </div>
