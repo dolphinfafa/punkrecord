@@ -167,9 +167,9 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 | 配置项 | 值 |
 |--------|-----|
 | `DB_TYPE` | `mysql` |
-| `DB_HOST` | `14.103.133.34` |
-| `DB_PORT` | `13306` |
-| `DB_NAME` | `punkrecord_dev` |
+| `DB_HOST` | 见 `backend/.env` |
+| `DB_PORT` | 见 `backend/.env` |
+| `DB_NAME` | 开发: `punkrecord_dev`，生产: `punkrecord_deploy` |
 | 驱动 | `pymysql`（已在 `requirements.txt`） |
 | 连接池 | `pool_pre_ping=True`，`pool_recycle=3600` |
 
@@ -189,4 +189,27 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-03-16*
+## 6. 部署环境
+
+### Dev 环境（开发服务器）
+- **后端**：端口 15085（uvicorn, Python 3.11, conda env: punk）
+- **前端**：端口 15173（Vite dev server）
+- **数据库**：`punkrecord_dev`
+- **启停**：`./dev.sh start|stop|restart|status`
+
+### Deploy 环境（生产服务器）
+- **后端**：端口 9086（uvicorn, Python 3.9, venv, pm2 守护）
+- **前端**：Nginx serve `frontend/dist/`
+- **数据库**：`punkrecord_deploy`
+- **部署**：`git pull origin main` + `pm2 restart punkrecord-api` + 前端需构建 dist 后 rsync
+
+### 端口分配（zheyang 用户专属范围 15000-19999）
+| 服务 | 端口 |
+|------|------|
+| 后端 API | 15085 |
+| 前端 Web | 15173 |
+| NestJS API | 15030 |
+
+---
+
+*最后更新：2026-03-26*

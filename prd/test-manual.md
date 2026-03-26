@@ -29,7 +29,7 @@
 | 前端地址 | `http://localhost:15173` |
 | API 前缀 | `/api/v1` |
 | API 基础地址 | `http://localhost:15085/api/v1` |
-| 数据库 | MySQL 8.0（`14.103.133.34:13306/punkrecord_dev`） |
+| 数据库 | MySQL 8.0（见 `backend/.env`） |
 
 ### 启动服务
 

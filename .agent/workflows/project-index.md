@@ -69,7 +69,7 @@ punkrecord/
 - **API 前缀**：所有接口在 `/api/v1` 下
 - **认证方式**：JWT Bearer Token（HS256，24 小时有效）
 - **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）
-- **数据库**：MySQL 8.0（`14.103.133.34:13306/punkrecord_dev`），驱动 `pymysql`
+- **数据库**：MySQL 8.0，驱动 `pymysql`（连接信息见 `backend/.env`）
 - **Python 环境**：虚拟环境名 `punkrecord`（macOS 用 pyenv，Linux/Windows 用 conda）
 - **RBAC 状态**：`ENFORCE_RBAC=True`，已正式启用前后端双层权限控制
 
@@ -102,4 +102,4 @@ punkrecord/
 
 ---
 
-*最后更新：2026-03-23*
+*最后更新：2026-03-26*

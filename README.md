@@ -50,18 +50,29 @@ punkrecord/
 
 ## 端口分配
 
-| 服务 | 端口 |
-|------|------|
-| 后端 API | 15085 |
-| 前端 Web | 15173 |
-| NestJS API | 15030 |
+| 服务 | 开发端口 | 生产端口 |
+|------|----------|----------|
+| 后端 API | 15085 | 9086 |
+| 前端 Web | 15173 | Nginx (80/443) |
 
-> 端口范围 15000-19999 为用户 zheyang 专用，所有分支使用统一端口。
+> 开发端口范围 15000-19999 为用户 zheyang 专用，所有分支使用统一端口。
+
+## 部署环境
+
+| 环境 | 后端端口 | 前端 | 数据库 |
+|------|----------|------|--------|
+| 开发 | 15085 | 15173 (Vite) | punkrecord_dev |
+| 生产 | 9086 | Nginx (80/443) | punkrecord_deploy |
+
+生产部署流程：
+1. 开发机 `git push origin main`
+2. 生产机 `git pull origin main` + `pm2 restart punkrecord-api`
+3. 前端需在开发机 `npm run build` 后 `rsync dist/` 到生产机（生产无 Node.js）
 
 ## 环境要求
 
 - **Node.js**: v16+
-- **Python**: 3.9+（Deploy 服务器为 3.9，不支持 `X | None` 语法）
+- **Python**: 3.9+（生产服务器为 3.9，不支持 `X | None` 语法）
 - **MySQL**: 8.0+
 - **Conda**: 用于 Python 环境管理（推荐）
 

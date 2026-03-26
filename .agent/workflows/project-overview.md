@@ -96,7 +96,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | **MySQL 8.0** | 开发/生产环境 | 成熟稳定，适合中小规模业务数据 |
 | **SQLite** | 本地快速启动（可选） | 零配置，通过 `DB_TYPE=sqlite` 切换 |
 
-通过 `DB_TYPE` 环境变量实现零侵入切换。实际开发和生产环境均使用 MySQL 8.0（`14.103.133.34:13306`）。
+通过 `DB_TYPE` 环境变量实现零侵入切换。实际开发和生产环境均使用 MySQL 8.0（连接信息见 `backend/.env`）。
 
 ---
 
@@ -224,7 +224,7 @@ AtlasException (基类, code=400)
 | `KB_CHUNK_SIZE` | `1000` | 知识库文档切片大小（字符） |
 | `KB_CHUNK_OVERLAP` | `200` | 切片重叠长度 |
 | `KB_RAG_TOP_K` | `5` | RAG 检索返回的 top-k 数量 |
-| `LITELLM_BASE_URL` | `http://212.50.233.55:4000/v1` | LiteLLM 代理地址（会议纪要/AI 对话） |
+| `LITELLM_BASE_URL` | （见 `.env`） | LiteLLM 代理地址（会议纪要/AI 对话） |
 | `LITELLM_API_KEY` | (已配置) | LiteLLM API 密钥 |
 | `LITELLM_MODEL` | `gemini/gemini-3.1-flash-lite-preview` | LiteLLM 使用的模型 |
 | `VOLC_ASR_APP_KEY` | (已配置) | 豆包 ASR 应用 Key |
@@ -725,7 +725,7 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 **AI 技术栈**：LiteLLM 代理（统一调用 Gemini 等模型） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
 
-通过 LiteLLM 代理（`http://212.50.233.55:4000/v1`）统一调用 AI 模型，支持 OpenAI 兼容接口。会议纪要、AI 对话等功能均通过 LiteLLM 路由。前端使用 `react-markdown` 渲染 Markdown。
+通过 LiteLLM 代理统一调用 AI 模型，支持 OpenAI 兼容接口。会议纪要、AI 对话等功能均通过 LiteLLM 路由。前端使用 `react-markdown` 渲染 Markdown。
 
 ---
 
