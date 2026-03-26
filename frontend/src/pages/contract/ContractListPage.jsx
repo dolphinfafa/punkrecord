@@ -24,6 +24,7 @@ export default function ContractListPage() {
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingContract, setEditingContract] = useState(null);
+    const [counterpartyMap, setCounterpartyMap] = useState({});
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const pageSize = 20;
@@ -34,13 +35,16 @@ export default function ContractListPage() {
 
     const loadContracts = async () => {
         try {
-            console.log('🔍 Starting to load contracts...');
             setLoading(true);
-            const response = await contractApi.listContracts({ page, page_size: pageSize });
-            console.log('✅ API Response:', response);
-            setContracts(response.data?.items || []);
-            setTotal(response.data?.total || 0);
-            console.log('✅ Contracts set:', response.data?.items || []);
+            const [contractRes, cpRes] = await Promise.all([
+                contractApi.listContracts({ page, page_size: pageSize }),
+                contractApi.listCounterparties({ page_size: 200 })
+            ]);
+            setContracts(contractRes.data?.items || []);
+            setTotal(contractRes.data?.total || 0);
+            const cpMap = {};
+            (cpRes.data?.items || cpRes.data || []).forEach(cp => { cpMap[cp.id] = cp.name; });
+            setCounterpartyMap(cpMap);
             setError(null);
         } catch (err) {
             console.error('❌ Error loading contracts:', err);
@@ -86,6 +90,8 @@ export default function ContractListPage() {
                             <th>合同编号</th>
                             <th>名称</th>
                             <th>类型</th>
+                            <th>甲方</th>
+                            <th>乙方</th>
                             <th className="text-right">总金额</th>
                             <th className="text-right">待付款金额</th>
                             <th>签约日期</th>
@@ -96,7 +102,7 @@ export default function ContractListPage() {
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
-                                <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                         <FileText size={48} opacity={0.5} />
                                         <p>暂无合同数据</p>
@@ -121,6 +127,8 @@ export default function ContractListPage() {
                                                 {TYPE_MAP[contract.contract_type] || contract.contract_type}
                                             </span>
                                         </td>
+                                        <td>{counterpartyMap[contract.party_a_id] || '-'}</td>
+                                        <td>{counterpartyMap[contract.party_b_id] || '-'}</td>
                                         <td className="text-right" style={{ fontFamily: 'monospace' }}>
                                             {(contract.amount_total || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
                                         </td>
