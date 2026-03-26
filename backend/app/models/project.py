@@ -37,7 +37,7 @@ class Project(BaseDBModel, table=True):
     """Project model"""
     __tablename__ = "project"
     
-    our_entity_id: Optional[UUID] = Field(default=None, foreign_key="our_entity.id", nullable=True, index=True)
+    our_entity_id: Optional[UUID] = Field(default=None, nullable=True, index=True)
     project_no: str = Field(nullable=False, unique=True, index=True)
     name: str = Field(nullable=False)
     project_type: ProjectType = Field(nullable=False)
