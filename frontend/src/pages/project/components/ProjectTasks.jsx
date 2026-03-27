@@ -39,7 +39,10 @@ export default function ProjectTasks({ project }) {
     };
 
     const handleSubmitTask = async (data) => {
-        await todoApi.create({ ...data, source_type: 'project_task', source_id: project.id });
+        // Ensure reviewer is project PM
+        const link = data.link || {};
+        link.reviewer_user_id = project.pm_user_id || '';
+        await todoApi.create({ ...data, source_type: 'project_task', source_id: project.id, link });
         loadTasks();
     };
 
