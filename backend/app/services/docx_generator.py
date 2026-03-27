@@ -55,6 +55,8 @@ def generate_acceptance_report(
     p = doc.add_paragraph()
     p.add_run(f"项目名称：{project_name}\n").bold = True
     p.add_run(f"项目编号：{project_no}\n")
+    p.add_run(f"甲方（客户方）：{customer_name or '____'}\n")
+    p.add_run(f"乙方（我方）：{our_entity_name or '____'}\n")
     p.add_run(f"计划开始日期：{start_date}\n")
     p.add_run(f"计划结束日期：{due_date}\n")
     
@@ -67,7 +69,7 @@ def generate_acceptance_report(
             l1 = feature.get("l1_feature", "")
             l2 = feature.get("l2_feature", "")
             desc = feature.get("description") or feature.get("func_desc") or ""
-            doc.add_paragraph(f"{idx}. {l1} - {l2}", style='List Number')
+            doc.add_paragraph(f"{idx}. {l1} - {l2}")
             if desc:
                 p_desc = doc.add_paragraph(desc)
                 p_desc.style.font.size = Pt(10)
@@ -102,7 +104,9 @@ def generate_acceptance_report(
     p_conclusion = doc.add_paragraph()
     p_conclusion.add_run(f"经验收测试和文档审查表明，该项目已经达到项目预期目标，验收人员一致认为该项目（ ☑ 通过 □ 不通过 ）验收。\n\n")
     
-    p_date = doc.add_paragraph(f"验收日期：      年    月    日")
+    p_sign = doc.add_paragraph("签字/盖章：________________")
+    p_sign.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_date = doc.add_paragraph("验收日期：      年    月    日")
     p_date.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
     doc.add_page_break()
