@@ -181,7 +181,13 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
             const wb = XLSX.read(buf, { type: 'array' });
             const sheetName = wb.SheetNames[0];
             const ws = wb.Sheets[sheetName];
-            const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            // Try default parsing first; if no data found, skip first row (title row in template)
+            let rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            if (rawRows.length === 0 || !rawRows.some(r => Object.values(r).some(v => resolveFieldByHeader(String(v)) !== null))) {
+                const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+                range.s.r = 1; // skip title row
+                rawRows = XLSX.utils.sheet_to_json(ws, { defval: '', range });
+            }
             const parsed = rawRows
                 .map(normalizeImportedRow)
                 .filter((row) => Object.values(row).some((v) => String(v || '').trim() !== ''));

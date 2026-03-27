@@ -80,6 +80,7 @@ export default function ProjectTasks({ project }) {
                 onClose={() => setShowTaskModal(false)}
                 onSubmit={handleSubmitTask}
                 mode="create"
+                fixedProjectId={project.id}
             />
 
             {loading ? (

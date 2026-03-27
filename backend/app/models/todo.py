@@ -50,7 +50,7 @@ class TodoItem(BaseDBModel, table=True):
     """Todo item model"""
     __tablename__ = "todo_item"
     
-    our_entity_id: UUID = Field(foreign_key="our_entity.id", nullable=False)
+    our_entity_id: UUID = Field(nullable=False)
     assignee_user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
     creator_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     
@@ -124,7 +124,7 @@ class LeaveRequest(BaseDBModel, table=True):
     """Leave request model"""
     __tablename__ = "leave_request"
 
-    our_entity_id: Optional[UUID] = Field(default=None, foreign_key="our_entity.id", index=True)
+    our_entity_id: Optional[UUID] = Field(default=None, index=True)
     applicant_user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
     leave_type: LeaveType = Field(nullable=False, index=True)
     status: LeaveStatus = Field(default=LeaveStatus.PENDING, nullable=False, index=True)

@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import client from '@/api/client';
 import './TodoModal.css';
 
-export default function TodoModal({ isOpen, onClose, onSubmit, initialData = null, mode = 'create', currentUserId }) {
+export default function TodoModal({ isOpen, onClose, onSubmit, initialData = null, mode = 'create', currentUserId, fixedProjectId = null }) {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -12,25 +12,45 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
         due_at: '',
         start_at: '',
         assignee_user_id: currentUserId || '',
-        project_id: '',
+        project_id: fixedProjectId || '',
         images: [],
     });
-    const [users, setUsers] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
+    const [projectMembers, setProjectMembers] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
 
-    // Load user list for assignee selector
+    // Load user list and project list
     useEffect(() => {
         if (isOpen && mode === 'create') {
             client.get('/iam/users', { params: { page_size: 100 } })
-                .then(res => setUsers(res.data?.items || []))
+                .then(res => setAllUsers(res.data?.items || []))
                 .catch(() => { });
-            client.get('/project/projects', { params: { page_size: 200 } })
-                .then(res => setProjects(res.data?.items || []))
-                .catch(() => { });
+            if (!fixedProjectId) {
+                client.get('/project/projects', { params: { page_size: 200 } })
+                    .then(res => setProjects(res.data?.items || []))
+                    .catch(() => { });
+            }
         }
-    }, [isOpen, mode]);
+    }, [isOpen, mode, fixedProjectId]);
+
+    // Load project members when project changes
+    useEffect(() => {
+        const pid = formData.project_id;
+        if (pid && isOpen) {
+            client.get(`/project/projects/${pid}/members`)
+                .then(res => setProjectMembers(res.data || []))
+                .catch(() => setProjectMembers([]));
+        } else {
+            setProjectMembers([]);
+        }
+    }, [formData.project_id, isOpen]);
+
+    // Compute which users to show in assignee dropdown
+    const users = formData.project_id && projectMembers.length > 0
+        ? allUsers.filter(u => projectMembers.some(m => m.user_id === u.id))
+        : allUsers;
 
     useEffect(() => {
         if (initialData) {
@@ -41,7 +61,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 16) : '',
                 start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 16) : '',
                 assignee_user_id: initialData.assignee_user_id || currentUserId || '',
-                project_id: initialData?.link?.project_id || '',
+                project_id: fixedProjectId || initialData?.link?.project_id || '',
                 images: [],
             });
         } else {
@@ -52,12 +72,12 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 due_at: '',
                 start_at: '',
                 assignee_user_id: currentUserId || '',
-                project_id: '',
+                project_id: fixedProjectId || '',
                 images: [],
             });
         }
         setErrors({});
-    }, [initialData, isOpen, currentUserId]);
+    }, [initialData, isOpen, currentUserId, fixedProjectId]);
 
     const validate = () => {
         const newErrors = {};
@@ -157,17 +177,24 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                                 {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
                             </div>
                             <div className="form-group">
-                                <label htmlFor="project_id">所属项目（可选）</label>
-                                <select
-                                    id="project_id"
-                                    value={formData.project_id}
-                                    onChange={(e) => handleChange('project_id', e.target.value)}
-                                >
-                                    <option value="">不关联项目</option>
-                                    {projects.map((project) => (
-                                        <option key={project.id} value={project.id}>{project.name}</option>
-                                    ))}
-                                </select>
+                                <label htmlFor="project_id">所属项目{fixedProjectId ? '' : '（可选）'}</label>
+                                {fixedProjectId ? (
+                                    <input type="text" value={projects.find(p => p.id === fixedProjectId)?.name || '当前项目'} disabled />
+                                ) : (
+                                    <select
+                                        id="project_id"
+                                        value={formData.project_id}
+                                        onChange={(e) => {
+                                            handleChange('project_id', e.target.value);
+                                            handleChange('assignee_user_id', currentUserId || '');
+                                        }}
+                                    >
+                                        <option value="">不关联项目</option>
+                                        {projects.map((project) => (
+                                            <option key={project.id} value={project.id}>{project.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label htmlFor="images">任务图片（可多选）</label>
