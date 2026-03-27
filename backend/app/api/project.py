@@ -1985,8 +1985,12 @@ async def get_contract_context(
         raise NotFoundException("未找到项目")
     
     pm_user = session.get(User, project.pm_user_id) if project.pm_user_id else None
-    # 乙方 = 我方主体 (our entity)
-    our_entity = session.get(OurEntity, project.our_entity_id) if project.our_entity_id else None
+    # 乙方 = 我方主体 (our_entity_id may reference counterparty table)
+    our_entity = None
+    if project.our_entity_id:
+        our_entity = session.get(OurEntity, project.our_entity_id)
+        if not our_entity:
+            our_entity = session.get(Counterparty, project.our_entity_id)
     # 甲方 defaults to the project's customer
     customer = session.get(Counterparty, project.customer_id) if project.customer_id else None
     contract = session.get(Contract, project.contract_id) if project.contract_id else None
@@ -2264,12 +2268,16 @@ async def download_acceptance_report(
         if customer:
             customer_name = customer.name
             
-    # Get Our Entity name
+    # Get Our Entity name (our_entity_id may reference counterparty table)
     our_entity_name = ""
     if project.our_entity_id:
         entity = session.get(OurEntity, project.our_entity_id)
         if entity:
             our_entity_name = entity.name
+        else:
+            cp = session.get(Counterparty, project.our_entity_id)
+            if cp:
+                our_entity_name = cp.name
             
     # Get Members
     members = []
