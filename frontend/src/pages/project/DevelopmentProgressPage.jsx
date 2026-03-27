@@ -92,6 +92,7 @@ export default function DevelopmentProgressPage() {
     }, [id]);
 
     const syncFeatureTasks = useCallback(async () => {
+        if (!window.confirm('注意：如果同步了功能清单，现有的任务全部都会被清空。是否执行？')) return;
         setGenerating(true);
         setSyncingTasks(true);
         setOpMessage(null);

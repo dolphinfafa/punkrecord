@@ -181,12 +181,22 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
             const wb = XLSX.read(buf, { type: 'array' });
             const sheetName = wb.SheetNames[0];
             const ws = wb.Sheets[sheetName];
-            // Try default parsing first; if no data found, skip first row (title row in template)
-            let rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-            if (rawRows.length === 0 || !rawRows.some(r => Object.values(r).some(v => resolveFieldByHeader(String(v)) !== null))) {
-                const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-                range.s.r = 1; // skip title row
-                rawRows = XLSX.utils.sheet_to_json(ws, { defval: '', range });
+            // Try multiple header row positions (row 1, row 2, row 3) to find the real header
+            let rawRows = [];
+            const ref = ws['!ref'] || 'A1';
+            for (let skipRows = 0; skipRows <= 2; skipRows++) {
+                const range = XLSX.utils.decode_range(ref);
+                range.s.r = skipRows;
+                const rows = XLSX.utils.sheet_to_json(ws, { defval: '', range });
+                // Check if the column names match known headers
+                if (rows.length > 0) {
+                    const colNames = Object.keys(rows[0]);
+                    const matched = colNames.filter(c => resolveFieldByHeader(c) !== null).length;
+                    if (matched >= 3) { // at least 3 known columns
+                        rawRows = rows;
+                        break;
+                    }
+                }
             }
             const parsed = rawRows
                 .map(normalizeImportedRow)

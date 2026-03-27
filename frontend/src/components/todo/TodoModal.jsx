@@ -18,6 +18,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
     const [allUsers, setAllUsers] = useState([]);
     const [projectMembers, setProjectMembers] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [fixedProjectName, setFixedProjectName] = useState('');
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
 
@@ -27,7 +28,11 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             client.get('/iam/users', { params: { page_size: 100 } })
                 .then(res => setAllUsers(res.data?.items || []))
                 .catch(() => { });
-            if (!fixedProjectId) {
+            if (fixedProjectId) {
+                client.get(`/project/projects/${fixedProjectId}`)
+                    .then(res => setFixedProjectName(res.data?.name || '当前项目'))
+                    .catch(() => setFixedProjectName('当前项目'));
+            } else {
                 client.get('/project/projects', { params: { page_size: 200 } })
                     .then(res => setProjects(res.data?.items || []))
                     .catch(() => { });
@@ -160,7 +165,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                     {mode === 'create' && (
                         <>
                             <div className="form-group">
-                                <label htmlFor="assignee">分配给 *</label>
+                                <label htmlFor="assignee">分配给 *{formData.project_id && projectMembers.length > 0 ? '（仅项目成员）' : ''}</label>
                                 <select
                                     id="assignee"
                                     value={formData.assignee_user_id}
@@ -179,7 +184,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                             <div className="form-group">
                                 <label htmlFor="project_id">所属项目{fixedProjectId ? '' : '（可选）'}</label>
                                 {fixedProjectId ? (
-                                    <input type="text" value={projects.find(p => p.id === fixedProjectId)?.name || '当前项目'} disabled />
+                                    <input type="text" value={fixedProjectName || '当前项目'} disabled />
                                 ) : (
                                     <select
                                         id="project_id"
