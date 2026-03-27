@@ -29,7 +29,7 @@ export const projectApi = {
     downloadProjectAttachment: async (projectId, attachmentId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/project/projects/${projectId}/attachments/${attachmentId}/download`, {
+        return axios.get(`/punkrecord/api/v1/project/projects/${projectId}/attachments/${attachmentId}/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,
@@ -112,7 +112,7 @@ export const projectApi = {
     downloadAcceptanceReport: async (projectId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/project/projects/${projectId}/acceptance-report/download`, {
+        return axios.get(`/punkrecord/api/v1/project/projects/${projectId}/acceptance-report/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,

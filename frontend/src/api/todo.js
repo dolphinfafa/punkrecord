@@ -26,7 +26,7 @@ export const todoApi = {
     downloadImage: (id, imageId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/todo/${id}/images/${imageId}/download`, {
+        return axios.get(`/punkrecord/api/v1/todo/${id}/images/${imageId}/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,
