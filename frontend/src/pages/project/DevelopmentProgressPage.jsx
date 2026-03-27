@@ -303,6 +303,7 @@ export default function DevelopmentProgressPage() {
                         project_name: project.name,
                         dev_type: taskForm.dev_type,
                         generated_from_feature_list: false,
+                        reviewer_user_id: project.pm_user_id || '',
                     },
                 });
                 setOpMessage('任务已创建');
