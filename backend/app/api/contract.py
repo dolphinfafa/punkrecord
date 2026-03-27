@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.core.database import get_session
-from app.core.auth import require_permission
+from app.core.auth import get_current_user, require_permission
 from app.core.exceptions import NotFoundException
 from app.core.response import success_response
 from app.models.iam import User
@@ -80,9 +80,9 @@ async def list_counterparties(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_permission("contract.read"))
+    current_user: User = Depends(get_current_user)
 ):
-    """List counterparties with pagination"""
+    """List counterparties with pagination (accessible to all logged-in users)"""
     query = select(Counterparty)
     if type:
         query = query.where(Counterparty.type == type)
