@@ -219,17 +219,7 @@ async def create_project(
     current_user: User = Depends(require_permission("project.write"))
 ):
     """Create project with automatic stage generation"""
-    # Validate and resolve our_entity_id
     our_entity_id = data.our_entity_id
-    if our_entity_id:
-        entity = session.get(OurEntity, our_entity_id)
-        if not entity:
-            # Provided entity doesn't exist, fall back to default
-            default_entity = session.exec(select(OurEntity)).first()
-            our_entity_id = default_entity.id if default_entity else None
-    else:
-        default_entity = session.exec(select(OurEntity)).first()
-        our_entity_id = default_entity.id if default_entity else None
 
     # Auto-generate project_no if not provided: PR-YYYYMMDD-NNN
     project_no = data.project_no
