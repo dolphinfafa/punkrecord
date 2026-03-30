@@ -94,7 +94,7 @@ export default function LoginPage() {
                 </form>
 
                 <div className="login-footer">
-                    <p>默认账号: admin / admin123</p>
+                    <p>PunkRecord 企业管理平台</p>
                 </div>
             </div>
         </div>
