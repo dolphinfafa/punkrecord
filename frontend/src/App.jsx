@@ -67,7 +67,7 @@ const PermissionRoute = ({ permission, children }) => {
 
 function App() {
   return (
-    <BrowserRouter basename="/punkrecord">
+    <BrowserRouter>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
