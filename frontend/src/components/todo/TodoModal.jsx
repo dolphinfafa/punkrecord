@@ -63,8 +63,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 title: initialData.title || '',
                 description: initialData.description || '',
                 priority: initialData.priority || 'p2',
-                due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 16) : '',
-                start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 16) : '',
+                due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 10) : '',
+                start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 10) : '',
                 assignee_user_id: initialData.assignee_user_id || currentUserId || '',
                 project_id: fixedProjectId || initialData?.link?.project_id || '',
                 images: [],
@@ -233,10 +233,10 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="due_at">截止时间</label>
+                            <label htmlFor="due_at">截止日期</label>
                             <input
                                 id="due_at"
-                                type="datetime-local"
+                                type="date"
                                 value={formData.due_at}
                                 onChange={(e) => handleChange('due_at', e.target.value)}
                             />

@@ -71,9 +71,19 @@ export default function LoginPage() {
                                 id="password"
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                onChange={(e) => {
+                                    const v = e.target.value.replace(/[^\x20-\x7E]/g, '');
+                                    setPassword(v);
+                                }}
+                                onCompositionStart={(e) => e.target.setAttribute('data-composing', 'true')}
+                                onCompositionEnd={(e) => {
+                                    e.target.setAttribute('data-composing', 'false');
+                                    const v = e.target.value.replace(/[^\x20-\x7E]/g, '');
+                                    setPassword(v);
+                                }}
                                 placeholder="请输入密码"
                                 required
+                                autoComplete="current-password"
                             />
                             <button
                                 type="button"

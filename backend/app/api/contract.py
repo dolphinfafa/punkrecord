@@ -236,6 +236,8 @@ async def update_contract(
         contract.name = data.name
     if data.contract_type is not None:
         contract.contract_type = data.contract_type
+    if data.status is not None:
+        contract.status = ContractStatus(data.status)
     if data.party_a_id is not None:
         contract.party_a_id = data.party_a_id
     if data.party_b_id is not None:
@@ -243,7 +245,11 @@ async def update_contract(
     if data.party_c_id is not None:
         contract.party_c_id = data.party_c_id
     if data.amount_total is not None:
+        # Recalculate pending_amount: new_total - already_paid
+        old_total = contract.amount_total
+        already_paid = old_total - contract.pending_amount  # amount already settled
         contract.amount_total = data.amount_total
+        contract.pending_amount = data.amount_total - already_paid
     if data.currency is not None:
         contract.currency = data.currency
     if data.pm_user_id is not None:

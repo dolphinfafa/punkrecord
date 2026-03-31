@@ -11,6 +11,7 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess, initia
         party_b_id: '',  // 乙方 (Party B)
         party_c_id: '',  // 丙方 (Optional Party C)
         contract_type: 'sales',
+        status: 'draft',
         amount_total: '',
         sign_date: '',
         currency: 'CNY',
@@ -36,6 +37,7 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess, initia
                     party_b_id: '',
                     party_c_id: '',
                     contract_type: 'sales',
+                    status: 'draft',
                     amount_total: '',
                     sign_date: new Date().toISOString().split('T')[0],
                     currency: 'CNY',
@@ -69,6 +71,7 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess, initia
                 contract_no: formData.contract_no,
                 name: formData.name,
                 contract_type: formData.contract_type,
+                status: formData.status,
                 party_a_id: formData.party_a_id,
                 party_b_id: formData.party_b_id,
                 party_c_id: formData.party_c_id || null,
@@ -191,6 +194,26 @@ export default function CreateContractModal({ isOpen, onClose, onSuccess, initia
                         <option value="third_party">第三方合同</option>
                     </select>
                 </div>
+                {initialData && (
+                    <div className="form-group">
+                        <label>合同状态</label>
+                        <select
+                            name="status"
+                            className="form-select"
+                            value={formData.status}
+                            onChange={handleChange}
+                        >
+                            <option value="draft">草稿</option>
+                            <option value="in_approval">审批中</option>
+                            <option value="approved">已审批</option>
+                            <option value="signed">已签约</option>
+                            <option value="in_delivery">执行中</option>
+                            <option value="accepted">已验收</option>
+                            <option value="archived">已归档</option>
+                            <option value="cancelled">已取消</option>
+                        </select>
+                    </div>
+                )}
                 <div className="form-group">
                     <label>总金额</label>
                     <input

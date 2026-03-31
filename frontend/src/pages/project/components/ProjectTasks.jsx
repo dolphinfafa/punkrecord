@@ -17,7 +17,7 @@ const STATUS_COLORS = {
     dismissed: { bg: '#f8fafc', color: '#94a3b8' },
 };
 const PRIORITY_LABELS = { p0: '🔴 P0', p1: '🟠 P1', p2: '🟡 P2', p3: '🟢 P3' };
-const DEV_TYPE_LABELS = { dev_backend: '后端', dev_frontend: '前端', dev_ui: 'UI', dev_product: '产品' };
+const DEV_TYPE_LABELS = { dev_backend: '后端', dev_frontend: '前端', dev_ui: 'UI', dev_product: '产品', bug: 'Bug', testing: 'Bug' };
 
 export default function ProjectTasks({ project }) {
     const [tasks, setTasks] = useState([]);
@@ -114,7 +114,7 @@ export default function ProjectTasks({ project }) {
                                     </td>
                                     <td style={{ padding: '0.55rem 0.75rem' }}>
                                         {getDevType(t) ? (
-                                            <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.45rem', borderRadius: '4px', background: '#ede9fe', color: '#6d28d9', fontWeight: '600' }}>
+                                            <span style={{ fontSize: '0.72rem', padding: '0.1rem 0.45rem', borderRadius: '4px', background: getDevType(t) === 'Bug' ? '#fef2f2' : '#ede9fe', color: getDevType(t) === 'Bug' ? '#dc2626' : '#6d28d9', fontWeight: '600' }}>
                                                 {getDevType(t)}
                                             </span>
                                         ) : '-'}

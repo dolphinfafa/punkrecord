@@ -55,6 +55,17 @@ class WeChatUserBinding(BaseDBModel, table=True):
     subscribe_status: SubscribeStatus = Field(default=SubscribeStatus.SUBSCRIBED, nullable=False)
 
 
+class ChangeLog(BaseDBModel, table=True):
+    """Version changelog entry"""
+    __tablename__ = "changelog"
+
+    version: str = Field(nullable=False)
+    title: str = Field(nullable=False)
+    content: str = Field(nullable=False)  # Markdown content
+    published_by_user_id: UUID = Field(foreign_key="users.id", nullable=False)
+    published_at: datetime = Field(nullable=False)
+
+
 class WeChatMessageTemplate(BaseDBModel, table=True):
     """WeChat message template"""
     __tablename__ = "wechat_message_template"

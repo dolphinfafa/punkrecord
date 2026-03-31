@@ -23,10 +23,11 @@
 | `todo.py` | `/api/v1/todo` | 任务管理（任务、请假） |
 | `contract.py` | `/api/v1/contract` | 合同管理（合同、对手方、付款计划） |
 | `project.py` | `/api/v1/project` | 项目管理（项目、阶段、成员、任务、导出） |
-| `finance.py` | `/api/v1/finance` | 财务管理（账户、交易、发票、报销） |
+| `finance.py` | `/api/v1/finance` | 财务管理（账户、交易、发票、报销、Excel 导出） |
 | `ai.py` | `/api/v1/ai` | AI 能力（对话、流式响应） |
 | `kb.py` | `/api/v1/kb` | 企业大脑（文档管理、RAG 对话、语义搜索） |
 | `meeting.py` | `/api/v1/meeting` | 会议记录（音频上传、ASR 转写、AI 总结、归档） |
+| `changelog.py` | `/api/v1/changelog` | 版本更新日志（CRUD，L0 权限控制） |
 
 路由文件位于 `backend/app/api/` 目录。
 
@@ -132,7 +133,9 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST/GET/PATCH | `/api/v1/finance/accounts` | 账户 CRUD |
-| POST/GET/PATCH | `/api/v1/finance/transactions` | 交易记录 CRUD |
+| POST/GET/PATCH | `/api/v1/finance/transactions` | 交易记录 CRUD（支持全字段编辑，编辑后自动重算关联合同 pending_amount） |
+| GET | `/api/v1/finance/transactions` | 交易列表（支持 `date_from`/`date_to` 日期筛选参数） |
+| GET | `/api/v1/finance/transactions/export-excel` | 导出交易记录 Excel（支持日期筛选） |
 | POST/GET | `/api/v1/finance/invoices` | 发票 |
 | POST/GET | `/api/v1/finance/reimbursements` | 报销 |
 
@@ -178,6 +181,17 @@
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
 
+### 版本更新日志（Changelog）
+
+| 方法 | 路径 | 权限 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/changelog/entries` | 登录用户 | 版本日志列表（分页，按发布时间倒序） |
+| POST | `/api/v1/changelog/entries` | L0 | 创建版本日志 |
+| PATCH | `/api/v1/changelog/entries/{entry_id}` | L0 | 更新版本日志 |
+| DELETE | `/api/v1/changelog/entries/{entry_id}` | L0 | 删除版本日志 |
+
+**权限说明**：L0 指 `manager_user_id` 为空的顶级员工（最高管理层），仅 L0 可创建/编辑/删除日志条目。
+
 ### 健康检查
 
 | 方法 | 路径 | 说明 |
@@ -187,4 +201,4 @@
 
 ---
 
-*最后更新：2026-03-23*
+*最后更新：2026-03-31*

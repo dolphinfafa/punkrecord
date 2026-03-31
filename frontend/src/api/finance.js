@@ -17,9 +17,17 @@ export const financeApi = {
 
     // Transactions
     listTransactions: async (params = {}) => {
-        const { page = 1, page_size = 20, account_id, txn_direction } = params;
+        const { page = 1, page_size = 20, account_id, txn_direction, date_from, date_to } = params;
         return client.get('/finance/transactions', {
-            params: { page, page_size, account_id, txn_direction }
+            params: { page, page_size, account_id, txn_direction, date_from, date_to }
+        });
+    },
+
+    exportTransactions: async (params = {}) => {
+        const { date_from, date_to, account_id, txn_direction } = params;
+        return client.get('/finance/transactions/export', {
+            params: { date_from, date_to, account_id, txn_direction },
+            responseType: 'blob'
         });
     },
 

@@ -11,9 +11,10 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 | 任务管理（Todo） | 个人/团队任务、状态机、图片附件、请假申请与审批（自动创建审批任务） |
 | 合同管理 | 合同 CRUD、交易方管理（含编辑）、付款计划、AI 生成合同 |
 | 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、Bug 管理、验收报告 |
-| 财务管理 | 账户、交易记录、发票、报销 |
+| 财务管理 | 账户、交易记录（编辑/日期筛选/Excel导出）、发票、报销 |
 | AI 能力 | AI 对话、功能清单生成、合同起草（LiteLLM/Gemini） |
 | 企业大脑（KB） | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
+| 版本日志 | 首页版本更新日志（L0 可编辑），版本选择查看，Markdown 渲染 |
 | 会议记录 | 音频上传、ASR 转写（豆包）、说话人标注/切换、会议日期、参会人、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
 
 ## 技术栈
@@ -29,7 +30,7 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 punkrecord/
 ├── backend/                 # FastAPI 后端服务
 │   ├── app/
-│   │   ├── api/             # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting）
+│   │   ├── api/             # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog）
 │   │   ├── core/            # 配置、数据库、认证、响应、异常处理、文件存储
 │   │   ├── models/          # SQLModel ORM 模型
 │   │   ├── schemas/         # Pydantic 请求/响应 Schema

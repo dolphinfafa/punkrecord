@@ -78,6 +78,15 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     """Transaction update schema"""
+    txn_type: Optional[str] = None
+    txn_direction: Optional[str] = None
+    amount: Optional[Decimal] = None
+    txn_date: Optional[date] = None
+    counterparty_id: Optional[UUID] = None
+    employee_user_id: Optional[UUID] = None
+    contract_id: Optional[UUID] = None
+    purpose: Optional[str] = None
+    attachments: Optional[list] = None
     reconcile_status: Optional[str] = None  # unreconciled / completed / reconciled
 
 

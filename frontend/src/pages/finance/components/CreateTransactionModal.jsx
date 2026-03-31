@@ -28,7 +28,7 @@ const TXN_TYPE_OPTIONS = [
     { value: 'reimbursement', label: '报销', direction: 'out' }
 ];
 
-export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
+export default function CreateTransactionModal({ isOpen, onClose, onSuccess, initialData = null }) {
     const [formData, setFormData] = useState({
         account_id: '',
         txn_type: 'payment',
@@ -53,23 +53,41 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
     useEffect(() => {
         if (isOpen) {
             loadDependencies();
-            setFormData({
-                account_id: '',
-                txn_type: 'payment',
-                txn_direction: 'out',
-                amount: '',
-                currency: 'CNY',
-                txn_date: new Date().toISOString().split('T')[0],
-                purpose: '',
-                counterparty_id: '',
-                employee_user_id: '',
-                contract_id: '',
-                our_entity_id: '',
-                attachments: [],
-                reconcile_status: 'unreconciled'
-            });
+            if (initialData) {
+                setFormData({
+                    account_id: initialData.account_id || '',
+                    txn_type: initialData.txn_type || 'payment',
+                    txn_direction: initialData.txn_direction || 'out',
+                    amount: initialData.amount?.toString() || '',
+                    currency: initialData.currency || 'CNY',
+                    txn_date: initialData.txn_date || new Date().toISOString().split('T')[0],
+                    purpose: initialData.purpose || '',
+                    counterparty_id: initialData.counterparty_id || '',
+                    employee_user_id: initialData.employee_user_id || '',
+                    contract_id: initialData.contract_id || '',
+                    our_entity_id: initialData.our_entity_id || '',
+                    attachments: initialData.attachments || [],
+                    reconcile_status: initialData.reconcile_status || 'unreconciled'
+                });
+            } else {
+                setFormData({
+                    account_id: '',
+                    txn_type: 'payment',
+                    txn_direction: 'out',
+                    amount: '',
+                    currency: 'CNY',
+                    txn_date: new Date().toISOString().split('T')[0],
+                    purpose: '',
+                    counterparty_id: '',
+                    employee_user_id: '',
+                    contract_id: '',
+                    our_entity_id: '',
+                    attachments: [],
+                    reconcile_status: 'unreconciled'
+                });
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialData]);
 
     const loadDependencies = async () => {
         try {
@@ -167,11 +185,15 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
                 contract_id: formData.contract_id || null
             };
 
-            await financeApi.createTransaction(payload);
+            if (initialData) {
+                await financeApi.updateTransaction(initialData.id, payload);
+            } else {
+                await financeApi.createTransaction(payload);
+            }
             onSuccess();
             onClose();
         } catch (error) {
-            console.error('Failed to create transaction', error);
+            console.error('Failed to save transaction', error);
             alert('保存交易失败: ' + (error.response?.data?.message || error.message));
         } finally {
             setLoading(false);
@@ -197,7 +219,7 @@ export default function CreateTransactionModal({ isOpen, onClose, onSuccess }) {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={modalTitleMap[formData.txn_type] || '新增交易明细'}
+            title={initialData ? '编辑交易明细' : (modalTitleMap[formData.txn_type] || '新增交易明细')}
             footer={footer}
             className="finance-transaction-modal"
         >

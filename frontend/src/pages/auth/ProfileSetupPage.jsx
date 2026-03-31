@@ -161,7 +161,15 @@ export default function ProfileSetupPage() {
                         <label>新密码 *</label>
                         <div className="input-with-icon">
                             <Lock size={18} className="input-icon" />
-                            <input type="password" value={form.new_password} onChange={e => setForm(p => ({ ...p, new_password: e.target.value }))} placeholder="至少6位" required />
+                            <input
+                                type="password"
+                                value={form.new_password}
+                                onChange={e => { const v = e.target.value.replace(/[^\x20-\x7E]/g, ''); setForm(p => ({ ...p, new_password: v })); }}
+                                onCompositionEnd={e => { const v = e.target.value.replace(/[^\x20-\x7E]/g, ''); setForm(p => ({ ...p, new_password: v })); }}
+                                placeholder="至少6位（仅限英文字符）"
+                                required
+                                autoComplete="new-password"
+                            />
                         </div>
                     </div>
 
@@ -169,7 +177,15 @@ export default function ProfileSetupPage() {
                         <label>确认密码 *</label>
                         <div className="input-with-icon">
                             <Lock size={18} className="input-icon" />
-                            <input type="password" value={form.confirm_password} onChange={e => setForm(p => ({ ...p, confirm_password: e.target.value }))} placeholder="再次输入新密码" required />
+                            <input
+                                type="password"
+                                value={form.confirm_password}
+                                onChange={e => { const v = e.target.value.replace(/[^\x20-\x7E]/g, ''); setForm(p => ({ ...p, confirm_password: v })); }}
+                                onCompositionEnd={e => { const v = e.target.value.replace(/[^\x20-\x7E]/g, ''); setForm(p => ({ ...p, confirm_password: v })); }}
+                                placeholder="再次输入新密码"
+                                required
+                                autoComplete="new-password"
+                            />
                         </div>
                     </div>
 

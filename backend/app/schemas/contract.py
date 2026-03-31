@@ -88,6 +88,7 @@ class ContractUpdate(BaseModel):
     contract_no: Optional[str] = None
     name: Optional[str] = None
     contract_type: Optional[str] = None
+    status: Optional[str] = None
     party_a_id: Optional[UUID] = None
     party_b_id: Optional[UUID] = None
     party_c_id: Optional[UUID] = None

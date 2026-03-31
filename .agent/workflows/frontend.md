@@ -16,8 +16,8 @@
 
 | 路由 | 页面 |
 |------|------|
-| `/login` | 登录页（`pages/auth/LoginPage`）- 含密码显示切换、详细错误提示 |
-| `/profile-setup` | 首次登录档案完善页（`pages/auth/ProfileSetupPage`） |
+| `/login` | 登录页（`pages/auth/LoginPage`）- 含密码显示切换、详细错误提示、密码输入限制中文 |
+| `/profile-setup` | 首次登录档案完善页（`pages/auth/ProfileSetupPage`）- 新密码/确认密码输入限制中文 |
 | `/` | 仪表盘 |
 | `/todo` | 任务管理（看板/列表双视图，看板已完成列懒加载折叠，列表分页） |
 | `/iam/users` | 用户管理 |
@@ -77,6 +77,7 @@
 |------|------|
 | `kb.js` | 企业大脑 API（文档 CRUD、对话、搜索） |
 | `meeting.js` | 会议记录 API（会议 CRUD、转写、总结、归档） |
+| `changelog.js` | 版本更新日志 API（列表、创建、更新、删除） |
 
 ---
 
@@ -123,6 +124,22 @@
 - 个人/团队任务视图切换
 - 请假提交、请假历史、经理审批
 
+### 本次版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/auth/LoginPage.jsx` | 密码输入限制中文字符 |
+| `pages/auth/ProfileSetupPage.jsx` | 新密码/确认密码输入限制中文字符 |
+| `pages/project/components/BugManagementModal.jsx` | AI Agent 文档补充完整 Bug 信息（配图、测试人员、截止日期、配图下载接口） |
+| `pages/project/components/ProjectTasks.jsx` | Bug 任务类型标签显示"Bug"（红色） |
+| `components/todo/TodoModal.jsx` | 日期选择器从 datetime-local 改为 date（仅选日期不选时间） |
+| `pages/contract/CreateContractModal.jsx` | 新增合同状态编辑（编辑模式下显示状态下拉框） |
+| `pages/contract/ContractListPage.jsx` | 金额字段添加 Number() 确保千分位格式正确 |
+| `pages/finance/TransactionListPage.jsx` | 新增日期筛选器 + 导出 Excel 按钮 + 编辑按钮 + 金额 Number() 转换 |
+| `pages/finance/CreateTransactionModal.jsx` | 支持编辑模式（接收 initialData） |
+| `pages/finance/AccountListPage.jsx` | 余额 Number() 转换确保千分位显示 |
+| `pages/dashboard/DashboardPage.jsx` | 新增版本更新日志区域（最近活动下方，下拉选择版本，L0 可编辑/删除） |
+
 ---
 
-*最后更新：2026-03-23*
+*最后更新：2026-03-31*

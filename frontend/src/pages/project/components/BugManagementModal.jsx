@@ -128,10 +128,23 @@ GET ${baseUrl}/api/v1/project/projects/${project.id}/todos
 - priority: 优先级 (p0/p1/p2/p3)
 - assignee_user_id: 负责开发人员的 user_id
 - assignee_name: 负责开发人员姓名
-- description: 备注
-- link.actual_result: 实际结果
-- link.expected_result: 期望结果
-- link.reproduce_steps: 复现步骤
+- description: 备注（补充说明）
+- link.actual_result: 实际结果（Bug 的实际表现）
+- link.expected_result: 期望结果（正确的预期行为）
+- link.reproduce_steps: 复现步骤（如何重现此 Bug）
+- link.bug_images: 配图列表（截图 URL 数组，可通过下方接口下载查看）
+- link.tester_user_id: 测试人员 user_id
+- due_at: 截止日期
+
+### 5. 下载 Bug 配图
+\`\`\`
+GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments
+\`\`\`
+返回项目所有附件。Bug 配图的文件名在 link.bug_images 数组中，每项包含 file_name 和 stored_name。
+下载单个附件:
+\`\`\`
+GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments/{stored_name}/download
+\`\`\`
 
 ### 2. 开始 AI 修复 (将 Bug 标记为 "AI 修复中")
 \`\`\`

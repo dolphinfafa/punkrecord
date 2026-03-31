@@ -130,10 +130,10 @@ export default function ContractListPage() {
                                         <td>{counterpartyMap[contract.party_a_id] || '-'}</td>
                                         <td>{counterpartyMap[contract.party_b_id] || '-'}</td>
                                         <td className="text-right" style={{ fontFamily: 'monospace' }}>
-                                            {(contract.amount_total || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
+                                            {Number(contract.amount_total || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
                                         </td>
                                         <td className="text-right" style={{ fontFamily: 'monospace', fontWeight: 600, color: contract.pending_amount > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
-                                            {(contract.pending_amount || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
+                                            {Number(contract.pending_amount || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

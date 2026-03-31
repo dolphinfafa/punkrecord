@@ -89,7 +89,7 @@ export default function AccountListPage() {
                                     <td>{account.bank_name}</td>
                                     <td>{account.account_no_masked || account.account_no}</td>
                                     <td>{account.currency}</td>
-                                    <td className="text-right">{(account.balance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                    <td className="text-right">{Number(account.balance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
                                     <td>
                                         <span className={`status-badge ${account.status} ${STATUS_MAP[account.status]?.color || ''}`}>
                                             {STATUS_MAP[account.status]?.label || account.status}

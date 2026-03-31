@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { todoApi } from '@/api/todo';
 import iamApi from '@/api/iam';
+import changelogApi from '@/api/changelog';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     LayoutDashboard, CheckSquare, Clock, AlertCircle, Plus,
-    TrendingUp, Activity, ArrowRight, CalendarClock
+    TrendingUp, Activity, ArrowRight, CalendarClock, FileText, Edit3, Trash2, Save, X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -36,24 +37,31 @@ export default function DashboardPage() {
         end_at: '',
         reason: ''
     });
+    const [changelogs, setChangelogs] = useState([]);
+    const [changelogEditing, setChangelogEditing] = useState(null); // id or 'new'
+    const [changelogForm, setChangelogForm] = useState({ version: '', title: '', content: '' });
+    const [changelogSaving, setChangelogSaving] = useState(false);
+    const [selectedChangelogIdx, setSelectedChangelogIdx] = useState(0);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
                 // Fetch user's todos
-                const [todoRes, teamPendingReviewRes, leaveRes, profileRes, teamPendingRes] = await Promise.all([
+                const [todoRes, teamPendingReviewRes, leaveRes, profileRes, teamPendingRes, changelogRes] = await Promise.all([
                     todoApi.list({ page_size: 100 }),
                     todoApi.listTeam({ status: 'pending_review', page_size: 100 }),
                     todoApi.listMyLeaves({ page_size: 5 }),
                     user?.id ? iamApi.getUser(user.id) : Promise.resolve({ data: null }),
-                    todoApi.listTeamPendingLeaves()
+                    todoApi.listTeamPendingLeaves(),
+                    changelogApi.list({ page_size: 10 }).catch(() => ({ data: { items: [] } }))
                 ]);
                 const todos = todoRes.data?.items || [];
                 const teamPendingReviewCount = teamPendingReviewRes.data?.total || 0;
                 setLeaves(leaveRes.data?.items || []);
                 setMyProfile(profileRes?.data || null);
                 setTeamPendingLeaves(teamPendingRes?.data || []);
+                setChangelogs(changelogRes?.data?.items || []);
 
                 // Calculate Stats
                 const newStats = {
@@ -67,7 +75,7 @@ export default function DashboardPage() {
 
                 // Get Recent Activity (Sort by updated_at desc)
                 const sorted = [...todos].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-                setRecentActivity(sorted.slice(0, 5));
+                setRecentActivity(sorted.slice(0, 3));
 
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
@@ -166,6 +174,41 @@ export default function DashboardPage() {
         }
     };
 
+    const isL0 = myProfile?.level === 0;
+
+    const handleSaveChangelog = async () => {
+        if (!changelogForm.version || !changelogForm.title || !changelogForm.content) {
+            alert('请填写版本号、标题和内容');
+            return;
+        }
+        try {
+            setChangelogSaving(true);
+            if (changelogEditing === 'new') {
+                await changelogApi.create(changelogForm);
+            } else {
+                await changelogApi.update(changelogEditing, changelogForm);
+            }
+            const res = await changelogApi.list({ page_size: 10 });
+            setChangelogs(res?.data?.items || []);
+            setChangelogEditing(null);
+            setChangelogForm({ version: '', title: '', content: '' });
+        } catch (err) {
+            alert('保存失败: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setChangelogSaving(false);
+        }
+    };
+
+    const handleDeleteChangelog = async (id) => {
+        if (!window.confirm('确认删除此版本日志？')) return;
+        try {
+            await changelogApi.delete(id);
+            setChangelogs(prev => prev.filter(c => c.id !== id));
+        } catch (err) {
+            alert('删除失败: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     return (
         <div className="dashboard-container">
             <header className="page-header">
@@ -225,39 +268,103 @@ export default function DashboardPage() {
             </div>
 
             <div className="dashboard-content">
-                <div className="section-card recent-activity">
-                    <div className="section-header">
-                        <h3>最近活动</h3>
-                        <button className="view-all-btn" onClick={() => navigate('/todo')}>
-                            查看全部 <ArrowRight size={14} />
-                        </button>
+                <div>
+                    <div className="section-card recent-activity">
+                        <div className="section-header">
+                            <h3>最近活动</h3>
+                            <button className="view-all-btn" onClick={() => navigate('/todo')}>
+                                查看全部 <ArrowRight size={14} />
+                            </button>
+                        </div>
+                        <div className="activity-list">
+                            {loading ? (
+                                <div className="loading-dots">加载中...</div>
+                            ) : recentActivity.length === 0 ? (
+                                <div className="empty-state">暂无活动记录</div>
+                            ) : (
+                                recentActivity.map(todo => (
+                                    <div key={todo.id} className="activity-item" onClick={() => { if (window.getSelection().toString()) return; navigate('/todo'); }}>
+                                        <div className={clsx('activity-icon', `status-${todo.status}`)}>
+                                            {todo.status === 'done' ? <CheckSquare size={16} /> : <Activity size={16} />}
+                                        </div>
+                                        <div className="activity-details">
+                                            <span className="activity-title">{todo.title}</span>
+                                            <span className="activity-meta">
+                                                {format(new Date(todo.updated_at), 'MM-dd HH:mm')} · {todo.status === 'done' ? '已完成' : '更新了状态'}
+                                            </span>
+                                        </div>
+                                        <div className={clsx('status-badge', `status-${todo.status}`)}>
+                                            {todo.status === 'in_progress' && '进行中'}
+                                            {todo.status === 'open' && '未开始'}
+                                            {todo.status === 'pending_review' && '待审核'}
+                                            {todo.status === 'done' && '已完成'}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
-                    <div className="activity-list">
-                        {loading ? (
-                            <div className="loading-dots">加载中...</div>
-                        ) : recentActivity.length === 0 ? (
-                            <div className="empty-state">暂无活动记录</div>
-                        ) : (
-                            recentActivity.map(todo => (
-                                <div key={todo.id} className="activity-item" onClick={() => { if (window.getSelection().toString()) return; navigate('/todo'); }}>
-                                    <div className={clsx('activity-icon', `status-${todo.status}`)}>
-                                        {todo.status === 'done' ? <CheckSquare size={16} /> : <Activity size={16} />}
-                                    </div>
-                                    <div className="activity-details">
-                                        <span className="activity-title">{todo.title}</span>
-                                        <span className="activity-meta">
-                                            {format(new Date(todo.updated_at), 'MM-dd HH:mm')} · {todo.status === 'done' ? '已完成' : '更新了状态'}
-                                        </span>
-                                    </div>
-                                    <div className={clsx('status-badge', `status-${todo.status}`)}>
-                                        {todo.status === 'in_progress' && '进行中'}
-                                        {todo.status === 'open' && '未开始'}
-                                        {todo.status === 'pending_review' && '待审核'}
-                                        {todo.status === 'done' && '已完成'}
-                                    </div>
+
+                    <div className="section-card" style={{ marginTop: '1.5rem' }}>
+                        <div className="section-header">
+                            <h3><FileText size={18} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />版本更新日志</h3>
+                            {isL0 && !changelogEditing && (
+                                <button className="create-btn" style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem' }} onClick={() => {
+                                    setChangelogEditing('new');
+                                    setChangelogForm({ version: '', title: '', content: '' });
+                                }}>
+                                    <Plus size={14} /> 新增版本
+                                </button>
+                            )}
+                        </div>
+
+                        {changelogEditing && (
+                            <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                    <input type="text" placeholder="版本号 (如 v1.2.0)" value={changelogForm.version} onChange={(e) => setChangelogForm(p => ({ ...p, version: e.target.value }))} style={{ padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }} />
+                                    <input type="text" placeholder="更新标题" value={changelogForm.title} onChange={(e) => setChangelogForm(p => ({ ...p, title: e.target.value }))} style={{ padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }} />
                                 </div>
-                            ))
+                                <textarea placeholder="更新内容（支持多行）" value={changelogForm.content} onChange={(e) => setChangelogForm(p => ({ ...p, content: e.target.value }))} rows={4} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', resize: 'vertical' }} />
+                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
+                                    <button style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white', cursor: 'pointer' }} onClick={() => setChangelogEditing(null)}><X size={14} /> 取消</button>
+                                    <button className="create-btn" style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }} onClick={handleSaveChangelog} disabled={changelogSaving}><Save size={14} /> {changelogSaving ? '保存中...' : '保存'}</button>
+                                </div>
+                            </div>
                         )}
+
+                        {changelogs.length === 0 ? (
+                            <div className="empty-state">暂无版本更新记录</div>
+                        ) : (() => {
+                            const log = changelogs[selectedChangelogIdx] || changelogs[0];
+                            return (
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <select
+                                                value={selectedChangelogIdx}
+                                                onChange={(e) => setSelectedChangelogIdx(Number(e.target.value))}
+                                                style={{ padding: '0.25rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', color: '#0369a1', fontWeight: '600', background: '#f0f9ff', cursor: 'pointer' }}
+                                            >
+                                                {changelogs.map((c, i) => (
+                                                    <option key={c.id} value={i}>{c.version}{i === 0 ? ' (最新)' : ''}</option>
+                                                ))}
+                                            </select>
+                                            <span style={{ fontWeight: '600', fontSize: '0.9rem', color: '#1e293b' }}>{log.title}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{log.published_by_name} {log.published_at ? format(new Date(log.published_at), 'yyyy-MM-dd') : ''}</span>
+                                            {isL0 && (
+                                                <>
+                                                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '2px' }} onClick={() => { setChangelogEditing(log.id); setChangelogForm({ version: log.version, title: log.title, content: log.content }); }} title="编辑"><Edit3 size={14} /></button>
+                                                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }} onClick={() => handleDeleteChangelog(log.id)} title="删除"><Trash2 size={14} /></button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.83rem', color: '#475569', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{log.content}</div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 

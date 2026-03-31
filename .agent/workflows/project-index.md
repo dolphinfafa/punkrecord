@@ -14,7 +14,7 @@ description: PunkRecord 项目索引大纲。执行任何任务前先阅读此�
 punkrecord/
 |- backend/                 # FastAPI 后端服务
 |  |- app/
-|  |  |- api/               # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting）
+|  |  |- api/               # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog）
 |  |  |- core/              # 配置、数据库、认证、响应、异常处理、文件存储
 |  |  |- models/            # SQLModel ORM 模型
 |  |  |- schemas/           # Pydantic 请求/响应 Schema
@@ -102,4 +102,4 @@ punkrecord/
 
 ---
 
-*最后更新：2026-03-27*
+*最后更新：2026-03-31*

@@ -129,7 +129,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
               |                    |                    |
     +---------v--------+  +-------v--------+  +--------v---------+
     |  Router Layer    |  |  Service Layer |  |  Core Layer       |
-    |  (9 API 模块)    |  |  (业务逻辑)    |  |  (Auth/DB/Config) |
+    |  (10 API 模块)   |  |  (业务逻辑)    |  |  (Auth/DB/Config) |
     +---------+--------+  +-------+--------+  +--------+---------+
               |                    |                    |
               +--------------------+--------------------+
@@ -157,7 +157,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 2. 注册 CORS 中间件（允许前端开发服务器跨域）
 3. 注册请求日志中间件（记录每个请求的方法、路径、响应码）
 4. 注册异常处理器（`AtlasException` 与通用异常）
-5. 注册 9 个路由模块（统一前缀 `/api/v1`）
+5. 注册 10 个路由模块（统一前缀 `/api/v1`）
 6. 启动事件中按需初始化数据库
 
 ### 4.2 路由模块一览
@@ -173,6 +173,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
   +-- ai/             AI 能力          (ai.py)
   +-- kb/             企业大脑        (kb.py,        ~460 行)
   +-- meeting/        会议记录        (meeting.py,   ~490 行)
+  +-- changelog/      版本更新日志    (changelog.py)
 ```
 
 ### 4.3 中间件栈
@@ -297,6 +298,7 @@ Approval 模块
 Shared 模块
   +-- AuditLog             操作审计日志
   +-- FileMetadata         文件元数据
+  +-- ChangeLog            版本更新日志（version, title, content, published_by, published_at）
   +-- WeChatUserBinding    微信用户绑定
   +-- WeChatMessageTemplate 微信消息模板
 
