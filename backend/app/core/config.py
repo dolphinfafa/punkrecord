@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
     # LiteLLM (meeting summary LLM)
-    LITELLM_BASE_URL: str = "http://212.50.233.55:4000/v1"
-    LITELLM_API_KEY: str = "sk-TzLTEohDg_5CxoRaqBOJpQ"
+    LITELLM_BASE_URL: str = "https://litellm.yios.cn/v1"
+    LITELLM_API_KEY: str = "sk-pd8ihad3IQRHfn0TILW7Pg"
     LITELLM_MODEL: str = "gemini/gemini-3.1-flash-lite-preview"
 
     # Knowledge Base
