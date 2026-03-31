@@ -139,7 +139,7 @@ export default function ChatPage() {
             const controller = new AbortController();
             abortControllerRef.current = controller;
 
-            const response = await fetch('/punkrecord/api/v1/kb/chat', {
+            const response = await fetch('/api/v1/kb/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

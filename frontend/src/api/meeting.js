@@ -19,5 +19,5 @@ export const meetingApi = {
     updateTranscript: (id, data) => client.patch(`/meeting/records/${id}/transcript`, data),
     updateSpeakers: (id, data) => client.put(`/meeting/records/${id}/speakers`, data),
     archiveToKB: (id) => client.post(`/meeting/records/${id}/archive`),
-    getAudioUrl: (id) => `/punkrecord/api/v1/meeting/records/${id}/audio`,
+    getAudioUrl: (id) => `/api/v1/meeting/records/${id}/audio`,
 };

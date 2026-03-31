@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const client = axios.create({
-    baseURL: '/punkrecord/api/v1',
+    baseURL: '/api/v1',
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -34,7 +34,7 @@ client.interceptors.response.use(
             localStorage.removeItem('user');
             // Don't redirect if already on the login page (avoid reload loop on login failure)
             if (!window.location.pathname.endsWith('/login')) {
-                window.location.href = '/punkrecord/login';
+                window.location.href = '/login';
             }
         }
         return Promise.reject(error);

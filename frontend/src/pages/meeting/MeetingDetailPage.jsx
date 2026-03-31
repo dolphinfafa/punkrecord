@@ -188,7 +188,7 @@ export default function MeetingDetailPage() {
         try {
             setAudioLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch(`/punkrecord/api/v1/meeting/records/${id}/audio`, {
+            const response = await fetch(`/api/v1/meeting/records/${id}/audio`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Failed to load audio');
@@ -379,7 +379,7 @@ export default function MeetingDetailPage() {
             const promptText = summaryPrompt || selectedPresetPrompt;
             if (promptText) body.prompt = promptText;
             if (previousMeetingId) body.previous_meeting_id = previousMeetingId;
-            const response = await fetch(`/punkrecord/api/v1/meeting/records/${id}/summarize`, {
+            const response = await fetch(`/api/v1/meeting/records/${id}/summarize`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -848,7 +848,7 @@ export default function MeetingDetailPage() {
                             已归档到企业大脑
                             {archiveResult?.doc_id && (
                                 <a
-                                    href={`/punkrecord/kb/doc/${archiveResult.doc_id}`}
+                                    href={`/kb/doc/${archiveResult.doc_id}`}
                                     className="archive-link"
                                     target="_blank"
                                     rel="noopener noreferrer"

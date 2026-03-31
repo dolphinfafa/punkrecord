@@ -126,7 +126,7 @@ export default function QuoteModal({ isOpen, onClose, stage, allStages, onSave, 
             }
 
             const token = localStorage.getItem('token');
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
             const response = await fetch(`${baseUrl}/project/export_quote_excel`, {
                 method: 'POST',
                 headers: {

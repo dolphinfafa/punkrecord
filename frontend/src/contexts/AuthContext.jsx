@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
-        window.location.href = '/punkrecord/login';
+        window.location.href = '/login';
     };
 
     const hasPermission = useCallback((code) => {

@@ -125,7 +125,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
         if (tableData.length === 0) return;
         try {
             const token = localStorage.getItem('token');
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
             const response = await fetch(`${baseUrl}/project/export-feature-list-excel`, {
                 method: 'POST',
                 headers: {
@@ -155,7 +155,7 @@ const FeatureListModal = ({ isOpen, onClose, stage, onSave }) => {
 
     const downloadTemplate = async () => {
         try {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/punkrecord/api/v1';
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
             const response = await fetch(`${baseUrl}/project/feature-list-template`);
             if (!response.ok) throw new Error('下载失败');
             const blob = await response.blob();
