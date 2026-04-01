@@ -31,6 +31,8 @@ class TodoUpdate(BaseModel):
     due_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     tags: Optional[List[str]] = None
+    link: Optional[dict] = None
+    assignee_user_id: Optional[UUID] = None
 
 
 class TodoStatusUpdate(BaseModel):

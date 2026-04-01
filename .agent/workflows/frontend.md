@@ -130,7 +130,7 @@
 |-----------|----------|
 | `pages/auth/LoginPage.jsx` | 密码输入限制中文字符 |
 | `pages/auth/ProfileSetupPage.jsx` | 新密码/确认密码输入限制中文字符 |
-| `pages/project/components/BugManagementModal.jsx` | AI Agent 文档补充完整 Bug 信息（配图、测试人员、截止日期、配图下载接口） |
+| `pages/project/components/BugManagementModal.jsx` | Bug 管理重构：新增编辑按钮、配图增删改查、独立 agent_status 列、弹窗宽度 1500px、四维筛选（状态/Agent状态/开发人员/测试人员） |
 | `pages/project/components/ProjectTasks.jsx` | Bug 任务类型标签显示"Bug"（红色） |
 | `components/todo/TodoModal.jsx` | 日期选择器从 datetime-local 改为 date（仅选日期不选时间） |
 | `pages/contract/CreateContractModal.jsx` | 新增合同状态编辑（编辑模式下显示状态下拉框） |
@@ -142,4 +142,4 @@
 
 ---
 
-*最后更新：2026-03-31*
+*最后更新：2026-04-01*
