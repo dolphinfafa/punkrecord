@@ -657,6 +657,15 @@ async def update_todo(
         todo.start_at = todo_data.start_at
     if todo_data.tags is not None:
         todo.tags = todo_data.tags
+    if todo_data.link is not None:
+        # Merge with existing link to preserve fields not sent
+        existing_link = dict(todo.link or {})
+        existing_link.update(todo_data.link)
+        todo.link = existing_link
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(todo, 'link')
+    if todo_data.assignee_user_id is not None:
+        todo.assignee_user_id = todo_data.assignee_user_id
 
     todo.updated_at = now_cn()
     session.add(todo)
@@ -1243,19 +1252,26 @@ async def update_todo_status(
              else:
                  raise NotFoundException("无权重置任务")
 
-    # 6. AI workflow transitions
+    # 6. AI workflow transitions — agent_status stored in link, todo.status follows normal flow
     elif target_status == TodoStatus.AI_FIXING and current_status in (TodoStatus.OPEN, TodoStatus.IN_PROGRESS, TodoStatus.BLOCKED):
-        todo.status = TodoStatus.AI_FIXING
+        # Set todo to in_progress, record agent_status in link
+        todo.status = TodoStatus.IN_PROGRESS
         if not todo.start_at:
             todo.start_at = now_cn()
+        link = dict(todo.link or {})
+        link['agent_status'] = 'ai_fixing'
+        todo.link = link
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(todo, 'link')
 
-    elif target_status == TodoStatus.AI_FIXED and current_status == TodoStatus.AI_FIXING:
-        todo.status = TodoStatus.AI_FIXED
-
-    elif current_status == TodoStatus.AI_FIXED and target_status in (TodoStatus.OPEN, TodoStatus.PENDING_REVIEW, TodoStatus.DONE):
-        todo.status = target_status
-        if target_status == TodoStatus.DONE:
-            todo.done_at = now_cn()
+    elif target_status == TodoStatus.AI_FIXED:
+        # AI finished — todo stays in_progress, only agent_status changes
+        link = dict(todo.link or {})
+        link['agent_status'] = 'ai_fixed'
+        todo.link = link
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(todo, 'link')
+        # Do NOT change todo.status — employee must submit for review manually
 
     # 7. Fallback/Other transitions
     else:

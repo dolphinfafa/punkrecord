@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2, FileText, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2, FileText, Copy, Check, ChevronDown, ChevronUp, Edit3, Image } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
@@ -68,6 +68,15 @@ function isDeveloperMember(member) {
     );
 }
 
+const AGENT_STATUS_LABELS = {
+    ai_fixing: 'AI 处理中',
+    ai_fixed: 'AI 已完成',
+};
+const AGENT_STATUS_COLORS = {
+    ai_fixing: { bg: '#fdf4ff', color: '#a855f7' },
+    ai_fixed: { bg: '#ecfdf5', color: '#059669' },
+};
+
 function isBugTodo(todo) {
     const tags = todo?.tags || [];
     const link = todo?.link || {};
@@ -124,62 +133,72 @@ GET ${baseUrl}/api/v1/project/projects/${project.id}/todos
 每条 Bug 的关键字段:
 - id: Bug ID (用于后续操作)
 - title: 标题
-- status: 状态 (open/in_progress/ai_fixing/ai_fixed/pending_review/done)
+- status: 待办状态 (open/in_progress/pending_review/done/blocked/dismissed)
 - priority: 优先级 (p0/p1/p2/p3)
 - assignee_user_id: 负责开发人员的 user_id
 - assignee_name: 负责开发人员姓名
 - description: 备注（补充说明）
+- link.agent_status: Agent 状态（ai_fixing = AI 处理中，ai_fixed = AI 已完成，无此字段 = 未使用 AI）
 - link.actual_result: 实际结果（Bug 的实际表现）
 - link.expected_result: 期望结果（正确的预期行为）
 - link.reproduce_steps: 复现步骤（如何重现此 Bug）
-- link.bug_images: 配图列表（截图 URL 数组，可通过下方接口下载查看）
+- link.bug_images: 配图列表（截图数组，每项包含 attachment_id, file_name, content_type, size）
 - link.tester_user_id: 测试人员 user_id
 - due_at: 截止日期
 
-### 5. 下载 Bug 配图
-\`\`\`
-GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments
-\`\`\`
-返回项目所有附件。Bug 配图的文件名在 link.bug_images 数组中，每项包含 file_name 和 stored_name。
-下载单个附件:
-\`\`\`
-GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments/{stored_name}/download
-\`\`\`
+**重要说明**：Bug 的 status 字段是待办事项状态，Agent 处理状态存储在 link.agent_status 中，两者独立。
+调用接口 2/3 后，status 会变为 in_progress（处理中），link.agent_status 会更新为 ai_fixing/ai_fixed。
+员工提交验收后，status 变为 pending_review，此时 agent_status 不受影响。
 
-### 2. 开始 AI 修复 (将 Bug 标记为 "AI 修复中")
+### 2. 开始 AI 修复 (标记 Agent 状态为 "AI 处理中")
 \`\`\`
 POST ${baseUrl}/api/v1/todo/{bug_id}/status
 Content-Type: application/json
 
 { "status": "ai_fixing" }
 \`\`\`
-适用于状态为 open / in_progress / blocked 的 Bug。
+适用于 status 为 open / in_progress / blocked 的 Bug。
+调用后：status 变为 in_progress，link.agent_status 变为 "ai_fixing"。
 
-### 3. 完成 AI 修复 (将 Bug 标记为 "AI 已修复")
+### 3. 完成 AI 修复 (标记 Agent 状态为 "AI 已完成")
 \`\`\`
 POST ${baseUrl}/api/v1/todo/{bug_id}/status
 Content-Type: application/json
 
 { "status": "ai_fixed" }
 \`\`\`
-仅适用于状态为 ai_fixing 的 Bug。
+调用后：status 保持 in_progress 不变，link.agent_status 变为 "ai_fixed"。
+**注意**：此接口不会改变待办状态，Bug 仍需员工手动提交验收。
 
 ### 4. 获取单个 Bug 详情
 \`\`\`
 GET ${baseUrl}/api/v1/todo/{bug_id}
 \`\`\`
 
+### 5. 下载 Bug 配图
+\`\`\`
+GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments
+\`\`\`
+返回项目所有附件。Bug 配图信息在 link.bug_images 数组中。
+下载单个附件:
+\`\`\`
+GET ${baseUrl}/api/v1/project/projects/${project.id}/attachments/{stored_name}/download
+\`\`\`
+
 ## 工作流程
-1. 调用接口 1 获取 Bug 列表
-2. 根据 assignee_user_id 筛选出当前操作人负责的 Bug
-3. 操作人指定需要修复的 Bug 后，对每个 Bug 调用接口 2 标记为 "AI 修复中"
-4. 完成代码修复后，调用接口 3 标记为 "AI 已修复"
-5. 之后由测试人员人工验收
+1. 调用接口 1 获取 Bug 列表，筛选出 tags 包含 "bug" 的条目
+2. 阅读每条 Bug 的完整信息：标题、备注(description)、实际结果(link.actual_result)、期望结果(link.expected_result)、复现步骤(link.reproduce_steps)、配图(link.bug_images)
+3. 根据 assignee_user_id 确认当前操作人负责的 Bug
+4. 对需要修复的 Bug 调用接口 2 标记为 "AI 处理中"
+5. 完成代码修复后，调用接口 3 标记为 "AI 已完成"
+6. 之后由测试人员人工验收（Agent 无需操作）
 
 ## 状态流转图
 \`\`\`
-open/in_progress/blocked --> ai_fixing --> ai_fixed --> (人工验收) --> done
+待办状态 (status):     open --> in_progress --> pending_review --> done
+Agent 状态 (link.agent_status):  (空) --> ai_fixing --> ai_fixed --> (员工手动提交验收)
 \`\`\`
+两个状态独立运作，Agent 只需关注 link.agent_status。
 `;
 }
 
@@ -195,10 +214,31 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     const [form, setForm] = useState(defaultBugForm(project, '', [], []));
     const [message, setMessage] = useState('');
     const [selectedBug, setSelectedBug] = useState(null);
+    const [editingBug, setEditingBug] = useState(null);
+    const [existingImages, setExistingImages] = useState([]);
+    const [imagesToDelete, setImagesToDelete] = useState([]);
     const [docExpanded, setDocExpanded] = useState(false);
     const [docCopied, setDocCopied] = useState(false);
+    // Filters
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterAgentStatus, setFilterAgentStatus] = useState('');
+    const [filterDeveloper, setFilterDeveloper] = useState('');
+    const [filterTester, setFilterTester] = useState('');
 
-    const bugList = useMemo(() => todos.filter(isBugTodo), [todos]);
+    const bugListAll = useMemo(() => todos.filter(isBugTodo), [todos]);
+    const bugList = useMemo(() => {
+        return bugListAll.filter(t => {
+            if (filterStatus && t.status !== filterStatus) return false;
+            if (filterAgentStatus) {
+                const as = t.link?.agent_status || '';
+                if (filterAgentStatus === 'none' && as) return false;
+                if (filterAgentStatus !== 'none' && as !== filterAgentStatus) return false;
+            }
+            if (filterDeveloper && t.assignee_user_id !== filterDeveloper) return false;
+            if (filterTester && t.link?.tester_user_id !== filterTester) return false;
+            return true;
+        });
+    }, [bugListAll, filterStatus, filterAgentStatus, filterDeveloper, filterTester]);
     const testerMembers = useMemo(() => {
         const filtered = members.filter(isTesterMember);
         return filtered.length > 0 ? filtered : members;
@@ -339,6 +379,84 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
         }
     };
 
+    const startEditBug = (todo) => {
+        const link = todo.link || {};
+        setEditingBug(todo);
+        setForm({
+            title: (todo.title || '').replace(/^\[BUG\]\s*/, ''),
+            description: todo.description || '',
+            tester_user_id: link.tester_user_id || '',
+            developer_user_id: todo.assignee_user_id || link.developer_user_id || '',
+            priority: todo.priority || 'p1',
+            due_at: todo.due_at ? new Date(todo.due_at).toISOString().slice(0, 10) : '',
+            actual_result: link.actual_result || '',
+            expected_result: link.expected_result || '',
+            reproduce_steps: link.reproduce_steps || '',
+            screenshot_files: [],
+        });
+        setExistingImages(link.bug_images || []);
+        setImagesToDelete([]);
+        setShowCreate(true);
+    };
+
+    const updateBug = async () => {
+        if (!form.title.trim()) { setMessage('Bug 标题不能为空'); return; }
+        if (!editingBug) return;
+        try {
+            setSubmitting(true);
+            setMessage('');
+            // Upload new images
+            const newImages = [];
+            for (const file of (form.screenshot_files || [])) {
+                const uploadRes = await projectApi.uploadProjectAttachment(project.id, file);
+                const uploaded = uploadRes?.data;
+                if (uploaded?.id) {
+                    newImages.push({
+                        attachment_id: uploaded.id,
+                        file_name: uploaded.file_name,
+                        content_type: uploaded.content_type,
+                        size: uploaded.size,
+                    });
+                }
+            }
+            // Merge: keep existing (minus deleted) + new
+            const keptImages = existingImages.filter(img => !imagesToDelete.includes(img.attachment_id));
+            const allImages = [...keptImages, ...newImages];
+
+            const dueAt = form.due_at ? `${form.due_at}T18:00:00` : null;
+            const existingLink = editingBug.link || {};
+            await todoApi.update(editingBug.id, {
+                title: `[BUG] ${form.title.trim()}`,
+                description: form.description?.trim() || null,
+                priority: form.priority,
+                due_at: dueAt,
+                assignee_user_id: form.developer_user_id || undefined,
+                link: {
+                    ...existingLink,
+                    tester_user_id: form.tester_user_id,
+                    developer_user_id: form.developer_user_id,
+                    reviewer_user_id: form.tester_user_id || existingLink.reviewer_user_id,
+                    actual_result: form.actual_result?.trim() || '',
+                    expected_result: form.expected_result?.trim() || '',
+                    reproduce_steps: form.reproduce_steps?.trim() || '',
+                    bug_image: allImages[0] || null,
+                    bug_images: allImages,
+                },
+            });
+            setEditingBug(null);
+            setShowCreate(false);
+            setForm(defaultBugForm(project, user?.id || '', testerMembers, developerMembers));
+            setExistingImages([]);
+            setImagesToDelete([]);
+            setMessage('Bug 已更新');
+            await loadData();
+        } catch (err) {
+            setMessage(err?.response?.data?.message || err?.message || '更新 Bug 失败');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const patchBugPlan = async (todoId, payload, okText) => {
         try {
             setUpdatingId(todoId);
@@ -397,7 +515,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
             padding: '20px',
         }}>
             <div style={{
-                width: 'min(1200px, 100%)',
+                width: 'min(1500px, 98%)',
                 maxHeight: '92vh',
                 background: '#fff',
                 borderRadius: '14px',
@@ -500,21 +618,64 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     </div>
                 )}
 
-                <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '0.86rem', color: '#334155' }}>Bug 总数：<strong>{bugList.length}</strong></span>
-                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>说明：这里的 Bug 与待办事项是同一条数据</span>
-                    </div>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '0.86rem', color: '#334155' }}>Bug 总数：<strong>{bugList.length}</strong>{bugListAll.length !== bugList.length && <span style={{ color: '#94a3b8' }}> / {bugListAll.length}</span>}</span>
+                        </div>
                     <button
-                        onClick={() => setShowCreate((prev) => !prev)}
+                        onClick={() => {
+                            if (showCreate) {
+                                setShowCreate(false);
+                                setEditingBug(null);
+                                setExistingImages([]);
+                                setImagesToDelete([]);
+                            } else {
+                                setEditingBug(null);
+                                setExistingImages([]);
+                                setImagesToDelete([]);
+                                setForm(defaultBugForm(project, user?.id || '', testerMembers, developerMembers));
+                                setShowCreate(true);
+                            }
+                        }}
                         style={{ border: 'none', background: '#2563eb', color: '#fff', borderRadius: '8px', padding: '7px 12px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
                     >
-                        <Plus size={14} /> {showCreate ? '收起新建' : '新建 Bug'}
+                        <Plus size={14} /> {showCreate && !editingBug ? '收起新建' : showCreate && editingBug ? '收起编辑' : '新建 Bug'}
                     </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>筛选：</span>
+                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                            <option value="">全部状态</option>
+                            {Object.entries(STATUS_LABELS).filter(([k]) => !k.startsWith('ai_')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                        </select>
+                        <select value={filterAgentStatus} onChange={(e) => setFilterAgentStatus(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                            <option value="">全部Agent状态</option>
+                            <option value="none">无Agent</option>
+                            <option value="ai_fixing">AI 处理中</option>
+                            <option value="ai_fixed">AI 已完成</option>
+                        </select>
+                        <select value={filterDeveloper} onChange={(e) => setFilterDeveloper(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                            <option value="">全部开发人员</option>
+                            {developerMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.user_name}</option>)}
+                        </select>
+                        <select value={filterTester} onChange={(e) => setFilterTester(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                            <option value="">全部测试人员</option>
+                            {testerMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.user_name}</option>)}
+                        </select>
+                        {(filterStatus || filterAgentStatus || filterDeveloper || filterTester) && (
+                            <button onClick={() => { setFilterStatus(''); setFilterAgentStatus(''); setFilterDeveloper(''); setFilterTester(''); }} style={{ border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.78rem', textDecoration: 'underline' }}>清除</button>
+                        )}
+                    </div>
                 </div>
 
                 {showCreate && (
-                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fbff' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', background: editingBug ? '#fffbeb' : '#f8fbff' }}>
+                        {editingBug && (
+                            <div style={{ marginBottom: '10px', fontSize: '0.85rem', color: '#92400e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Edit3 size={14} /> 编辑 Bug：{editingBug.title}
+                            </div>
+                        )}
                         <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
                             <label style={{ fontSize: '0.83rem', color: '#334155' }}>
                                 Bug 标题
@@ -566,35 +727,72 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                             复现步骤 / 补充描述
                             <textarea value={form.reproduce_steps} onChange={(e) => setField('reproduce_steps', e.target.value)} rows={3} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
                         </label>
-                        <label style={{ marginTop: '10px', display: 'block', fontSize: '0.83rem', color: '#334155' }}>
-                            配图（可选）
+                        <div style={{ marginTop: '10px', fontSize: '0.83rem', color: '#334155' }}>
+                            <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Image size={14} /> 配图（可选）
+                            </div>
+                            {/* Existing images (edit mode) */}
+                            {existingImages.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                                    {existingImages.map((img) => {
+                                        const isDeleted = imagesToDelete.includes(img.attachment_id);
+                                        return (
+                                            <div key={img.attachment_id} style={{ position: 'relative', padding: '6px 10px', borderRadius: '6px', border: isDeleted ? '1px dashed #e2e8f0' : '1px solid #cbd5e1', background: isDeleted ? '#f8fafc' : '#fff', display: 'flex', alignItems: 'center', gap: '6px', opacity: isDeleted ? 0.4 : 1 }}>
+                                                <span style={{ fontSize: '0.78rem', color: '#475569', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{img.file_name}</span>
+                                                {isDeleted ? (
+                                                    <button type="button" onClick={() => setImagesToDelete(prev => prev.filter(id => id !== img.attachment_id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.75rem', padding: 0 }}>撤销</button>
+                                                ) : (
+                                                    <button type="button" onClick={() => setImagesToDelete(prev => [...prev, img.attachment_id])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 0 }}><X size={14} /></button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {/* Add new images */}
                             <input
                                 type="file"
                                 accept="image/*"
                                 multiple
-                                onChange={(e) => setField('screenshot_files', Array.from(e.target.files || []))}
-                                style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px', background: '#fff' }}
+                                onChange={(e) => {
+                                    const newFiles = Array.from(e.target.files || []);
+                                    setField('screenshot_files', [...(form.screenshot_files || []), ...newFiles]);
+                                    e.target.value = '';
+                                }}
+                                style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px', background: '#fff' }}
                             />
                             {(form.screenshot_files || []).length > 0 && (
-                                <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.75rem' }}>
-                                    已选择 {(form.screenshot_files || []).length} 张：
-                                    {' '}
-                                    {(form.screenshot_files || []).map((file) => file.name).join('、')}
+                                <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                    {(form.screenshot_files || []).map((file, idx) => (
+                                        <div key={`${file.name}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '5px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '0.75rem', color: '#15803d' }}>
+                                            <span>{file.name}</span>
+                                            <button type="button" onClick={() => setField('screenshot_files', (form.screenshot_files || []).filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 0 }}><X size={12} /></button>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
-                        </label>
+                        </div>
                         <label style={{ marginTop: '10px', display: 'block', fontSize: '0.83rem', color: '#334155' }}>
                             备注
                             <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} rows={2} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
                         </label>
-                        <div style={{ marginTop: '10px' }}>
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
                             <button
-                                onClick={createBug}
+                                onClick={editingBug ? updateBug : createBug}
                                 disabled={submitting}
                                 style={{ border: 'none', background: '#111827', color: '#fff', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer' }}
                             >
-                                {submitting ? '创建中...' : '确认创建并同步待办'}
+                                {submitting ? (editingBug ? '更新中...' : '创建中...') : (editingBug ? '保存修改' : '确认创建并同步待办')}
                             </button>
+                            {editingBug && (
+                                <button
+                                    onClick={() => { setEditingBug(null); setShowCreate(false); setExistingImages([]); setImagesToDelete([]); }}
+                                    disabled={submitting}
+                                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer' }}
+                                >
+                                    取消编辑
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}
@@ -611,10 +809,10 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     ) : bugList.length === 0 ? (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '28px 0', textAlign: 'center' }}>暂无 Bug，点击上方"新建 Bug"开始记录</div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                    {['标题', '状态', '优先级', '开发人员', '审核人', '截止日期', '待办联动'].map((h) => (
+                                    {['标题', '状态', 'Agent状态', '优先级', '开发人员', '审核人', '截止日期', '操作', '待办联动'].map((h) => (
                                         <th key={h} style={{ textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>{h}</th>
                                     ))}
                                 </tr>
@@ -622,16 +820,25 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                             <tbody>
                                 {bugList.map((todo) => {
                                     const statusStyle = STATUS_COLORS[todo.status] || STATUS_COLORS.open;
+                                    const agentStatus = todo.link?.agent_status;
+                                    const agentStyle = agentStatus ? (AGENT_STATUS_COLORS[agentStatus] || {}) : null;
                                     return (
                                         <tr key={todo.id} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }} onClick={() => setSelectedBug(todo)}>
-                                            <td style={{ padding: '10px 8px', fontSize: '0.88rem', color: '#0f172a', maxWidth: '360px' }}>
+                                            <td style={{ padding: '10px 8px', fontSize: '0.88rem', color: '#0f172a', maxWidth: '300px' }}>
                                                 <div style={{ fontWeight: 600 }}>{todo.title}</div>
-                                                {todo.description && <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.8rem' }}>{todo.description}</div>}
+                                                {todo.description && <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>{todo.description}</div>}
                                             </td>
                                             <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', background: statusStyle.bg, color: statusStyle.color, fontWeight: 600 }}>
                                                     {STATUS_LABELS[todo.status] || todo.status}
                                                 </span>
+                                            </td>
+                                            <td style={{ padding: '10px 8px' }}>
+                                                {agentStatus ? (
+                                                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', background: agentStyle?.bg || '#f8fafc', color: agentStyle?.color || '#64748b', fontWeight: 600 }}>
+                                                        {AGENT_STATUS_LABELS[agentStatus] || agentStatus}
+                                                    </span>
+                                                ) : <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>-</span>}
                                             </td>
                                             <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                                                 <select
@@ -669,6 +876,15 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                                     onChange={(e) => patchBugPlan(todo.id, { due_at: e.target.value ? `${e.target.value}T18:00:00` : null }, '截止日期已更新')}
                                                     style={{ border: '1px solid #cbd5e1', borderRadius: '7px', padding: '5px 6px', fontSize: '0.8rem' }}
                                                 />
+                                            </td>
+                                            <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => startEditBug(todo)}
+                                                    disabled={updatingId === todo.id}
+                                                    style={{ border: '1px solid #c7d2fe', color: '#4338ca', background: '#eef2ff', borderRadius: '7px', padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                >
+                                                    <Edit3 size={12} /> 编辑
+                                                </button>
                                             </td>
                                             <td style={{ padding: '10px 8px' }}>
                                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

@@ -27,9 +27,10 @@
 - `rejected`：审核驳回
 - `dismissed`：任务取消
 
-AI Agent 工作流：
+AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - `ai_fixing`：AI 正在修复
 - `ai_fixed`：AI 已完成修复，等待人工审核
+- AI 只更新 `link.agent_status`，不改变 `todo.status`，两者完全解耦
 
 小程序支持"我的任务"和"团队任务"视图及对应操作按钮。
 
@@ -52,7 +53,9 @@ AI Agent 工作流：
 - Bug 创建只写入一条 Bug 任务记录（不创建额外镜像）
 - Bug 列表视图不显示附件缩略图，图片仅在详情弹窗中展示
 - Bug 管理包含"Agent 文档"面板，可一键复制自动生成的 AI Agent 操作手册
-- AI Agent Bug 修复流程：Agent 通过状态 API 将 Bug 从 `ai_fixing` 推进到 `ai_fixed`
+- AI Agent Bug 修复流程：Agent 通过 PATCH `/api/v1/todo/{todo_id}` 更新 `link.agent_status`（`ai_fixing` → `ai_fixed`），不改变 `todo.status`。`status` 和 `agent_status` 完全独立
+- Bug 列表支持编辑（预填所有字段）、配图增删改查（单张删除/撤销、继续添加）
+- Bug 管理弹窗宽度 1500px，支持按状态/Agent状态/开发人员/测试人员四维筛选
 
 ### 1.5 财务操作
 
@@ -186,11 +189,20 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 | `DB_TYPE` | `mysql` |
 | `DB_HOST` | 见 `backend/.env` |
 | `DB_PORT` | 见 `backend/.env` |
-| `DB_NAME` | 开发: `punkrecord_dev`，生产: `punkrecord_deploy` |
+| `DB_NAME` | 本地开发: `punkrecord_local`，远程开发: `punkrecord_dev`，生产: `punkrecord_deploy` |
 | 驱动 | `pymysql`（已在 `requirements.txt`） |
 | 连接池 | `pool_pre_ping=True`，`pool_recycle=3600` |
 
+### 数据库环境说明
+
+| 环境 | 库名 | 主机 | 端口 | 用途 |
+|------|------|------|------|------|
+| 本地开发 | `punkrecord_local` | `127.0.0.1` | `3306` | 日常开发，`.env` 默认连接此库 |
+| 远程开发 | `punkrecord_dev` | `14.103.133.34` | `13306` | 共享开发数据（已停止直连） |
+| 生产 | `punkrecord_deploy` | `14.103.133.34` | `13306` | 生产环境 |
+
 **注意事项**：
+- 开发时使用本地数据库 `punkrecord_local`（用户: `punkrecord`，密码: `punkrecord123`），不再直连远程 `punkrecord_dev`
 - User 模型表名为 `users`（`user` 是 MySQL 保留字），所有 `foreign_key` 引用已同步更新
 - 旧的 SQLite 专用启动迁移代码（`_ensure_user_profile_columns`）已删除
 - 测试仍使用 SQLite 内存数据库（`tests/test_project_workflow.py`），不影响生产
@@ -209,9 +221,9 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 ## 6. 部署环境
 
 ### Dev 环境（开发服务器）
-- **后端**：端口 15085（uvicorn, Python 3.11, conda env: punk）
+- **后端**：端口 15085（uvicorn, Python 3.11, conda env: punkrecord）
 - **前端**：端口 15173（Vite dev server）
-- **数据库**：`punkrecord_dev`
+- **数据库**：`punkrecord_local`（本地 MySQL 3306）
 - **启停**：`./dev.sh start|stop|restart|status`
 
 ### Deploy 环境（生产服务器）
@@ -229,4 +241,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-03-31*
+*最后更新：2026-04-01*

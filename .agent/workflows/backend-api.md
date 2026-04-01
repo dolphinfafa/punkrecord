@@ -80,7 +80,11 @@
 | GET | `/api/v1/todo/{todo_id}/images/{image_id}/download` | 下载任务图片 |
 | DELETE | `/api/v1/todo/{todo_id}/images/{image_id}` | 删除任务图片 |
 
-**AI Agent 工作流**：状态接口支持 `ai_fixing` 和 `ai_fixed` 状态，用于 AI 驱动的 Bug 修复流程。
+**AI Agent 工作流**：AI 修复状态存储在 `TodoItem.link.agent_status` 字段（值为 `ai_fixing` / `ai_fixed`），与 `todo.status` 完全解耦。AI 只需关注 `agent_status`，不改变任务本身的状态。
+
+**PATCH `/api/v1/todo/{todo_id}` 扩展字段**：
+- `link`（dict）：合并更新任务的 link JSON 字段（如 `{"agent_status": "ai_fixed"}`），不会覆盖已有键
+- `assignee_user_id`（int）：更新任务的执行人
 
 **团队任务访问规则**：显示当前用户创建但分配给他人的任务，或当前用户是审核员的任务。自指派任务（creator==assignee 且无审核员）不在团队列表展示。
 
@@ -201,4 +205,4 @@
 
 ---
 
-*最后更新：2026-03-31*
+*最后更新：2026-04-01*

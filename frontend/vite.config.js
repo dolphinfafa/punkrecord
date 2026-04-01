@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/' : '/punkrecord/',
+  base: process.env.VITE_BASE || '/punkrecord/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -16,10 +16,11 @@ export default defineConfig(({ mode }) => ({
     port: 15173,
     strictPort: true,
     proxy: {
-      '/api': {
+      '/punkrecord/api': {
         target: 'http://localhost:15085',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/punkrecord/, ''),
       },
     },
   },
