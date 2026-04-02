@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
+import ReactMarkdown from 'react-markdown';
 import TodoModal from '@/components/todo/TodoModal';
 import './DashboardPage.css';
 
@@ -361,7 +362,9 @@ export default function DashboardPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <div style={{ fontSize: '0.83rem', color: '#475569', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{log.content}</div>
+                                    <div style={{ fontSize: '0.83rem', color: '#475569', lineHeight: '1.6' }} className="changelog-markdown">
+                                        <ReactMarkdown>{log.content}</ReactMarkdown>
+                                    </div>
                                 </div>
                             );
                         })()}

@@ -22,6 +22,11 @@ export default defineConfig(({ mode }) => ({
         secure: false,
         rewrite: (path) => path.replace(/^\/punkrecord/, ''),
       },
+      '/api': {
+        target: 'http://localhost:15085',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 }))

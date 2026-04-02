@@ -243,10 +243,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
         const filtered = members.filter(isTesterMember);
         return filtered.length > 0 ? filtered : members;
     }, [members]);
-    const developerMembers = useMemo(() => {
-        const filtered = members.filter(isDeveloperMember);
-        return filtered.length > 0 ? filtered : members;
-    }, [members]);
+    const developerMembers = useMemo(() => members, [members]);
 
     const agentDoc = useMemo(() => {
         if (!project) return '';
@@ -341,11 +338,19 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                 }
             }
             const bugImage = bugImages[0] || null;
+            // Build full description with all bug details
+            const descParts = [];
+            if (form.actual_result?.trim()) descParts.push(`【实际结果】${form.actual_result.trim()}`);
+            if (form.expected_result?.trim()) descParts.push(`【期望结果】${form.expected_result.trim()}`);
+            if (form.reproduce_steps?.trim()) descParts.push(`【复现步骤】${form.reproduce_steps.trim()}`);
+            if (form.description?.trim()) descParts.push(`【备注】${form.description.trim()}`);
+            const fullDescription = descParts.length > 0 ? descParts.join('\n') : null;
+
             await todoApi.create({
                 our_entity_id: project.our_entity_id,
                 assignee_user_id: form.developer_user_id,
                 title: `[BUG] ${form.title.trim()}`,
-                description: form.description?.trim() || null,
+                description: fullDescription,
                 source_type: 'project_task',
                 source_id: project.id,
                 action_type: 'do',
@@ -657,11 +662,23 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                         </select>
                         <select value={filterDeveloper} onChange={(e) => setFilterDeveloper(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部开发人员</option>
-                            {developerMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.user_name}</option>)}
+                            {(() => {
+                                const devIds = [...new Set(bugListAll.map(t => t.assignee_user_id).filter(Boolean))];
+                                return devIds.map(id => {
+                                    const m = members.find(m => m.user_id === id);
+                                    return <option key={id} value={id}>{m?.user_name || id}</option>;
+                                });
+                            })()}
                         </select>
                         <select value={filterTester} onChange={(e) => setFilterTester(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部测试人员</option>
-                            {testerMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.user_name}</option>)}
+                            {(() => {
+                                const testerIds = [...new Set(bugListAll.map(t => t.link?.tester_user_id).filter(Boolean))];
+                                return testerIds.map(id => {
+                                    const m = members.find(m => m.user_id === id);
+                                    return <option key={id} value={id}>{m?.user_name || id}</option>;
+                                });
+                            })()}
                         </select>
                         {(filterStatus || filterAgentStatus || filterDeveloper || filterTester) && (
                             <button onClick={() => { setFilterStatus(''); setFilterAgentStatus(''); setFilterDeveloper(''); setFilterTester(''); }} style={{ border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.78rem', textDecoration: 'underline' }}>清除</button>

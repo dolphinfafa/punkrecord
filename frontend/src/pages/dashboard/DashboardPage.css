@@ -1,5 +1,13 @@
 /* DashboardPage.css */
 
+/* Changelog Markdown */
+.changelog-markdown h1, .changelog-markdown h2, .changelog-markdown h3 { margin: 0.4em 0 0.2em; font-size: 0.9rem; color: #1e293b; }
+.changelog-markdown p { margin: 0.2em 0; }
+.changelog-markdown ul, .changelog-markdown ol { margin: 0.2em 0; padding-left: 1.4em; }
+.changelog-markdown li { margin: 0.1em 0; }
+.changelog-markdown code { background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.8rem; }
+.changelog-markdown strong { color: #0f172a; }
+
 .dashboard-container {
     padding: 32px;
     max-width: 1400px;
