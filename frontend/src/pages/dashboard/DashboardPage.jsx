@@ -53,7 +53,7 @@ export default function DashboardPage() {
                 // Fetch user's todos
                 const [todoRes, teamPendingReviewRes, leaveRes, profileRes, teamPendingRes, changelogRes] = await Promise.all([
                     todoApi.list({ page_size: 100 }),
-                    todoApi.listTeam({ status: 'pending_review', page_size: 100 }),
+                    todoApi.listTeam({ status: 'pending_review', reviewed_by_user_id: user?.id, page_size: 100 }),
                     todoApi.listMyLeaves({ page_size: 5 }),
                     user?.id ? iamApi.getUser(user.id) : Promise.resolve({ data: null }),
                     todoApi.listTeamPendingLeaves(),

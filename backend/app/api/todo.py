@@ -327,10 +327,13 @@ async def create_todo(
     session.commit()
     session.refresh(new_todo)
 
-    # Notify the assignee and their manager
-    _notify_user(todo_data.assignee_user_id, new_todo, session, "todo_assigned")
-    _notify_manager(todo_data.assignee_user_id, new_todo, session, "todo_created_notify_manager")
-    session.commit()
+    # Notify the assignee and their manager (non-critical, don't fail the request)
+    try:
+        _notify_user(todo_data.assignee_user_id, new_todo, session, "todo_assigned")
+        _notify_manager(todo_data.assignee_user_id, new_todo, session, "todo_created_notify_manager")
+        session.commit()
+    except Exception:
+        session.rollback()
 
     return success_response(_enrich_todo(new_todo, session))
 
@@ -397,7 +400,10 @@ async def get_team_todos(
     )
 
     if reviewed_by_user_id:
-        query = query.where(TodoItem.reviewed_by_user_id == reviewed_by_user_id)
+        try:
+            query = query.where(TodoItem.reviewed_by_user_id == UUID(reviewed_by_user_id))
+        except ValueError:
+            pass
 
     if status:
         query = query.where(TodoItem.status == status)
@@ -754,8 +760,11 @@ async def update_todo(
     session.refresh(todo)
 
     if reassigned_to:
-        _notify_user(reassigned_to, todo, session, "todo_reassigned")
-        session.commit()
+        try:
+            _notify_user(reassigned_to, todo, session, "todo_reassigned")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
