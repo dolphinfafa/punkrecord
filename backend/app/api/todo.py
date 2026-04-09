@@ -400,8 +400,19 @@ async def get_team_todos(
     )
 
     if reviewed_by_user_id:
+        from sqlalchemy import or_, and_
         try:
-            query = query.where(TodoItem.reviewed_by_user_id == UUID(reviewed_by_user_id))
+            rid = UUID(reviewed_by_user_id)
+            query = query.where(
+                or_(
+                    TodoItem.reviewed_by_user_id == rid,
+                    # 当 reviewed_by 未显式设置时，创建人是隐含审核人
+                    and_(
+                        TodoItem.reviewed_by_user_id == None,
+                        TodoItem.creator_user_id == rid,
+                    ),
+                )
+            )
         except ValueError:
             pass
 
