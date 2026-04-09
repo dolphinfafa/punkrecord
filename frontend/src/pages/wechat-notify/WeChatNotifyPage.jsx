@@ -358,11 +358,11 @@ export default function WeChatNotifyPage() {
 
             {/* Unbind Confirmation Modal */}
             {showUnbindConfirm && (
-                <div className="modal-overlay" onClick={() => setShowUnbindConfirm(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="wechat-modal-overlay" onClick={() => setShowUnbindConfirm(false)}>
+                    <div className="wechat-modal-content" onClick={(e) => e.stopPropagation()}>
                         <h3>确认解除绑定</h3>
                         <p>解绑后将不再通过微信接收通知，确定要解除绑定吗？</p>
-                        <div className="modal-actions">
+                        <div className="wechat-modal-actions">
                             <button
                                 className="wechat-btn wechat-btn-secondary"
                                 onClick={() => setShowUnbindConfirm(false)}
