@@ -124,7 +124,7 @@
 - 个人/团队任务视图切换
 - 请假提交、请假历史、经理审批
 
-### 本次版本变更的页面/组件
+### v1.0.3 版本变更的页面/组件
 
 | 页面/组件 | 变更说明 |
 |-----------|----------|
@@ -140,6 +140,14 @@
 | `pages/finance/AccountListPage.jsx` | 余额 Number() 转换确保千分位显示 |
 | `pages/dashboard/DashboardPage.jsx` | 新增版本更新日志区域（最近活动下方，下拉选择版本，L0 可编辑/删除） |
 
+### v1.0.4 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/project/components/BugManagementModal.jsx` | Bug 编辑时同步更新 TodoItem 描述（重组实际结果/期望结果/复现步骤/备注）；link 中新增 notes 字段存储备注 |
+| `pages/todo/TodoPage.jsx` | 团队任务显示逻辑改为"负责人非本人"；新增审核人过滤器（默认本人）；API 调用传递 reviewed_by_user_id 参数 |
+| `pages/dashboard/DashboardPage.jsx` | 请假表单改为日期+半天选择器（上午/下午），替代 datetime-local 输入 |
+
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-04-09*

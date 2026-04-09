@@ -1,0 +1,435 @@
+.wechat-notify-container {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    animation: wechatFadeIn 0.4s ease-out;
+}
+
+@keyframes wechatFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.wechat-header {
+    margin-bottom: 2rem;
+}
+
+.wechat-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.wechat-subtitle {
+    color: #718096;
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    margin-bottom: 0;
+}
+
+/* Loading */
+.wechat-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 4rem;
+    color: #718096;
+}
+
+/* Card */
+.wechat-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.wechat-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    background: #f7fafc;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 1rem;
+}
+
+.wechat-card-body {
+    padding: 1.5rem;
+}
+
+/* Binding Info */
+.binding-info {
+    margin-bottom: 1.5rem;
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: #718096;
+    font-size: 0.875rem;
+    width: 100px;
+    flex-shrink: 0;
+}
+
+.info-value {
+    color: #2d3748;
+    font-size: 0.875rem;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+/* Actions */
+.wechat-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+/* Buttons */
+.wechat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wechat-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.wechat-btn-primary {
+    background: #1a73e8;
+    color: #fff;
+    border-color: #1a73e8;
+}
+
+.wechat-btn-primary:hover:not(:disabled) {
+    background: #1557b0;
+}
+
+.wechat-btn-secondary {
+    background: #fff;
+    color: #4a5568;
+    border-color: #e2e8f0;
+}
+
+.wechat-btn-secondary:hover:not(:disabled) {
+    background: #f7fafc;
+}
+
+.wechat-btn-danger {
+    background: #fff;
+    color: #e53e3e;
+    border-color: #feb2b2;
+}
+
+.wechat-btn-danger:hover:not(:disabled) {
+    background: #fff5f5;
+}
+
+.wechat-btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Alerts */
+.wechat-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+}
+
+.wechat-alert-error {
+    background: #fff5f5;
+    color: #c53030;
+    border: 1px solid #feb2b2;
+}
+
+.wechat-alert-success {
+    background: #f0fff4;
+    color: #276749;
+    border: 1px solid #9ae6b4;
+}
+
+.alert-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-size: 1rem;
+    padding: 0 0.25rem;
+    opacity: 0.6;
+}
+
+.alert-dismiss:hover {
+    opacity: 1;
+}
+
+/* Bind Intro */
+.bind-intro {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.bind-intro p {
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+.bind-intro ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+}
+
+.bind-intro ul li {
+    color: #718096;
+    font-size: 0.875rem;
+    padding: 0.3rem 0;
+}
+
+.bind-intro ul li::before {
+    content: '- ';
+    color: #a0aec0;
+}
+
+/* QR Section */
+.qr-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.qr-image-wrapper {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+}
+
+.qr-image {
+    padding: 8px;
+}
+
+.qr-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: #e53e3e;
+    font-weight: 600;
+}
+
+/* Status Indicator */
+.qr-status {
+    margin: 0.5rem 0;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+}
+
+.status-waiting {
+    color: #718096;
+}
+
+.status-scanned {
+    color: #d69e2e;
+    background: #fffff0;
+}
+
+.status-confirmed {
+    color: #38a169;
+    background: #f0fff4;
+}
+
+.status-expired,
+.status-error {
+    color: #e53e3e;
+    background: #fff5f5;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Text color helpers */
+.text-success {
+    color: #38a169;
+}
+
+/* Spin animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 400px;
+    max-width: 90vw;
+}
+
+.modal-content h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+    color: #1a1a2e;
+}
+
+.modal-content p {
+    color: #4a5568;
+    font-size: 0.9rem;
+    margin: 0 0 1.25rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+/* Preferences Section */
+.pref-section {
+    margin-bottom: 1.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.pref-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #f7fafc;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #2d3748;
+}
+
+.pref-hint {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #a0aec0;
+    margin-left: auto;
+}
+
+.pref-list {
+    padding: 0.5rem 0;
+}
+
+.pref-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.pref-item:hover {
+    background: #f7fafc;
+}
+
+.pref-item input[type="checkbox"] {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    accent-color: #1a73e8;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.pref-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pref-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.pref-desc {
+    font-size: 0.78rem;
+    color: #a0aec0;
+}
+
+.pref-actions {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+}

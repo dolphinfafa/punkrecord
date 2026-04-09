@@ -28,6 +28,7 @@ import DocumentDetailPage from '@/pages/kb/DocumentDetailPage';
 import ChatPage from '@/pages/kb/ChatPage';
 import MeetingListPage from '@/pages/meeting/MeetingListPage';
 import MeetingDetailPage from '@/pages/meeting/MeetingDetailPage';
+import WeChatNotifyPage from '@/pages/wechat-notify/WeChatNotifyPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -110,6 +111,8 @@ function App() {
 
             <Route path="meeting" element={<PermissionRoute permission="meeting.read"><MeetingListPage /></PermissionRoute>} />
             <Route path="meeting/:id" element={<PermissionRoute permission="meeting.read"><MeetingDetailPage /></PermissionRoute>} />
+
+            <Route path="wechat-notify" element={<WeChatNotifyPage />} />
           </Route>
         </Routes>
       </AuthProvider>

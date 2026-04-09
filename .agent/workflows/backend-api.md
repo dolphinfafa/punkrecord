@@ -73,7 +73,7 @@
 |------|------|------|
 | POST | `/api/v1/todo` | 创建任务 |
 | GET | `/api/v1/todo/my` | 我的任务列表 |
-| GET | `/api/v1/todo/team` | 团队任务列表 |
+| GET | `/api/v1/todo/team` | 团队任务列表（支持 `reviewed_by_user_id` 过滤） |
 | GET/PATCH | `/api/v1/todo/{todo_id}` | 任务详情/更新 |
 | POST | `/api/v1/todo/{todo_id}/status` | 任务状态变更 |
 | POST | `/api/v1/todo/{todo_id}/images` | 上传任务图片 |
@@ -86,7 +86,7 @@
 - `link`（dict）：合并更新任务的 link JSON 字段（如 `{"agent_status": "ai_fixed"}`），不会覆盖已有键
 - `assignee_user_id`（int）：更新任务的执行人
 
-**团队任务访问规则**：显示当前用户创建但分配给他人的任务，或当前用户是审核员的任务。自指派任务（creator==assignee 且无审核员）不在团队列表展示。
+**团队任务访问规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`）。支持 `reviewed_by_user_id` 查询参数按审核人过滤，前端默认传当前用户 ID。
 
 #### 请假相关
 
@@ -205,4 +205,4 @@
 
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-04-09*

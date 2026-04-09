@@ -85,6 +85,7 @@ export default function TodoPage() {
     const [draggedTodo, setDraggedTodo] = useState(null);
     const [taskTypeFilter, setTaskTypeFilter] = useState('all');
     const [assigneeFilter, setAssigneeFilter] = useState('all');
+    const [reviewerFilter, setReviewerFilter] = useState(user?.id || 'all');
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const pageSize = 20;
@@ -119,7 +120,9 @@ export default function TodoPage() {
         try {
             setDoneLoading(true);
             const api = viewMode === 'team' ? todoApi.listTeam : todoApi.list;
-            const response = await api({ status: 'done', page_size: 100 });
+            const teamExtra = viewMode === 'team' && reviewerFilter !== 'all'
+                ? { reviewed_by_user_id: reviewerFilter } : {};
+            const response = await api({ status: 'done', page_size: 100, ...teamExtra });
             setDoneTodos(response.data?.items || []);
         } catch {
             // silent
@@ -133,13 +136,15 @@ export default function TodoPage() {
             setLoading(true);
             let response;
             const statusParam = filter === 'board' ? undefined : (filter === 'all' ? undefined : filter);
+            const teamExtra = viewMode === 'team' && reviewerFilter !== 'all'
+                ? { reviewed_by_user_id: reviewerFilter } : {};
             if (filter === 'board') {
                 // Board view: fetch active tasks only (exclude done), done loaded on expand
                 const statuses = ['open', 'in_progress', 'pending_review', 'blocked'];
                 const results = await Promise.all(
                     statuses.map(s => {
                         const api = viewMode === 'team' ? todoApi.listTeam : todoApi.list;
-                        return api({ status: s, page_size: 100 });
+                        return api({ status: s, page_size: 100, ...teamExtra });
                     })
                 );
                 const allItems = results.flatMap(r => r.data?.items || []);
@@ -160,7 +165,7 @@ export default function TodoPage() {
             } else {
                 // List view: use pagination
                 if (viewMode === 'team') {
-                    response = await todoApi.listTeam({ status: statusParam, page: page, page_size: pageSize });
+                    response = await todoApi.listTeam({ status: statusParam, page: page, page_size: pageSize, ...teamExtra });
                 } else {
                     response = await todoApi.list({ status: statusParam, page: page, page_size: pageSize });
                 }
@@ -174,7 +179,7 @@ export default function TodoPage() {
         }
     };
 
-    useEffect(() => { fetchTodos(); }, [filter, viewMode, page]);
+    useEffect(() => { fetchTodos(); }, [filter, viewMode, page, reviewerFilter]);
 
     const assigneeOptions = useMemo(() => {
         const map = new Map();
@@ -185,6 +190,19 @@ export default function TodoPage() {
         });
         return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
     }, [todos]);
+
+    const reviewerOptions = useMemo(() => {
+        const map = new Map();
+        if (user?.id && user?.display_name) {
+            map.set(user.id, user.display_name);
+        }
+        todos.forEach((todo) => {
+            if (todo.reviewed_by_user_id && todo.reviewer_name) {
+                map.set(todo.reviewed_by_user_id, todo.reviewer_name);
+            }
+        });
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    }, [todos, user]);
 
     const taskTypeOptions = useMemo(() => {
         const set = new Set();
@@ -468,13 +486,13 @@ export default function TodoPage() {
             <div className="todo-view-tabs">
                 <button
                     className={clsx('view-tab', { active: viewMode === 'my' })}
-                    onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); setPage(1); }}
+                    onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); setReviewerFilter('all'); setPage(1); }}
                 >
                     <User size={15} /> 我的任务
                 </button>
                 <button
                     className={clsx('view-tab', { active: viewMode === 'team' })}
-                    onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); setPage(1); }}
+                    onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); setReviewerFilter(user?.id || 'all'); setPage(1); }}
                 >
                     <Users size={15} /> 团队任务
                 </button>
@@ -521,6 +539,21 @@ export default function TodoPage() {
                             ))}
                         </select>
                     </label>
+                    {viewMode === 'team' && (
+                        <label className="filter-select-item">
+                            <span>审核人</span>
+                            <select
+                                className="filter-select"
+                                value={reviewerFilter}
+                                onChange={(e) => { setReviewerFilter(e.target.value); setPage(1); }}
+                            >
+                                <option value="all">全部审核人</option>
+                                {reviewerOptions.map((item) => (
+                                    <option key={item.id} value={item.id}>{item.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
                 </div>
             </div>
 

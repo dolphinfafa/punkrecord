@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.0.4"
     APP_ENV: str = "development"
     DEBUG: bool = False
     
@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     TOS_REGION: Optional[str] = None
     TOS_BUCKET: Optional[str] = None
     
+    # WeChat Message Service (weixin-agent-sdk)
+    WECHAT_MSG_SERVICE_URL: Optional[str] = None
+    WECHAT_MSG_SERVICE_API_KEY: Optional[str] = None
+
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100

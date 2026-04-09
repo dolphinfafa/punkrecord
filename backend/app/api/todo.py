@@ -4,7 +4,7 @@ Todo API endpoints
 from typing import Optional, Any
 from app.models.base import now_cn
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, time, timedelta
 import math
 from pathlib import Path
 from fastapi import APIRouter, Depends, Query, UploadFile, File
@@ -54,42 +54,100 @@ def _can_access_todo(todo: TodoItem, current_user: User, session: Session) -> bo
     return bool(assignee and assignee.manager_user_id == current_user.id)
 
 
-def _notify_manager(user_id: UUID, todo: TodoItem, session: Session):
+EVENT_LABELS = {
+    "todo_assigned": "新任务分配",
+    "todo_created_notify_manager": "下属收到新任务",
+    "todo_submitted": "任务提交审核",
+    "todo_approved": "任务审核通过",
+    "todo_rejected": "任务被退回",
+    "todo_reassigned": "任务转派",
+    "todo_reopened": "任务被重新打开",
+    "todo_blocked": "任务被阻塞",
+    "todo_done_direct": "任务已完成",
+}
+
+
+def _send_wechat_for_todo(recipient_user_id: UUID, todo: TodoItem, session: Session, event_type: str):
+    """Send WeChat notification for a todo event if user has active binding and preference enabled."""
+    from app.models.shared import WeChatNotifyBinding
+    from app.core.config import settings
+
+    if not settings.WECHAT_MSG_SERVICE_URL:
+        return
+
+    binding = session.exec(
+        select(WeChatNotifyBinding).where(
+            WeChatNotifyBinding.user_id == recipient_user_id,
+            WeChatNotifyBinding.is_active == True,
+        )
+    ).first()
+    if not binding:
+        return
+
+    # Check preference: None means all enabled (backward compatible)
+    if binding.preferences is not None:
+        if not binding.preferences.get(event_type, True):
+            return
+
+    label = EVENT_LABELS.get(event_type, "待办通知")
+    assignee = session.get(User, todo.assignee_user_id)
+    text = f"📋 {label}\n标题: {todo.title}\n优先级: {todo.priority.value.upper()}\n状态: {todo.status.value}"
+    if assignee:
+        text += f"\n负责人: {assignee.display_name}"
+
+    import httpx
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.post(
+                f"{settings.WECHAT_MSG_SERVICE_URL}/api/send",
+                json={"key": binding.msg_service_key, "text": text},
+                headers={"Authorization": f"Bearer {settings.WECHAT_MSG_SERVICE_API_KEY}"}
+                if settings.WECHAT_MSG_SERVICE_API_KEY else {},
+            )
+            status = NotificationStatus.SENT if resp.status_code == 200 else NotificationStatus.FAILED
+            error_msg = None if resp.status_code == 200 else resp.text
+    except Exception as e:
+        status = NotificationStatus.FAILED
+        error_msg = str(e)
+
+    wechat_log = NotificationLog(
+        todo_id=todo.id,
+        recipient_user_id=recipient_user_id,
+        channel=NotificationChannel.WECHAT,
+        status=status,
+        sent_at=now_cn(),
+        error_message=error_msg,
+    )
+    session.add(wechat_log)
+
+
+def _notify_manager(user_id: UUID, todo: TodoItem, session: Session, event_type: str = "todo_created_notify_manager"):
     """Create an in-app notification for the user's manager (if they have one)."""
     user = session.get(User, user_id)
     if not user or not user.manager_user_id:
         return
     log = NotificationLog(
         todo_id=todo.id,
+        recipient_user_id=user.manager_user_id,
         channel=NotificationChannel.IN_APP,
         status=NotificationStatus.SENT,
         sent_at=now_cn(),
     )
     session.add(log)
+    _send_wechat_for_todo(user.manager_user_id, todo, session, event_type)
 
 
-def _notify_user(user_id: UUID, todo: TodoItem, session: Session):
+def _notify_user(user_id: UUID, todo: TodoItem, session: Session, event_type: str = "todo_submitted"):
     """Create an in-app notification for a specific user."""
     log = NotificationLog(
         todo_id=todo.id,
+        recipient_user_id=user_id,
         channel=NotificationChannel.IN_APP,
         status=NotificationStatus.SENT,
         sent_at=now_cn(),
     )
-    # Note: NotificationLog doesn't have a 'recipient_user_id' field in the model shown?
-    # Wait, looking at app/models/todo.py:
-    # class NotificationLog(BaseDBModel, table=True):
-    #    todo_id: UUID ...
-    # It doesn't seem to have a recipient field! 
-    # How does `_notify_manager` work?
-    # `_notify_manager` creates a log. But who receives it?
-    # Maybe the system infers recipient from context?
-    # "manager of assignee"?
-    # If NotificationLog is just a log, how is the notification delivered?
-    # Let's check `backend/app/models/todo.py` again.
-    # It has `todo_id`.
-    # Maybe the frontend queries NotificationLog joined with Todo?
     session.add(log)
+    _send_wechat_for_todo(user_id, todo, session, event_type)
 
 
 def _is_direct_manager(manager: User, subordinate: User) -> bool:
@@ -133,10 +191,32 @@ def _resolve_leave_balance_field(leave_type: LeaveType) -> str:
     return mapping[leave_type]
 
 
-def _calc_leave_days(start_at: datetime, end_at: datetime) -> int:
-    """Round up leave duration to whole days."""
-    seconds = (end_at - start_at).total_seconds()
-    return max(1, math.ceil(seconds / 86400))
+def _calc_leave_days(start_at: datetime, end_at: datetime) -> float:
+    """基于工作时间计算请假天数，精度 0.5 天。
+    工作时间：周一至周五，上午 10:00-12:00，下午 14:00-19:00。
+    每个半天算 0.5 天，全天算 1.0 天。
+    """
+    total = 0.0
+    current_date = start_at.date()
+    end_date = end_at.date()
+    while current_date <= end_date:
+        if current_date.weekday() < 5:  # 工作日 Mon-Fri
+            day_start_bound = datetime.combine(current_date, time(0, 0))
+            day_end_bound = datetime.combine(current_date, time(23, 59, 59))
+            actual_start = max(start_at, day_start_bound)
+            actual_end = min(end_at, day_end_bound)
+            # 上午 10:00-12:00
+            morning_s = datetime.combine(current_date, time(10, 0))
+            morning_e = datetime.combine(current_date, time(12, 0))
+            if actual_start < morning_e and actual_end > morning_s:
+                total += 0.5
+            # 下午 14:00-19:00
+            afternoon_s = datetime.combine(current_date, time(14, 0))
+            afternoon_e = datetime.combine(current_date, time(19, 0))
+            if actual_start < afternoon_e and actual_end > afternoon_s:
+                total += 0.5
+        current_date += timedelta(days=1)
+    return max(0.5, total)
 
 
 def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
@@ -247,8 +327,9 @@ async def create_todo(
     session.commit()
     session.refresh(new_todo)
 
-    # Notify the assignee's manager
-    _notify_manager(todo_data.assignee_user_id, new_todo, session)
+    # Notify the assignee and their manager
+    _notify_user(todo_data.assignee_user_id, new_todo, session, "todo_assigned")
+    _notify_manager(todo_data.assignee_user_id, new_todo, session, "todo_created_notify_manager")
     session.commit()
 
     return success_response(_enrich_todo(new_todo, session))
@@ -304,24 +385,19 @@ async def get_my_todos(
 @router.get("/team", response_model=dict)
 async def get_team_todos(
     status: Optional[str] = Query(None),
+    reviewed_by_user_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.read"))
 ):
-    """Get todos where current user is the reviewer or created for others."""
-    from sqlalchemy import or_, and_
+    """Get todos where assignee is not current user, with optional reviewer filter."""
     query = select(TodoItem).where(
-        or_(
-            # Tasks created by me but assigned to someone else
-            and_(
-                TodoItem.creator_user_id == current_user.id,
-                TodoItem.assignee_user_id != current_user.id,
-            ),
-            # Tasks where I am the reviewer
-            TodoItem.reviewed_by_user_id == current_user.id,
-        )
+        TodoItem.assignee_user_id != current_user.id
     )
+
+    if reviewed_by_user_id:
+        query = query.where(TodoItem.reviewed_by_user_id == reviewed_by_user_id)
 
     if status:
         query = query.where(TodoItem.status == status)
@@ -401,9 +477,12 @@ async def create_leave_request(
         }
         leave_label = leave_type_labels.get(leave_type, str(leave_type))
         today_end = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
+        def _fmt_half(dt: datetime) -> str:
+            return f"{dt.strftime('%Y-%m-%d')} {'上午' if dt.hour < 13 else '下午'}"
+        days_str = f"{leave_days:g}"  # 0.5 -> "0.5", 1.0 -> "1"
         leave_desc = (
             f"请假类型：{leave_label}\n"
-            f"请假时间：{data.start_at.strftime('%Y-%m-%d')} 至 {data.end_at.strftime('%Y-%m-%d')}\n"
+            f"请假时间：{_fmt_half(data.start_at)} 至 {_fmt_half(data.end_at)}（{days_str}天）\n"
             f"请假原因：{data.reason or '未填写'}"
         )
         approval_todo = TodoItem(
@@ -664,13 +743,19 @@ async def update_todo(
         todo.link = existing_link
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(todo, 'link')
-    if todo_data.assignee_user_id is not None:
+    reassigned_to = None
+    if todo_data.assignee_user_id is not None and todo_data.assignee_user_id != todo.assignee_user_id:
+        reassigned_to = todo_data.assignee_user_id
         todo.assignee_user_id = todo_data.assignee_user_id
 
     todo.updated_at = now_cn()
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if reassigned_to:
+        _notify_user(reassigned_to, todo, session, "todo_reassigned")
+        session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -906,7 +991,7 @@ async def submit_todo(
         session.refresh(todo)
 
         # Notify creator
-        _notify_user(todo.creator_user_id, todo, session)
+        _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
         session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
@@ -968,6 +1053,10 @@ async def approve_todo(
         except ValueError:
             pass
 
+    # Notify assignee that task was approved
+    _notify_user(todo.assignee_user_id, todo, session, "todo_approved")
+    session.commit()
+
     # If this is a leave approval todo, sync the LeaveRequest status
     if todo.source_type == TodoSourceType.APPROVAL_STEP and todo.source_id:
         try:
@@ -1022,6 +1111,10 @@ async def reject_todo(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    # Notify assignee that task was rejected
+    _notify_user(todo.assignee_user_id, todo, session, "todo_rejected")
+    session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1089,7 +1182,7 @@ async def mark_todo_done(
         session.commit()
         session.refresh(todo)
 
-        _notify_user(todo.creator_user_id, todo, session)
+        _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
         session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
@@ -1123,6 +1216,10 @@ async def block_todo(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    # Notify creator that task is blocked
+    _notify_user(todo.creator_user_id, todo, session, "todo_blocked")
+    session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1190,9 +1287,10 @@ async def update_todo_status(
 
     target_status = data.status
     current_status = todo.status
-    
+    is_reopen = False
+
     # Permission Checks & Logic
-    
+
     # 1. In Progress -> Open (Stop/Reset)
     if current_status == TodoStatus.IN_PROGRESS and target_status == TodoStatus.OPEN:
         if todo.assignee_user_id != current_user.id:
@@ -1215,6 +1313,7 @@ async def update_todo_status(
              
     # 3. Done -> In Progress (Reopen)
     elif current_status == TodoStatus.DONE and target_status == TodoStatus.IN_PROGRESS:
+        is_reopen = True
         # Creator or Manager can reopen
         if todo.creator_user_id == current_user.id or (todo.assignee_user_id == current_user.id and todo.creator_user_id == current_user.id):
             todo.status = TodoStatus.IN_PROGRESS
@@ -1238,6 +1337,7 @@ async def update_todo_status(
 
     # 5. Done -> Open (Reset fully)
     elif current_status == TodoStatus.DONE and target_status == TodoStatus.OPEN:
+        is_reopen = True
          # Creator or Manager can reset
         if todo.creator_user_id == current_user.id or (todo.assignee_user_id == current_user.id and todo.creator_user_id == current_user.id):
             todo.status = TodoStatus.OPEN
@@ -1290,6 +1390,10 @@ async def update_todo_status(
     session.add(todo)
     session.commit()
     session.refresh(todo)
+
+    if is_reopen:
+        _notify_user(todo.assignee_user_id, todo, session, "todo_reopened")
+        session.commit()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:

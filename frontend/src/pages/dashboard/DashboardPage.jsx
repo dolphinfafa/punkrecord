@@ -34,8 +34,10 @@ export default function DashboardPage() {
     const [myProfile, setMyProfile] = useState(null);
     const [leaveForm, setLeaveForm] = useState({
         leave_type: 'annual',
-        start_at: '',
-        end_at: '',
+        start_date: '',
+        start_half: 'am',
+        end_date: '',
+        end_half: 'pm',
         reason: ''
     });
     const [changelogs, setChangelogs] = useState([]);
@@ -104,16 +106,24 @@ export default function DashboardPage() {
             alert('L0 级别员工无需请假');
             return;
         }
-        if (!leaveForm.start_at || !leaveForm.end_at) {
-            alert('请填写请假开始和结束时间');
+        if (!leaveForm.start_date || !leaveForm.end_date) {
+            alert('请填写请假开始和结束日期');
+            return;
+        }
+        const startTime = leaveForm.start_half === 'am' ? '10:00:00' : '14:00:00';
+        const endTime = leaveForm.end_half === 'am' ? '12:00:00' : '19:00:00';
+        const startAt = `${leaveForm.start_date}T${startTime}`;
+        const endAt = `${leaveForm.end_date}T${endTime}`;
+        if (endAt <= startAt) {
+            alert('结束时间必须晚于开始时间');
             return;
         }
         try {
             setLeaveSubmitting(true);
             await todoApi.createLeave({
                 leave_type: leaveForm.leave_type,
-                start_at: leaveForm.start_at,
-                end_at: leaveForm.end_at,
+                start_at: startAt,
+                end_at: endAt,
                 reason: leaveForm.reason || null
             });
             const [leaveRes, profileRes, teamPendingRes] = await Promise.all([
@@ -126,8 +136,10 @@ export default function DashboardPage() {
             setTeamPendingLeaves(teamPendingRes?.data || []);
             setLeaveForm({
                 leave_type: 'annual',
-                start_at: '',
-                end_at: '',
+                start_date: '',
+                start_half: 'am',
+                end_date: '',
+                end_half: 'pm',
                 reason: ''
             });
             alert('请假申请已提交');
@@ -404,22 +416,46 @@ export default function DashboardPage() {
                             </select>
                         </label>
                         <label>
-                            开始时间
-                            <input
-                                type="datetime-local"
-                                value={leaveForm.start_at}
-                                onChange={(e) => setLeaveForm(prev => ({ ...prev, start_at: e.target.value }))}
-                                disabled={myProfile?.level === 0}
-                            />
+                            开始日期
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="date"
+                                    value={leaveForm.start_date}
+                                    onChange={(e) => setLeaveForm(prev => ({ ...prev, start_date: e.target.value }))}
+                                    disabled={myProfile?.level === 0}
+                                    style={{ flex: 1 }}
+                                />
+                                <select
+                                    value={leaveForm.start_half}
+                                    onChange={(e) => setLeaveForm(prev => ({ ...prev, start_half: e.target.value }))}
+                                    disabled={myProfile?.level === 0}
+                                    style={{ width: '80px' }}
+                                >
+                                    <option value="am">上午</option>
+                                    <option value="pm">下午</option>
+                                </select>
+                            </div>
                         </label>
                         <label>
-                            结束时间
-                            <input
-                                type="datetime-local"
-                                value={leaveForm.end_at}
-                                onChange={(e) => setLeaveForm(prev => ({ ...prev, end_at: e.target.value }))}
-                                disabled={myProfile?.level === 0}
-                            />
+                            结束日期
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="date"
+                                    value={leaveForm.end_date}
+                                    onChange={(e) => setLeaveForm(prev => ({ ...prev, end_date: e.target.value }))}
+                                    disabled={myProfile?.level === 0}
+                                    style={{ flex: 1 }}
+                                />
+                                <select
+                                    value={leaveForm.end_half}
+                                    onChange={(e) => setLeaveForm(prev => ({ ...prev, end_half: e.target.value }))}
+                                    disabled={myProfile?.level === 0}
+                                    style={{ width: '80px' }}
+                                >
+                                    <option value="am">上午</option>
+                                    <option value="pm">下午</option>
+                                </select>
+                            </div>
                         </label>
                         <label>
                             请假原因

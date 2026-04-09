@@ -11,6 +11,7 @@ import {
     CreditCard,
     Brain,
     Mic,
+    MessageSquare,
     LogOut,
     ChevronLeft,
     ChevronRight
@@ -27,6 +28,7 @@ const MENU_ITEMS = [
     { path: '/finance', label: '财务管理', icon: CreditCard, permission: 'finance.read' },
     { path: '/kb', label: '企业大脑', icon: Brain, permission: 'kb.read' },
     { path: '/meeting', label: '会议记录', icon: Mic, permission: 'meeting.read' },
+    { path: '/wechat-notify', label: '微信通知', icon: MessageSquare, permission: null },
 ];
 
 export default function Sidebar() {

@@ -35,7 +35,7 @@ from app.models.finance import (
 )
 from app.models.shared import (
     AuditLog, FileMetadata, WeChatUserBinding, WeChatMessageTemplate,
-    SubscribeStatus
+    WeChatNotifyBinding, SubscribeStatus
 )
 from app.models.kb import (
     KBDocument, KBDocumentChunk, KBConversation, KBMessage,
@@ -82,7 +82,7 @@ __all__ = [
     
     # Shared
     "AuditLog", "FileMetadata", "WeChatUserBinding", "WeChatMessageTemplate",
-    "SubscribeStatus",
+    "WeChatNotifyBinding", "SubscribeStatus",
 
     # Knowledge Base
     "KBDocument", "KBDocumentChunk", "KBConversation", "KBMessage",

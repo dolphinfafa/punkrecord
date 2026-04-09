@@ -34,14 +34,20 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 小程序支持"我的任务"和"团队任务"视图及对应操作按钮。
 
+**团队任务显示规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`），支持按审核人过滤（`reviewed_by_user_id` 参数），默认过滤为当前用户。前端提供审核人下拉过滤器，可选"全部审核人"查看更广范围。
+
 ### 1.3 请假审批
 
-1. 员工 A 提交请假申请
-2. 系统自动创建待办任务：creator=A，assignee=A，reviewed_by=A 的上级，标题为 "A - 请假申请"，描述含请假类型/时间/原因，截止当天 23:59
-3. 经理在待审批列表中审批/驳回（遍历 manager 链，不限于直属）
-4. 审批/驳回时同步更新对应 TodoItem 状态（done/dismissed）
-5. 批准后自动更新假期余额
-4. 小程序 `pages/todo` 包含请假提交、历史记录、经理审批功能
+1. 员工 A 提交请假申请（选择开始日期+上午/下午、结束日期+上午/下午）
+2. 系统基于工作时间计算请假天数（精度 0.5 天）
+   - 工作时间：周一至周五，上午 10:00-12:00，下午 14:00-19:00
+   - 上午半天 = 0.5 天，下午半天 = 0.5 天，全天 = 1.0 天
+   - 自动跳过周末，仅计算工作日
+3. 系统自动创建待办任务：creator=A，assignee=A，reviewed_by=A 的上级，标题为 "A - 请假申请"，描述含请假类型/时间（含上午/下午）/天数/原因，截止当天 23:59
+4. 经理在待审批列表中审批/驳回（遍历 manager 链，不限于直属）
+5. 审批/驳回时同步更新对应 TodoItem 状态（done/dismissed）
+6. 批准后按计算天数扣减假期余额（支持 0.5 天扣减）
+7. 小程序 `pages/todo` 包含请假提交、历史记录、经理审批功能
 
 ### 1.4 项目执行
 
@@ -55,6 +61,8 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - Bug 管理包含"Agent 文档"面板，可一键复制自动生成的 AI Agent 操作手册
 - AI Agent Bug 修复流程：Agent 通过 PATCH `/api/v1/todo/{todo_id}` 更新 `link.agent_status`（`ai_fixing` → `ai_fixed`），不改变 `todo.status`。`status` 和 `agent_status` 完全独立
 - Bug 列表支持编辑（预填所有字段）、配图增删改查（单张删除/撤销、继续添加）
+- Bug 编辑时自动同步更新关联 TodoItem 的描述（重新组合实际结果/期望结果/复现步骤/备注）
+- Bug 的备注存储在 `link.notes` 字段，编辑时正确回填到备注输入框
 - Bug 管理弹窗宽度 1500px，支持按状态/Agent状态/开发人员/测试人员四维筛选
 
 ### 1.5 财务操作
@@ -241,4 +249,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-04-09*

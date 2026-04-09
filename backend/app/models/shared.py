@@ -69,8 +69,20 @@ class ChangeLog(BaseDBModel, table=True):
 class WeChatMessageTemplate(BaseDBModel, table=True):
     """WeChat message template"""
     __tablename__ = "wechat_message_template"
-    
+
     template_code: str = Field(nullable=False, unique=True, index=True)
     wx_template_id: str = Field(nullable=False)
     name: str = Field(nullable=False)
     is_active: bool = Field(default=True, nullable=False)
+
+
+class WeChatNotifyBinding(BaseDBModel, table=True):
+    """WeChat notification binding via weixin-msg-service"""
+    __tablename__ = "wechat_notify_binding"
+
+    user_id: UUID = Field(foreign_key="users.id", nullable=False, unique=True, index=True)
+    msg_service_key: str = Field(nullable=False, unique=True, index=True)
+    account_id: Optional[str] = Field(default=None, index=True)
+    nickname: Optional[str] = None
+    is_active: bool = Field(default=True, nullable=False)
+    preferences: Optional[dict] = Field(default=None, sa_column=Column(JSON))

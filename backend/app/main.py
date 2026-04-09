@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.database import create_db_and_tables
 from app.core.exceptions import AtlasException
 from app.core.response import error_response
-from app.api import auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog
+from app.api import auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog, wechat_notify
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ app.include_router(ai.router, prefix="/api/v1")
 app.include_router(kb.router, prefix="/api/v1")
 app.include_router(meeting.router, prefix="/api/v1")
 app.include_router(changelog.router, prefix="/api/v1")
+app.include_router(wechat_notify.router, prefix="/api/v1")
 
 # CORS middleware
 app.add_middleware(

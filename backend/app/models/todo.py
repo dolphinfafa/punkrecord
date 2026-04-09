@@ -83,6 +83,7 @@ class NotificationChannel(str, Enum):
     IN_APP = "in_app"
     EMAIL = "email"
     WEBHOOK = "webhook"
+    WECHAT = "wechat"
 
 
 class NotificationStatus(str, Enum):
@@ -95,8 +96,9 @@ class NotificationStatus(str, Enum):
 class NotificationLog(BaseDBModel, table=True):
     """Notification log"""
     __tablename__ = "notification_log"
-    
+
     todo_id: UUID = Field(foreign_key="todo_item.id", nullable=False, index=True)
+    recipient_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     channel: NotificationChannel = Field(nullable=False)
     status: NotificationStatus = Field(default=NotificationStatus.PENDING, nullable=False)
     sent_at: Optional[datetime] = None

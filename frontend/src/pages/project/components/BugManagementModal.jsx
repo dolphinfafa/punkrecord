@@ -366,6 +366,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     actual_result: form.actual_result?.trim() || '',
                     expected_result: form.expected_result?.trim() || '',
                     reproduce_steps: form.reproduce_steps?.trim() || '',
+                    notes: form.description?.trim() || '',
                     bug_image: bugImage,
                     bug_images: bugImages,
                     project_id: project.id,
@@ -387,9 +388,12 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     const startEditBug = (todo) => {
         const link = todo.link || {};
         setEditingBug(todo);
+        // Extract notes from link.notes or parse from composed description
+        const notesMatch = (todo.description || '').match(/【备注】([\s\S]*)$/);
+        const notesOnly = link.notes || (notesMatch ? notesMatch[1].trim() : '');
         setForm({
             title: (todo.title || '').replace(/^\[BUG\]\s*/, ''),
-            description: todo.description || '',
+            description: notesOnly,
             tester_user_id: link.tester_user_id || '',
             developer_user_id: todo.assignee_user_id || link.developer_user_id || '',
             priority: todo.priority || 'p1',
@@ -430,9 +434,16 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
 
             const dueAt = form.due_at ? `${form.due_at}T18:00:00` : null;
             const existingLink = editingBug.link || {};
+            // Recompose full description from all bug fields (same as createBug)
+            const descParts = [];
+            if (form.actual_result?.trim()) descParts.push(`【实际结果】${form.actual_result.trim()}`);
+            if (form.expected_result?.trim()) descParts.push(`【期望结果】${form.expected_result.trim()}`);
+            if (form.reproduce_steps?.trim()) descParts.push(`【复现步骤】${form.reproduce_steps.trim()}`);
+            if (form.description?.trim()) descParts.push(`【备注】${form.description.trim()}`);
+            const fullDescription = descParts.length > 0 ? descParts.join('\n') : null;
             await todoApi.update(editingBug.id, {
                 title: `[BUG] ${form.title.trim()}`,
-                description: form.description?.trim() || null,
+                description: fullDescription,
                 priority: form.priority,
                 due_at: dueAt,
                 assignee_user_id: form.developer_user_id || undefined,
@@ -444,6 +455,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     actual_result: form.actual_result?.trim() || '',
                     expected_result: form.expected_result?.trim() || '',
                     reproduce_steps: form.reproduce_steps?.trim() || '',
+                    notes: form.description?.trim() || '',
                     bug_image: allImages[0] || null,
                     bug_images: allImages,
                 },
