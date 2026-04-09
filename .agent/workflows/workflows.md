@@ -34,7 +34,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 小程序支持"我的任务"和"团队任务"视图及对应操作按钮。
 
-**团队任务显示规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`），支持按审核人过滤（`reviewed_by_user_id` 参数），默认过滤为当前用户。前端提供审核人下拉过滤器，可选"全部审核人"查看更广范围。
+**团队任务显示规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`），支持按审核人过滤（`reviewed_by_user_id` 参数），默认过滤为当前用户。审核人匹配逻辑：显式设置的 `reviewed_by_user_id` 优先匹配；未设置时以 `creator_user_id` 作为隐含审核人。前端提供审核人下拉过滤器，可选"全部审核人"查看更广范围。
 
 ### 1.3 请假审批
 

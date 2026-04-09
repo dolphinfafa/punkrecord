@@ -146,7 +146,11 @@
 |-----------|----------|
 | `pages/project/components/BugManagementModal.jsx` | Bug 编辑时同步更新 TodoItem 描述（重组实际结果/期望结果/复现步骤/备注）；link 中新增 notes 字段存储备注 |
 | `pages/todo/TodoPage.jsx` | 团队任务显示逻辑改为"负责人非本人"；新增审核人过滤器（默认本人）；API 调用传递 reviewed_by_user_id 参数 |
-| `pages/dashboard/DashboardPage.jsx` | 请假表单改为日期+半天选择器（上午/下午），替代 datetime-local 输入 |
+| `pages/dashboard/DashboardPage.jsx` | 请假表单改为日期+半天选择器（上午/下午）；待审批统计增加 reviewed_by_user_id 过滤 |
+| `components/todo/TodoModal.css` | max-width 统一为 800px |
+| `components/todo/TodoDetailModal.css` | max-width 统一为 800px |
+| `pages/wechat-notify/WeChatNotifyPage.css` | `.modal-content` 重命名为 `.wechat-modal-content`，修复全局样式污染 |
+| `pages/wechat-notify/WeChatNotifyPage.jsx` | 同步更新弹窗类名引用 |
 
 ---
 
