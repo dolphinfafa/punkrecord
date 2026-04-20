@@ -1010,9 +1010,12 @@ async def submit_todo(
         session.commit()
         session.refresh(todo)
 
-        # Notify creator
-        _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
-        session.commit()
+        # Notify creator (non-critical)
+        try:
+            _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1073,9 +1076,12 @@ async def approve_todo(
         except ValueError:
             pass
 
-    # Notify assignee that task was approved
-    _notify_user(todo.assignee_user_id, todo, session, "todo_approved")
-    session.commit()
+    # Notify assignee that task was approved (non-critical)
+    try:
+        _notify_user(todo.assignee_user_id, todo, session, "todo_approved")
+        session.commit()
+    except Exception:
+        session.rollback()
 
     # If this is a leave approval todo, sync the LeaveRequest status
     if todo.source_type == TodoSourceType.APPROVAL_STEP and todo.source_id:
@@ -1132,9 +1138,12 @@ async def reject_todo(
     session.commit()
     session.refresh(todo)
 
-    # Notify assignee that task was rejected
-    _notify_user(todo.assignee_user_id, todo, session, "todo_rejected")
-    session.commit()
+    # Notify assignee that task was rejected (non-critical)
+    try:
+        _notify_user(todo.assignee_user_id, todo, session, "todo_rejected")
+        session.commit()
+    except Exception:
+        session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1202,8 +1211,11 @@ async def mark_todo_done(
         session.commit()
         session.refresh(todo)
 
-        _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
-        session.commit()
+        try:
+            _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1237,9 +1249,12 @@ async def block_todo(
     session.commit()
     session.refresh(todo)
 
-    # Notify creator that task is blocked
-    _notify_user(todo.creator_user_id, todo, session, "todo_blocked")
-    session.commit()
+    # Notify creator that task is blocked (non-critical)
+    try:
+        _notify_user(todo.creator_user_id, todo, session, "todo_blocked")
+        session.commit()
+    except Exception:
+        session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
@@ -1412,8 +1427,11 @@ async def update_todo_status(
     session.refresh(todo)
 
     if is_reopen:
-        _notify_user(todo.assignee_user_id, todo, session, "todo_reopened")
-        session.commit()
+        try:
+            _notify_user(todo.assignee_user_id, todo, session, "todo_reopened")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
