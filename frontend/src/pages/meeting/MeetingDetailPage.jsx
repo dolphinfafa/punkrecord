@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    Play, Square, Check, AlertCircle, ExternalLink, X
+    Play, Square, Check, AlertCircle, ExternalLink, X, Upload
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -109,6 +109,12 @@ export default function MeetingDetailPage() {
     const [archiving, setArchiving] = useState(false);
     const [archiveResult, setArchiveResult] = useState(null);
 
+    // Audio upload (for meetings without audio)
+    const [uploadingAudio, setUploadingAudio] = useState(false);
+
+    // Attendees (for meetings without audio)
+    const [attendeesInput, setAttendeesInput] = useState('');
+
     // Polling
     const pollingRef = useRef(null);
 
@@ -156,6 +162,9 @@ export default function MeetingDetailPage() {
             const data = response.data;
             setMeeting(data);
 
+            if (data.attendees && data.attendees.length > 0) {
+                setAttendeesInput(data.attendees.join('，'));
+            }
             if (data.summary) {
                 setSummary(data.summary);
             }
@@ -506,6 +515,7 @@ export default function MeetingDetailPage() {
     const hasTranscript = ['transcribed', 'summarized', 'archived'].includes(meeting.status);
     const hasSummary = ['summarized', 'archived'].includes(meeting.status) || summary;
     const isArchived = meeting.status === 'archived';
+    const hasAudio = !!meeting.audio_stored_name;
 
     return (
         <div className="meeting-detail-container">
@@ -554,21 +564,94 @@ export default function MeetingDetailPage() {
                 </div>
             )}
 
-            {/* Section 1: Audio Player */}
+            {/* Section 1: Audio Player / Upload */}
             <div className="detail-section audio-section">
-                <h2 className="section-title">音频播放</h2>
+                <h2 className="section-title">{hasAudio ? '音频播放' : '音频（可选）'}</h2>
                 <div className="audio-player-wrapper">
-                    {audioLoading ? (
-                        <div className="audio-loading">
-                            <Loader2 size={20} className="spin" /> 加载音频中...
-                        </div>
-                    ) : audioUrl ? (
-                        <audio ref={audioRef} controls src={audioUrl} className="audio-player" />
+                    {hasAudio ? (
+                        audioLoading ? (
+                            <div className="audio-loading">
+                                <Loader2 size={20} className="spin" /> 加载音频中...
+                            </div>
+                        ) : audioUrl ? (
+                            <audio ref={audioRef} controls src={audioUrl} className="audio-player" />
+                        ) : (
+                            <div className="audio-unavailable">音频加载失败</div>
+                        )
                     ) : (
-                        <div className="audio-unavailable">音频不可用</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0' }}>
+                            <input
+                                type="file"
+                                id="audio-upload-input"
+                                accept="audio/*"
+                                style={{ display: 'none' }}
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    try {
+                                        setUploadingAudio(true);
+                                        await meetingApi.uploadAudio(id, file);
+                                        const res = await meetingApi.getMeeting(id);
+                                        setMeeting(res.data);
+                                    } catch (err) {
+                                        alert(err?.response?.data?.message || '上传失败');
+                                    } finally {
+                                        setUploadingAudio(false);
+                                    }
+                                }}
+                            />
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => document.getElementById('audio-upload-input').click()}
+                                disabled={uploadingAudio || isProcessing}
+                            >
+                                {uploadingAudio ? <><Loader2 size={16} className="spin" /> 上传中...</> : <><Upload size={16} /> 上传音频</>}
+                            </button>
+                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>无音频也可直接使用自定义提示词生成会议纪要</span>
+                        </div>
                     )}
                 </div>
             </div>
+
+            {/* Section 1b: Attendees (for meetings without transcript from audio) */}
+            {!hasAudio && !isProcessing && (
+                <div className="detail-section" style={{ padding: '16px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <Users size={16} />
+                        <h2 className="section-title" style={{ margin: 0 }}>参会人员</h2>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            value={attendeesInput}
+                            onChange={(e) => setAttendeesInput(e.target.value)}
+                            placeholder="输入参会人员姓名，用逗号分隔（如：张三,李四,王五）"
+                            style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem' }}
+                        />
+                        <button
+                            className="btn btn-primary btn-sm"
+                            onClick={async () => {
+                                const names = attendeesInput.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+                                if (!names.length) return;
+                                try {
+                                    await meetingApi.updateAttendees(id, names);
+                                    const res = await meetingApi.getMeeting(id);
+                                    setMeeting(res.data);
+                                } catch (err) {
+                                    alert(err?.response?.data?.message || '保存失败');
+                                }
+                            }}
+                        >
+                            <Save size={14} /> 保存
+                        </button>
+                    </div>
+                    {meeting.attendees && meeting.attendees.length > 0 && (
+                        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '0.85rem' }}>
+                            已保存: {meeting.attendees.join('、')}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Section 2: Transcript Editor */}
             {hasTranscript && (
@@ -710,12 +793,12 @@ export default function MeetingDetailPage() {
             )}
 
             {/* Section 3: AI Summary & Archive */}
-            {(hasTranscript || hasSummary) && (
+            {(hasTranscript || hasSummary || !hasAudio) && !isProcessing && (
                 <div className="detail-section summary-section">
                     <div className="section-header">
                         <h2 className="section-title">AI 会议纪要</h2>
                         <div className="section-actions">
-                            {!isArchived && hasTranscript && (
+                            {!isArchived && (hasTranscript || !hasAudio) && (
                                 <button
                                     className="btn btn-primary btn-sm"
                                     onClick={handleGenerateSummary}
@@ -739,7 +822,7 @@ export default function MeetingDetailPage() {
                     </div>
 
                     {/* Prompt & Previous Meeting options */}
-                    {!isArchived && hasTranscript && (
+                    {!isArchived && (hasTranscript || !hasAudio) && (
                         <div className="summary-options">
                             <div className="summary-option-row">
                                 <label className="summary-option-label">提示词预设</label>
@@ -766,8 +849,8 @@ export default function MeetingDetailPage() {
                                         setSummaryPrompt(e.target.value);
                                         if (e.target.value) setSelectedPresetPrompt('');
                                     }}
-                                    placeholder="输入自定义提示词，覆盖预设..."
-                                    rows={2}
+                                    placeholder={hasAudio ? "输入自定义提示词，覆盖预设..." : "输入会议记录内容，AI 将据此生成会议纪要..."}
+                                    rows={hasAudio ? 2 : 6}
                                     disabled={summaryStreaming}
                                 />
                             </div>

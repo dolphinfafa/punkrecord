@@ -107,18 +107,14 @@ async def _run_asr(meeting_id: UUID):
 
 @router.post("/records", response_model=dict)
 async def create_meeting(
-    file: UploadFile = File(...),
     title: str = Form(...),
     meeting_type: str = Form(default="morning"),
     meeting_date: Optional[str] = Form(default=None),
+    file: Optional[UploadFile] = File(default=None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.write")),
 ):
-    """Upload audio file and create a new meeting record."""
-    file_data = await file.read()
-    if not file_data:
-        raise AtlasException("音频文件不能为空")
-
+    """Create a new meeting record. Audio file is optional."""
     # Validate meeting_type
     valid_types = [t.value for t in MeetingType]
     if meeting_type not in valid_types:
@@ -132,38 +128,119 @@ async def create_meeting(
         except ValueError:
             parsed_date = date.today()
 
+    has_audio = file is not None and file.filename
+    if has_audio:
+        file_data = await file.read()
+        if not file_data:
+            has_audio = False
+
+    if has_audio:
+        original_name = file.filename or "audio"
+        content_type = file.content_type or "audio/mpeg"
+        ext = Path(original_name).suffix or ".mp3"
+        stored_name = f"{uuid4().hex}{ext}"
+        save_file("meeting-audio", stored_name, file_data, content_type)
+
+        meeting = MeetingRecord(
+            title=title,
+            meeting_type=meeting_type,
+            meeting_date=parsed_date,
+            audio_file_name=original_name,
+            audio_stored_name=stored_name,
+            audio_content_type=content_type,
+            audio_file_size=len(file_data),
+            status=MeetingStatus.UPLOADING,
+            created_by=current_user.id,
+        )
+        session.add(meeting)
+        session.commit()
+        session.refresh(meeting)
+
+        meeting.status = MeetingStatus.TRANSCRIBING
+        session.add(meeting)
+        session.commit()
+        session.refresh(meeting)
+
+        asyncio.ensure_future(_run_asr(meeting.id))
+    else:
+        # No audio: create meeting ready for manual input
+        meeting = MeetingRecord(
+            title=title,
+            meeting_type=meeting_type,
+            meeting_date=parsed_date,
+            status=MeetingStatus.TRANSCRIBED,
+            created_by=current_user.id,
+        )
+        session.add(meeting)
+        session.commit()
+        session.refresh(meeting)
+
+    resp = MeetingCreateResponse.model_validate(meeting)
+    return success_response(resp.model_dump())
+
+
+# ─── 1b. Upload audio to existing meeting ──────────────────────────────────
+
+@router.post("/records/{meeting_id}/upload-audio", response_model=dict)
+async def upload_audio(
+    meeting_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    """Upload audio to an existing meeting that has no audio yet."""
+    meeting = session.get(MeetingRecord, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+    if meeting.audio_stored_name:
+        raise AtlasException("该会议已有音频文件，无法重复上传")
+
+    file_data = await file.read()
+    if not file_data:
+        raise AtlasException("音频文件不能为空")
+
     original_name = file.filename or "audio"
     content_type = file.content_type or "audio/mpeg"
     ext = Path(original_name).suffix or ".mp3"
     stored_name = f"{uuid4().hex}{ext}"
-
     save_file("meeting-audio", stored_name, file_data, content_type)
 
-    meeting = MeetingRecord(
-        title=title,
-        meeting_type=meeting_type,
-        meeting_date=parsed_date,
-        audio_file_name=original_name,
-        audio_stored_name=stored_name,
-        audio_content_type=content_type,
-        audio_file_size=len(file_data),
-        status=MeetingStatus.UPLOADING,
-        created_by=current_user.id,
-    )
-    session.add(meeting)
-    session.commit()
-    session.refresh(meeting)
-
-    # Transition to TRANSCRIBING and kick off ASR
+    meeting.audio_file_name = original_name
+    meeting.audio_stored_name = stored_name
+    meeting.audio_content_type = content_type
+    meeting.audio_file_size = len(file_data)
     meeting.status = MeetingStatus.TRANSCRIBING
+    meeting.updated_at = now_cn()
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
 
     asyncio.ensure_future(_run_asr(meeting.id))
 
-    resp = MeetingCreateResponse.model_validate(meeting)
-    return success_response(resp.model_dump())
+    return success_response(_enrich_meeting(meeting, session).model_dump())
+
+
+# ─── 1c. Update attendees ──────────────────────────────────────────────────
+
+@router.patch("/records/{meeting_id}/attendees", response_model=dict)
+async def update_attendees(
+    meeting_id: UUID,
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    """Update meeting attendees list."""
+    meeting = session.get(MeetingRecord, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+
+    meeting.attendees = data.get("attendees", [])
+    meeting.updated_at = now_cn()
+    session.add(meeting)
+    session.commit()
+    session.refresh(meeting)
+
+    return success_response(_enrich_meeting(meeting, session).model_dump())
 
 
 # ─── 2. List meetings (paginated) ────────────────────────────────────────────
@@ -361,28 +438,36 @@ async def summarize_meeting(
         .order_by(MeetingTranscriptSegment.segment_index)
     ).all()
 
-    if not segments:
-        raise AtlasException("会议尚无转写内容，无法生成纪要")
+    custom_prompt = body.prompt if body and body.prompt else None
+
+    if not segments and not custom_prompt:
+        raise AtlasException("会议尚无转写内容，请上传音频转录或在自定义提示词中填写会议记录")
 
     speaker_mapping = meeting.speaker_mapping or {}
-    lines = []
-    for seg in segments:
-        speaker_name = speaker_mapping.get(seg.speaker_id, seg.speaker_id)
-        lines.append(f"{speaker_name}: {seg.content}")
-    transcript_text = "\n".join(lines)
+    attendees_list = list(meeting.attendees or [])
 
-    # Extract attendees from speaker_mapping
-    attendees_list = [name for name in speaker_mapping.values() if name and name.strip()]
+    if segments:
+        lines = []
+        for seg in segments:
+            speaker_name = speaker_mapping.get(seg.speaker_id, seg.speaker_id)
+            lines.append(f"{speaker_name}: {seg.content}")
+        transcript_text = "\n".join(lines)
+        # Also extract attendees from speaker_mapping if not manually set
+        if not attendees_list:
+            attendees_list = [name for name in speaker_mapping.values() if name and name.strip()]
+    else:
+        transcript_text = ""
 
     # Store meeting_id for the generator closure
     m_id = meeting.id
 
-    system_prompt = "你是专业的会议纪要生成助手。请根据以下会议转写文稿，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
-
-    # Append custom prompt if provided
-    custom_prompt = body.prompt if body and body.prompt else None
-    if custom_prompt:
-        system_prompt += f"\n\n额外要求：{custom_prompt}"
+    if segments:
+        system_prompt = "你是专业的会议纪要生成助手。请根据以下会议转写文稿，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
+        if custom_prompt:
+            system_prompt += f"\n\n额外要求：{custom_prompt}"
+    else:
+        # No transcript — use custom prompt as the meeting content
+        system_prompt = "你是专业的会议纪要生成助手。请根据用户提供的会议记录，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
 
     # Build user message with optional previous meeting context
     user_message_parts = []
@@ -391,7 +476,11 @@ async def summarize_meeting(
         prev_meeting = session.get(MeetingRecord, previous_meeting_id)
         if prev_meeting and prev_meeting.summary:
             user_message_parts.append(f"上次会议纪要（供参考对比）：\n{prev_meeting.summary}\n\n---\n")
-    user_message_parts.append(f"会议转写文稿：\n{transcript_text}")
+    if transcript_text:
+        user_message_parts.append(f"会议转写文稿：\n{transcript_text}")
+    if custom_prompt and not segments:
+        # For text-only meetings, the custom prompt IS the meeting content
+        user_message_parts.append(f"会议记录：\n{custom_prompt}")
     user_message = "\n".join(user_message_parts)
 
     async def generate():

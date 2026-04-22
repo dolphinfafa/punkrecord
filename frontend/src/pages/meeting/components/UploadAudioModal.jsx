@@ -1,11 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { meetingApi } from '@/api/meeting';
-import { Upload, X, FileAudio, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, X, Loader2, AlertCircle } from 'lucide-react';
 import './UploadAudioModal.css';
-
-const ACCEPTED_FORMATS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.amr'];
-const ACCEPTED_MIME = 'audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/flac,audio/ogg,audio/aac,audio/x-ms-wma,audio/amr';
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 const MEETING_TYPES = [
     { value: 'morning', label: '早会' },
@@ -16,95 +12,33 @@ const MEETING_TYPES = [
     { value: 'other', label: '其他' },
 ];
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
 export default function UploadAudioModal({ onClose, onSuccess }) {
-    const [file, setFile] = useState(null);
     const [title, setTitle] = useState('');
     const [meetingType, setMeetingType] = useState('morning');
     const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
-    const [uploading, setUploading] = useState(false);
+    const [creating, setCreating] = useState(false);
     const [error, setError] = useState('');
-    const [dragOver, setDragOver] = useState(false);
-    const fileInputRef = useRef(null);
 
-    const validateFile = (f) => {
-        if (!f) return '请选择文件';
-        const ext = '.' + f.name.split('.').pop().toLowerCase();
-        if (!ACCEPTED_FORMATS.includes(ext)) {
-            return `不支持的文件格式。支持格式: ${ACCEPTED_FORMATS.join(', ')}`;
-        }
-        if (f.size > MAX_FILE_SIZE) {
-            return `文件大小超过限制 (最大 ${formatFileSize(MAX_FILE_SIZE)})`;
-        }
-        return '';
-    };
-
-    const handleFileSelect = (f) => {
-        const err = validateFile(f);
-        if (err) {
-            setError(err);
-            setFile(null);
-            return;
-        }
-        setError('');
-        setFile(f);
-        if (!title) {
-            // Auto-fill title from filename (without extension)
-            const nameWithoutExt = f.name.replace(/\.[^/.]+$/, '');
-            setTitle(nameWithoutExt);
-        }
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const droppedFile = e.dataTransfer.files?.[0];
-        if (droppedFile) {
-            handleFileSelect(droppedFile);
-        }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        setDragOver(true);
-    };
-
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        setDragOver(false);
-    };
-
-    const handleUpload = async () => {
-        if (!file) {
-            setError('请选择音频文件');
-            return;
-        }
+    const handleCreate = async () => {
         if (!title.trim()) {
             setError('请输入会议标题');
             return;
         }
 
         try {
-            setUploading(true);
+            setCreating(true);
             setError('');
-            await meetingApi.createMeeting(file, title.trim(), meetingType, meetingDate);
-            onSuccess();
+            const res = await meetingApi.createMeeting(title.trim(), meetingType, meetingDate);
+            onSuccess(res.data);
         } catch (err) {
-            setError(err?.response?.data?.message || err.message || '上传失败，请重试');
+            setError(err?.response?.data?.message || err.message || '创建失败，请重试');
         } finally {
-            setUploading(false);
+            setCreating(false);
         }
     };
 
     const handleOverlayClick = (e) => {
-        if (e.target === e.currentTarget && !uploading) {
+        if (e.target === e.currentTarget && !creating) {
             onClose();
         }
     };
@@ -113,14 +47,13 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
         <div className="modal-overlay" onClick={handleOverlayClick}>
             <div className="upload-modal">
                 <div className="upload-modal-header">
-                    <h2>上传会议音频</h2>
-                    <button className="modal-close-btn" onClick={onClose} disabled={uploading}>
+                    <h2>创建会议记录</h2>
+                    <button className="modal-close-btn" onClick={onClose} disabled={creating}>
                         <X size={20} />
                     </button>
                 </div>
 
                 <div className="upload-modal-body">
-                    {/* Title input */}
                     <div className="form-group">
                         <label className="form-label">会议标题 <span className="required">*</span></label>
                         <input
@@ -129,18 +62,17 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="输入会议标题"
-                            disabled={uploading}
+                            disabled={creating}
                         />
                     </div>
 
-                    {/* Meeting type select */}
                     <div className="form-group">
-                        <label className="form-label">会议类型 <span className="required">*</span></label>
+                        <label className="form-label">会议类型</label>
                         <select
                             className="form-input"
                             value={meetingType}
                             onChange={(e) => setMeetingType(e.target.value)}
-                            disabled={uploading}
+                            disabled={creating}
                         >
                             {MEETING_TYPES.map(t => (
                                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -148,7 +80,6 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                         </select>
                     </div>
 
-                    {/* Meeting date */}
                     <div className="form-group">
                         <label className="form-label">会议日期</label>
                         <input
@@ -156,61 +87,10 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                             className="form-input"
                             value={meetingDate}
                             onChange={(e) => setMeetingDate(e.target.value)}
-                            disabled={uploading}
+                            disabled={creating}
                         />
                     </div>
 
-                    {/* Drop zone */}
-                    <div className="form-group">
-                        <label className="form-label">音频文件 <span className="required">*</span></label>
-                        <div
-                            className={`drop-zone ${dragOver ? 'drop-zone-active' : ''} ${file ? 'drop-zone-has-file' : ''}`}
-                            onDrop={handleDrop}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onClick={() => !uploading && fileInputRef.current?.click()}
-                        >
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept={ACCEPTED_MIME}
-                                onChange={(e) => handleFileSelect(e.target.files?.[0])}
-                                style={{ display: 'none' }}
-                                disabled={uploading}
-                            />
-
-                            {file ? (
-                                <div className="file-selected">
-                                    <FileAudio size={32} className="file-icon" />
-                                    <div className="file-info">
-                                        <span className="file-name">{file.name}</span>
-                                        <span className="file-size">{formatFileSize(file.size)}</span>
-                                    </div>
-                                    {!uploading && (
-                                        <button
-                                            className="file-remove-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setFile(null);
-                                            }}
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="drop-zone-content">
-                                    <Upload size={36} className="drop-icon" />
-                                    <p className="drop-text">拖拽音频文件到此处，或点击选择</p>
-                                    <p className="drop-hint">
-                                        支持格式: MP3, WAV, M4A, FLAC, OGG (最大 {formatFileSize(MAX_FILE_SIZE)})
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Error */}
                     {error && (
                         <div className="upload-error">
                             <AlertCircle size={16} />
@@ -220,22 +100,18 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                 </div>
 
                 <div className="upload-modal-footer">
-                    <button className="btn btn-secondary" onClick={onClose} disabled={uploading}>
+                    <button className="btn btn-secondary" onClick={onClose} disabled={creating}>
                         取消
                     </button>
                     <button
                         className="btn btn-primary"
-                        onClick={handleUpload}
-                        disabled={uploading || !file || !title.trim()}
+                        onClick={handleCreate}
+                        disabled={creating || !title.trim()}
                     >
-                        {uploading ? (
-                            <>
-                                <Loader2 size={16} className="spin" /> 上传中...
-                            </>
+                        {creating ? (
+                            <><Loader2 size={16} className="spin" /> 创建中...</>
                         ) : (
-                            <>
-                                <Upload size={16} /> 上传
-                            </>
+                            <><Plus size={16} /> 创建会议</>
                         )}
                     </button>
                 </div>

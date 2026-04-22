@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
 import { format } from 'date-fns';
-import { Mic, Upload, Trash2, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
+import { Mic, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import UploadAudioModal from './components/UploadAudioModal';
 import './MeetingListPage.css';
 
@@ -145,7 +145,7 @@ export default function MeetingListPage() {
                         ))}
                     </select>
                     <button className="btn btn-primary upload-btn" onClick={() => setShowUploadModal(true)}>
-                        <Upload size={18} /> 上传音频
+                        <Plus size={18} /> 创建会议
                     </button>
                 </div>
             </div>
@@ -154,7 +154,7 @@ export default function MeetingListPage() {
                 <div className="empty-state">
                     <Mic size={48} color="#cbd5e0" />
                     <h3>暂无会议记录</h3>
-                    <p>点击右上角的"上传音频"按钮来创建第一条会议记录。</p>
+                    <p>点击右上角的"创建会议"按钮来创建第一条会议记录。</p>
                 </div>
             ) : (
                 <>
@@ -259,9 +259,13 @@ export default function MeetingListPage() {
             {showUploadModal && (
                 <UploadAudioModal
                     onClose={() => setShowUploadModal(false)}
-                    onSuccess={() => {
+                    onSuccess={(data) => {
                         setShowUploadModal(false);
-                        loadMeetings();
+                        if (data?.id) {
+                            navigate(`/meeting/${data.id}`);
+                        } else {
+                            loadMeetings();
+                        }
                     }}
                 />
             )}

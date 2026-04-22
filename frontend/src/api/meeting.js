@@ -1,9 +1,8 @@
 import client from './client';
 
 export const meetingApi = {
-    createMeeting: (file, title, meetingType = 'morning', meetingDate = null) => {
+    createMeeting: (title, meetingType = 'morning', meetingDate = null) => {
         const formData = new FormData();
-        formData.append('file', file);
         formData.append('title', title);
         formData.append('meeting_type', meetingType);
         if (meetingDate) formData.append('meeting_date', meetingDate);
@@ -11,6 +10,15 @@ export const meetingApi = {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
     },
+    uploadAudio: (meetingId, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/meeting/records/${meetingId}/upload-audio`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    updateAttendees: (meetingId, attendees) =>
+        client.patch(`/meeting/records/${meetingId}/attendees`, { attendees }),
     getMeetings: (params) => client.get('/meeting/records', { params }),
     getMeeting: (id) => client.get(`/meeting/records/${id}`),
     deleteMeeting: (id) => client.delete(`/meeting/records/${id}`),
