@@ -103,6 +103,12 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 ### 1.9 会议记录
 
 - 上传音频文件 → 后台异步调用豆包 ASR 转写（含说话人分离）
+- **大文件自动切片**：音频 > 300MB 时自动用 ffmpeg 切片（重编码为 mp3），每片独立提交 ASR
+  - 切片说话人 ID 带 chunk 前缀：`chunk1_speaker_0`、`chunk2_speaker_0`
+  - 时间戳自动加偏移，segment_index 全局递增
+  - 单片文件不加前缀，保持向后兼容
+  - 用户手动将不同 chunk 的说话人改为同一名字 → AI 纪要自动视为同一人
+- 每片 ASR 超时 20 分钟，ASR 返回 0 segments 时标记为 `failed`（而非 `transcribed`）
 - 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
 - 转写完成后可编辑文稿内容和说话人标注
 - AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项
