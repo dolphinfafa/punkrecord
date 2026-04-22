@@ -175,7 +175,9 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
-| POST | `/api/v1/meeting/records` | meeting.write | 上传音频创建会议（支持 `meeting_date` 参数，默认今天） |
+| POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
+| POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR |
+| PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表 |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
 | DELETE | `/api/v1/meeting/records/{id}` | meeting.write | 删除会议 |
@@ -183,7 +185,7 @@
 | GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
 | PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人（支持 `speaker_id`） |
 | PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射 |
-| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，总结后自动提取参会人） |
+| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要） |
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
 

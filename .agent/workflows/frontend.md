@@ -152,6 +152,15 @@
 | `pages/wechat-notify/WeChatNotifyPage.css` | `.modal-content` 重命名为 `.wechat-modal-content`，修复全局样式污染 |
 | `pages/wechat-notify/WeChatNotifyPage.jsx` | 同步更新弹窗类名引用 |
 
+### v1.0.6 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/meeting/components/UploadAudioModal.jsx` | 改为纯创建会议弹窗（标题/类型/日期），去掉音频上传，创建后跳转详情页 |
+| `pages/meeting/MeetingListPage.jsx` | 按钮从"上传音频"改为"创建会议"，创建成功后跳转详情页 |
+| `pages/meeting/MeetingDetailPage.jsx` | 无音频时显示上传按钮+参会人员输入；AI 纪要区无音频也可见；提示词框加大 |
+| `api/meeting.js` | createMeeting 不传文件；新增 uploadAudio、updateAttendees |
+
 ---
 
-*最后更新：2026-04-09*
+*最后更新：2026-04-22*
