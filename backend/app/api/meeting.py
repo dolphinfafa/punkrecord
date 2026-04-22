@@ -55,7 +55,7 @@ async def _run_asr(meeting_id: UUID):
                 logger.error("Meeting %s not found for ASR", meeting_id)
                 return
 
-            # Call ASR service with stored filename (it will construct the public URL)
+            # Call ASR service (auto-splits large files into chunks)
             result = await submit_asr_task(meeting.audio_stored_name, meeting.audio_content_type)
 
             if result.get("error"):
@@ -67,6 +67,13 @@ async def _run_asr(meeting_id: UUID):
 
             # Parse segments and create records
             segments = result.get("segments", [])
+            if not segments:
+                logger.warning("ASR returned 0 segments for meeting %s", meeting_id)
+                meeting.status = MeetingStatus.FAILED
+                session.add(meeting)
+                session.commit()
+                return
+
             for seg in segments:
                 segment = MeetingTranscriptSegment(
                     meeting_id=meeting.id,
