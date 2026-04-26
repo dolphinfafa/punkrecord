@@ -195,10 +195,13 @@ def _collect_related_todos_for_project_todo(session: Session, todo: TodoItem) ->
 
 def _delete_todo_and_notifications(session: Session, todo: TodoItem) -> None:
     """Delete a single todo and its notification logs."""
-    from app.models.todo import NotificationLog
-    notifs = session.exec(select(NotificationLog).where(NotificationLog.todo_id == todo.id)).all()
-    for n in notifs:
-        session.delete(n)
+    try:
+        from app.models.todo import NotificationLog
+        notifs = session.exec(select(NotificationLog).where(NotificationLog.todo_id == todo.id)).all()
+        for n in notifs:
+            session.delete(n)
+    except Exception:
+        session.rollback()
     session.delete(todo)
 
 
