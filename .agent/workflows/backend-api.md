@@ -88,7 +88,7 @@
 
 **团队任务访问规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`）。支持 `reviewed_by_user_id` 查询参数按审核人过滤，前端默认传当前用户 ID。
 
-**通知安全规则**：所有状态变更端点（submit/approve/reject/block/reopen/updateStatus）中的通知调用（`_notify_user`/`_notify_manager`）均用 try/except 包裹，通知失败时 rollback 但不影响主操作响应。
+**通知安全规则**：所有状态变更端点（submit/approve/reject/block/reopen/updateStatus）中的通知调用（`_notify_user`/`_notify_manager`）均用 try/except 包裹，通知失败时 rollback 但不影响主操作响应。删除任务时的通知记录清理（`_delete_todo_and_notifications`）同样受 try/except 保护。
 
 #### 请假相关
 
