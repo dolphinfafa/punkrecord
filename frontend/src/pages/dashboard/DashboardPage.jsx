@@ -66,12 +66,20 @@ export default function DashboardPage() {
                 setTeamPendingLeaves(teamPendingRes?.data || []);
                 setChangelogs(changelogRes?.data?.items || []);
 
-                // Calculate Stats
+                // Calculate Stats (done = this week only)
+                const now = new Date();
+                const dayOfWeek = now.getDay() || 7; // Sunday=7
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - dayOfWeek + 1);
+                weekStart.setHours(0, 0, 0, 0);
+                const doneThisWeek = todos.filter(t =>
+                    t.status === 'done' && t.done_at && new Date(t.done_at) >= weekStart
+                ).length;
                 const newStats = {
                     open: todos.filter(t => t.status === 'open').length,
                     in_progress: todos.filter(t => t.status === 'in_progress').length,
                     pending_review: teamPendingReviewCount,
-                    done: todos.filter(t => t.status === 'done').length,
+                    done: doneThisWeek,
                     total: todos.length
                 };
                 setStats(newStats);

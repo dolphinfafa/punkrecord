@@ -24,7 +24,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
 
     // Load user list and project list
     useEffect(() => {
-        if (isOpen && mode === 'create') {
+        if (isOpen) {
             client.get('/iam/users', { params: { page_size: 100 } })
                 .then(res => setAllUsers(res.data?.items || []))
                 .catch(() => { });
@@ -38,7 +38,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                     .catch(() => { });
             }
         }
-    }, [isOpen, mode, fixedProjectId]);
+    }, [isOpen, fixedProjectId]);
 
     // Load project members when project changes
     useEffect(() => {
@@ -112,6 +112,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                     project_id: formData.project_id,
                     project_name: selectedProject?.name || '',
                 } : undefined,
+                images: formData.images || [],
             };
             await onSubmit(submitData);
             onClose();
@@ -162,60 +163,77 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                         />
                     </div>
 
-                    {mode === 'create' && (
-                        <>
-                            <div className="form-group">
-                                <label htmlFor="assignee">分配给 *{formData.project_id && projectMembers.length > 0 ? '（仅项目成员）' : ''}</label>
+                    <div className="form-group">
+                        <label htmlFor="assignee">分配给 *{formData.project_id && projectMembers.length > 0 ? '（仅项目成员）' : ''}</label>
+                        <select
+                            id="assignee"
+                            value={formData.assignee_user_id}
+                            onChange={(e) => handleChange('assignee_user_id', e.target.value)}
+                            className={clsx({ error: errors.assignee_user_id })}
+                        >
+                            <option value="">请选择被分配人</option>
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.display_name}{u.id === currentUserId ? '（我）' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
+                    </div>
+                    {mode === 'create' ? (
+                        <div className="form-group">
+                            <label htmlFor="project_id">所属项目{fixedProjectId ? '' : '（可选）'}</label>
+                            {fixedProjectId ? (
+                                <input type="text" value={fixedProjectName || '当前项目'} disabled />
+                            ) : (
                                 <select
-                                    id="assignee"
-                                    value={formData.assignee_user_id}
-                                    onChange={(e) => handleChange('assignee_user_id', e.target.value)}
-                                    className={clsx({ error: errors.assignee_user_id })}
+                                    id="project_id"
+                                    value={formData.project_id}
+                                    onChange={(e) => {
+                                        handleChange('project_id', e.target.value);
+                                        handleChange('assignee_user_id', currentUserId || '');
+                                    }}
                                 >
-                                    <option value="">请选择被分配人</option>
-                                    {users.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.display_name}{u.id === currentUserId ? '（我）' : ''}
-                                        </option>
+                                    <option value="">不关联项目</option>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.id}>{project.name}</option>
                                     ))}
                                 </select>
-                                {errors.assignee_user_id && <span className="error-message">{errors.assignee_user_id}</span>}
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="project_id">所属项目{fixedProjectId ? '' : '（可选）'}</label>
-                                {fixedProjectId ? (
-                                    <input type="text" value={fixedProjectName || '当前项目'} disabled />
-                                ) : (
-                                    <select
-                                        id="project_id"
-                                        value={formData.project_id}
-                                        onChange={(e) => {
-                                            handleChange('project_id', e.target.value);
-                                            handleChange('assignee_user_id', currentUserId || '');
-                                        }}
-                                    >
-                                        <option value="">不关联项目</option>
-                                        {projects.map((project) => (
-                                            <option key={project.id} value={project.id}>{project.name}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="images">任务图片（可多选）</label>
-                                <input
-                                    id="images"
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={(e) => handleChange('images', Array.from(e.target.files || []))}
-                                />
-                                {formData.images?.length > 0 && (
-                                    <span className="form-helper">已选择 {formData.images.length} 张图片</span>
-                                )}
-                            </div>
-                        </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="form-group">
+                            <label>所属项目</label>
+                            <input
+                                type="text"
+                                value={(() => {
+                                    const pid = formData.project_id;
+                                    if (!pid) return '无';
+                                    const p = projects.find(item => item.id === pid);
+                                    return p?.name || initialData?.link?.project_name || pid;
+                                })()}
+                                disabled
+                            />
+                        </div>
                     )}
+                    <div className="form-group">
+                        <label htmlFor="images">{mode === 'edit' ? '添加新图片（可多选）' : '任务图片（可多选）'}</label>
+                        {mode === 'edit' && initialData?.link?.todo_images?.length > 0 && (
+                            <div style={{ marginBottom: '8px', fontSize: '0.85rem', color: '#64748b' }}>
+                                已有 {initialData.link.todo_images.length} 张图片（可在任务详情中查看和删除）
+                            </div>
+                        )}
+                        <input
+                            id="images"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => handleChange('images', Array.from(e.target.files || []))}
+                        />
+                        {formData.images?.length > 0 && (
+                            <span className="form-helper">已选择 {formData.images.length} 张新图片</span>
+                        )}
+                    </div>
 
                     <div className="form-row">
                         <div className="form-group">

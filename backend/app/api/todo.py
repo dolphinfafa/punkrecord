@@ -50,6 +50,8 @@ def _enrich_todo(todo: TodoItem, session: Session) -> TodoResponse:
 def _can_access_todo(todo: TodoItem, current_user: User, session: Session) -> bool:
     if todo.assignee_user_id == current_user.id or todo.creator_user_id == current_user.id:
         return True
+    if todo.reviewed_by_user_id == current_user.id:
+        return True
     assignee = session.get(User, todo.assignee_user_id)
     return bool(assignee and assignee.manager_user_id == current_user.id)
 

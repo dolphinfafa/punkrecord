@@ -246,6 +246,13 @@ export default function TodoPage() {
     const handleEditTodo = async (formData) => {
         try {
             await todoApi.update(selectedTodo.id, formData);
+            // Upload new images if any
+            const images = Array.isArray(formData.images) ? formData.images : [];
+            if (images.length > 0) {
+                for (const file of images) {
+                    await todoApi.uploadImage(selectedTodo.id, file);
+                }
+            }
             showNotification('任务更新成功');
             setEditModalOpen(false);
             setSelectedTodo(null);
@@ -366,7 +373,8 @@ export default function TodoPage() {
 
     const canEditTodo = (todo) => {
         if (!todo) return false;
-        if (todo.assignee_user_id === user?.id || todo.creator_user_id === user?.id) return true;
+        const uid = user?.id;
+        if (todo.assignee_user_id === uid || todo.creator_user_id === uid || todo.reviewed_by_user_id === uid) return true;
         return isManagerOfTodo(todo);
     };
 
