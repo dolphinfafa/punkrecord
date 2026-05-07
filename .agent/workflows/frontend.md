@@ -161,6 +161,14 @@
 | `pages/meeting/MeetingDetailPage.jsx` | 无音频时显示上传按钮+参会人员输入；AI 纪要区无音频也可见；提示词框加大 |
 | `api/meeting.js` | createMeeting 不传文件；新增 uploadAudio、updateAttendees |
 
+### v1.0.8 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `components/todo/TodoModal.jsx` | 编辑模式下显示分配人/图片字段；submitData 包含 images；编辑时显示已有图片数量；所属项目编辑时只读展示；用户列表创建和编辑模式都加载 |
+| `pages/todo/TodoPage.jsx` | handleEditTodo 支持上传新图片；canEditTodo 增加 reviewed_by_user_id 权限检查 |
+| `pages/dashboard/DashboardPage.jsx` | "已完成"统计改为仅统计本周（周一至今）完成的任务 |
+
 ---
 
-*最后更新：2026-04-22*
+*最后更新：2026-05-07*

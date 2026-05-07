@@ -90,6 +90,8 @@
 
 **通知安全规则**：所有状态变更端点（submit/approve/reject/block/reopen/updateStatus）中的通知调用（`_notify_user`/`_notify_manager`）均用 try/except 包裹，通知失败时 rollback 但不影响主操作响应。删除任务时的通知记录清理（`_delete_todo_and_notifications`）同样受 try/except 保护。
 
+**编辑权限规则**：`_can_access_todo()` 检查 `assignee_user_id`、`creator_user_id`、`reviewed_by_user_id`、直属上级四个维度，前端 `canEditTodo()` 同步一致。
+
 #### 请假相关
 
 | 方法 | 路径 | 说明 |
