@@ -169,6 +169,13 @@
 | `pages/todo/TodoPage.jsx` | handleEditTodo 支持上传新图片；canEditTodo 增加 reviewed_by_user_id 权限检查 |
 | `pages/dashboard/DashboardPage.jsx` | "已完成"统计改为仅统计本周（周一至今）完成的任务 |
 
+### v2.0.0 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/dashboard/DashboardPage.jsx` | 新增 Agent 密钥管理区域（版本日志下方）：生成/复制/删除 Token |
+| `api/agentToken.js` | 新增 Agent Token API 层（创建/列表/删除） |
+
 ---
 
-*最后更新：2026-05-07*
+*最后更新：2026-05-09*

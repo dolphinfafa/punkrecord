@@ -92,6 +92,16 @@
 
 **编辑权限规则**：`_can_access_todo()` 检查 `assignee_user_id`、`creator_user_id`、`reviewed_by_user_id`、直属上级四个维度，前端 `canEditTodo()` 同步一致。
 
+### Agent Token 管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/auth/agent-tokens` | 生成 Agent Token（名称、有效期）。Token 仅创建时返回明文 |
+| GET | `/api/v1/auth/agent-tokens` | 列出当前用户的所有 Agent Token（token 仅显示 preview） |
+| DELETE | `/api/v1/auth/agent-tokens/{token_id}` | 删除 Agent Token |
+
+**Agent Token 认证**：请求头 `Authorization: Bearer pat_xxx`，后端识别 `pat_` 前缀后查表验证，映射到对应用户，权限与该用户一致。Token 过期或删除后立即失效。
+
 #### 请假相关
 
 | 方法 | 路径 | 说明 |

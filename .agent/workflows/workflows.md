@@ -17,6 +17,7 @@
   4. 完成后标记 `profile_completed=true`, `must_change_password=false`，进入系统
 - 管理员可重置员工密码（默认重置为 `punkrecord123`，员工下次登录需修改）
 - 小程序登录后持久化 Token，个人中心页可通过 `/auth/me` 回填用户信息
+- **Agent Token**：用户在工作台"Agent 密钥"区域生成专用 Token（格式 `pat_xxx`），供 AI Agent 通过 `Authorization: Bearer pat_xxx` 调用 API。Token 可设有效期（30/90/180天/永久），支持删除。认证中间件自动识别 `pat_` 前缀并映射到用户。
 
 ### 1.2 任务生命周期
 
