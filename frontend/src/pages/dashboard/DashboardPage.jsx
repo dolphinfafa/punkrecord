@@ -470,24 +470,21 @@ export default function DashboardPage() {
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {agentTokens.map(t => (
-                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: t.is_active ? '#f8fafc' : '#fef2f2', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                                         <div>
                                             <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{t.name} <code style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>{t.token_preview}</code></div>
                                             <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
                                                 创建: {t.created_at?.slice(0, 10)}
                                                 {t.expires_at && ` · 到期: ${t.expires_at.slice(0, 10)}`}
                                                 {t.last_used_at && ` · 最后使用: ${t.last_used_at.slice(0, 16).replace('T', ' ')}`}
-                                                {!t.is_active && <span style={{ color: '#ef4444', marginLeft: '8px' }}>已撤销</span>}
                                             </div>
                                         </div>
-                                        {t.is_active && (
-                                            <button style={{ padding: '4px 10px', border: '1px solid #fca5a5', borderRadius: '6px', background: 'white', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
-                                                onClick={async () => {
-                                                    if (!window.confirm('确认撤销此密钥？')) return;
-                                                    try { await agentTokenApi.revoke(t.id); const res = await agentTokenApi.list(); setAgentTokens(res.data || []); }
-                                                    catch (err) { alert(err?.response?.data?.message || '撤销失败'); }
-                                                }}>撤销</button>
-                                        )}
+                                        <button style={{ padding: '4px 10px', border: '1px solid #fca5a5', borderRadius: '6px', background: 'white', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
+                                            onClick={async () => {
+                                                if (!window.confirm('确认删除此密钥？删除后使用该密钥的 Agent 将无法继续访问。')) return;
+                                                try { await agentTokenApi.remove(t.id); const res = await agentTokenApi.list(); setAgentTokens(res.data || []); }
+                                                catch (err) { alert(err?.response?.data?.message || '删除失败'); }
+                                            }}>删除</button>
                                     </div>
                                 ))}
                             </div>

@@ -228,7 +228,7 @@ async def revoke_agent_token(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Revoke (deactivate) an Agent Token."""
+    """Delete an Agent Token."""
     from uuid import UUID as _UUID
     from app.models.shared import AgentToken
 
@@ -237,8 +237,7 @@ async def revoke_agent_token(
         from app.core.exceptions import NotFoundException
         raise NotFoundException("Token not found")
 
-    agent_token.is_active = False
-    session.add(agent_token)
+    session.delete(agent_token)
     session.commit()
 
-    return success_response({"message": "Token has been revoked"})
+    return success_response({"message": "Token has been deleted"})
