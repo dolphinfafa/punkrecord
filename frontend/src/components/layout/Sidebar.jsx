@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { todoApi } from '@/api/todo';
 import {
     Terminal,
     LayoutDashboard,
@@ -36,6 +37,35 @@ export default function Sidebar() {
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
+    const [todoCounts, setTodoCounts] = useState({ my_active: 0, team_pending_review: 0 });
+
+    const canReadTodo = hasPermission('todo.read');
+
+    const fetchTodoCounts = useCallback(async () => {
+        if (!canReadTodo) return;
+        try {
+            const res = await todoApi.badgeCounts();
+            const data = res?.data || {};
+            setTodoCounts({
+                my_active: data.my_active || 0,
+                team_pending_review: data.team_pending_review || 0,
+            });
+        } catch {
+            // Badge counts are non-critical; ignore errors silently
+        }
+    }, [canReadTodo]);
+
+    // Fetch on mount + on route change, and poll periodically so the badges
+    // reflect task activity without a full page reload.
+    useEffect(() => {
+        fetchTodoCounts();
+    }, [fetchTodoCounts, location.pathname]);
+
+    useEffect(() => {
+        if (!canReadTodo) return;
+        const timer = setInterval(fetchTodoCounts, 45000);
+        return () => clearInterval(timer);
+    }, [fetchTodoCounts, canReadTodo]);
 
     const handleNavigation = (path) => {
         navigate(path);
@@ -60,6 +90,11 @@ export default function Sidebar() {
                     const isActive = location.pathname === item.path ||
                         (item.path !== '/' && location.pathname.startsWith(item.path));
 
+                    const isTodo = item.path === '/todo';
+                    const myCount = todoCounts.my_active;
+                    const reviewCount = todoCounts.team_pending_review;
+                    const totalCount = myCount + reviewCount;
+
                     return (
                         <button
                             key={item.path}
@@ -69,6 +104,29 @@ export default function Sidebar() {
                         >
                             <Icon className="nav-icon" />
                             {!collapsed && <span className="nav-label">{item.label}</span>}
+                            {isTodo && !collapsed && totalCount > 0 && (
+                                <span className="nav-badges">
+                                    {myCount > 0 && (
+                                        <span
+                                            className="nav-badge nav-badge-my"
+                                            title={`我的任务：未开始/进行中 ${myCount}`}
+                                        >
+                                            {myCount}
+                                        </span>
+                                    )}
+                                    {reviewCount > 0 && (
+                                        <span
+                                            className="nav-badge nav-badge-review"
+                                            title={`团队任务：待我审核 ${reviewCount}`}
+                                        >
+                                            {reviewCount}
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                            {isTodo && collapsed && totalCount > 0 && (
+                                <span className="nav-badge-dot" title={`待办 ${totalCount}`} />
+                            )}
                         </button>
                     );
                 })}

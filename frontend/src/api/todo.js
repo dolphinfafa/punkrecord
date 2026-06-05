@@ -11,6 +11,9 @@ export const todoApi = {
     // Get team todos (manager view)
     listTeam: (params) => client.get('/todo/team', { params }),
 
+    // Sidebar badge counts: { my_active, team_pending_review }
+    badgeCounts: () => client.get('/todo/badge-counts'),
+
     // Get single todo
     get: (id) => client.get(`/todo/${id}`),
 

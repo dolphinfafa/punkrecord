@@ -74,6 +74,7 @@
 | POST | `/api/v1/todo` | 创建任务（支持 `link` 关联项目 + `dev_type`，见下方扩展说明） |
 | GET | `/api/v1/todo/my` | 我的任务列表 |
 | GET | `/api/v1/todo/team` | 团队任务列表（支持 `reviewed_by_user_id` 过滤） |
+| GET | `/api/v1/todo/badge-counts` | 侧边栏角标计数：`{my_active(我的 open+in_progress), team_pending_review(待我审核的 pending_review)}` |
 | GET/PATCH | `/api/v1/todo/{todo_id}` | 任务详情/更新 |
 | POST | `/api/v1/todo/{todo_id}/status` | 任务状态变更 |
 | POST | `/api/v1/todo/{todo_id}/block` | 阻塞任务。`blocked_reason` 走**请求体**（兼容 query），必填 |

@@ -521,6 +521,49 @@ async def get_team_todos(
     })
 
 
+# ─── Badge counts (sidebar) ───────────────────────────────────────────────────
+
+@router.get("/badge-counts", response_model=dict)
+async def get_todo_badge_counts(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.read"))
+):
+    """Counts for sidebar badges:
+    - my_active: my tasks that are not started (open) or in progress
+    - team_pending_review: team tasks awaiting my review (pending_review where I am
+      the reviewer, including the implicit case where reviewer is unset and I created it)
+    """
+    from sqlalchemy import func, or_, and_
+
+    my_active = session.exec(
+        select(func.count())
+        .select_from(TodoItem)
+        .where(TodoItem.assignee_user_id == current_user.id)
+        .where(TodoItem.status.in_([TodoStatus.OPEN, TodoStatus.IN_PROGRESS]))
+    ).one()
+
+    team_pending_review = session.exec(
+        select(func.count())
+        .select_from(TodoItem)
+        .where(TodoItem.assignee_user_id != current_user.id)
+        .where(TodoItem.status == TodoStatus.PENDING_REVIEW)
+        .where(
+            or_(
+                TodoItem.reviewed_by_user_id == current_user.id,
+                and_(
+                    TodoItem.reviewed_by_user_id == None,  # noqa: E711
+                    TodoItem.creator_user_id == current_user.id,
+                ),
+            )
+        )
+    ).one()
+
+    return success_response({
+        "my_active": int(my_active),
+        "team_pending_review": int(team_pending_review),
+    })
+
+
 # ─── Leave requests ───────────────────────────────────────────────────────────
 
 @router.post("/leaves", response_model=dict)
