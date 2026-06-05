@@ -175,7 +175,11 @@
 |-----------|----------|
 | `pages/dashboard/DashboardPage.jsx` | 新增 Agent 密钥管理区域（版本日志下方）：生成/复制/删除 Token |
 | `api/agentToken.js` | 新增 Agent Token API 层（创建/列表/删除） |
+| `components/layout/Sidebar.jsx` + `Sidebar.css` | "待办事项"导航项右侧两个角标：蓝=我的活动任务(open+in_progress)、红=团队待我审核(pending_review)；挂载/路由切换拉取 + 45s 轮询；折叠态红点 |
+| `pages/todo/TodoPage.jsx` + `TodoPage.css` | "我的任务/团队任务"切换标签加同源角标；计数随任务列表刷新（含操作后）同步更新 |
+| `api/todo.js` | 新增 `badgeCounts()` → `GET /todo/badge-counts` |
+| `pages/meeting/MeetingDetailPage.jsx` | 会议纪要选提示词预设改为追加到自定义框（不覆盖），切换预设自动剥离上次追加段 |
 
 ---
 
-*最后更新：2026-05-09*
+*最后更新：2026-06-05*
