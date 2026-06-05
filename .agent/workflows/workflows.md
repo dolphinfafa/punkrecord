@@ -114,6 +114,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
 - 转写完成后可编辑文稿内容和说话人标注
 - AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项
+- 提示词预设与自定义提示词：选择预设会**追加**预设文案到自定义框已有内容之后（两部分共存，提交时合并为 `prompt`），切换预设自动剥离上一次追加段以避免累积
 - 归档到企业大脑：将转写文稿 + 纪要存为知识库文档，自动进入处理管线
 
 ---

@@ -71,20 +71,30 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/v1/todo` | 创建任务 |
+| POST | `/api/v1/todo` | 创建任务（支持 `link` 关联项目 + `dev_type`，见下方扩展说明） |
 | GET | `/api/v1/todo/my` | 我的任务列表 |
 | GET | `/api/v1/todo/team` | 团队任务列表（支持 `reviewed_by_user_id` 过滤） |
 | GET/PATCH | `/api/v1/todo/{todo_id}` | 任务详情/更新 |
 | POST | `/api/v1/todo/{todo_id}/status` | 任务状态变更 |
+| POST | `/api/v1/todo/{todo_id}/block` | 阻塞任务。`blocked_reason` 走**请求体**（兼容 query），必填 |
+| POST | `/api/v1/todo/{todo_id}/dismiss` | 忽略任务。`dismiss_reason` 走**请求体**（兼容 query），可选 |
 | POST | `/api/v1/todo/{todo_id}/images` | 上传任务图片 |
+| GET | `/api/v1/todo/{todo_id}/images` | 列出任务全部图片（含 `download_path`） |
+| GET | `/api/v1/todo/images` | 按 `todo_id` 或 `title`（任务名精确匹配）定位图片；同名多个返回候选列表 |
 | GET | `/api/v1/todo/{todo_id}/images/{image_id}/download` | 下载任务图片 |
 | DELETE | `/api/v1/todo/{todo_id}/images/{image_id}` | 删除任务图片 |
+
+> **路由顺序**：字面量 `/todo/images` 必须声明在 `/todo/{todo_id}` 之前，否则会被 UUID 路径参数捕获。
 
 **AI Agent 工作流**：AI 修复状态存储在 `TodoItem.link.agent_status` 字段（值为 `ai_fixing` / `ai_fixed`），与 `todo.status` 完全解耦。AI 只需关注 `agent_status`，不改变任务本身的状态。
 
 **PATCH `/api/v1/todo/{todo_id}` 扩展字段**：
 - `link`（dict）：合并更新任务的 link JSON 字段（如 `{"agent_status": "ai_fixed"}`），不会覆盖已有键
 - `assignee_user_id`（int）：更新任务的执行人
+
+**POST `/api/v1/todo` 项目关联扩展**（便于 AI Agent 一次创建项目任务）：
+- `link.project_id` 或 `link.project_name`：解析项目后将任务设为 `source_type=PROJECT_TASK`、`source_id=project_id`，出现在该项目任务列表；`project_name` 需精确匹配，同名多个时报错要求改用 `project_id`；关联后调用 `sync_project_progress` 同步项目进度
+- `link.dev_type`：任务类型（`dev_backend`/`dev_frontend`/`dev_ui`/`dev_product`/`other`），校验后写入 `tags` 与 `link.dev_type`，与项目页任务一致
 
 **团队任务访问规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`）。支持 `reviewed_by_user_id` 查询参数按审核人过滤，前端默认传当前用户 ID。
 
@@ -117,7 +127,7 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST/GET/PATCH | `/api/v1/contract/counterparties` | 对手方 CRUD（含编辑） |
-| POST/GET | `/api/v1/contract/contracts` | 合同创建/列表 |
+| POST/GET | `/api/v1/contract/contracts` | 合同创建/列表。`contract_no` 可选，缺省时后端自动生成 `CNT-<毫秒时间戳>-<随机>`（与前端页面 `CNT-<Date.now()>` 规则一致） |
 | GET/PATCH | `/api/v1/contract/contracts/{id}` | 合同详情/更新 |
 | POST | `/api/v1/contract/contracts/{id}/submit` | 提交合同 |
 | GET | `/api/v1/contract/contracts/{id}/payment-plans` | 付款计划 |
@@ -128,7 +138,7 @@
 |------|------|------|
 | POST/GET | `/api/v1/project/projects` | 项目创建/列表 |
 | GET/PATCH/DELETE | `/api/v1/project/projects/{id}` | 项目详情/更新/删除 |
-| GET/PATCH | `/api/v1/project/projects/{id}/stages` | 阶段列表/更新 |
+| GET/PATCH | `/api/v1/project/projects/{id}/stages` | 阶段列表/更新。**阶段须按序推进**：将某阶段置 `in_progress`/`done` 前，其所有 `sequence_no` 更小的前序阶段必须为 `done` 或 `skipped`，否则 400 拒绝；跳过须显式置 `skipped` |
 | POST/GET/DELETE | `/api/v1/project/projects/{id}/attachments` | 项目附件 |
 | POST/GET/DELETE | `/api/v1/project/projects/{id}/members` | 项目成员 |
 | GET | `/api/v1/project/projects/{id}/todos` | 项目任务列表 |
@@ -180,8 +190,10 @@
 | GET | `/api/v1/kb/conversations` | kb.read | 对话列表 |
 | GET | `/api/v1/kb/conversations/{id}/messages` | kb.read | 对话消息 |
 | DELETE | `/api/v1/kb/conversations/{id}` | kb.write | 删除对话 |
-| POST | `/api/v1/kb/chat` | kb.write | RAG 对话（SSE 流式） |
-| POST | `/api/v1/kb/search` | kb.read | 语义搜索 |
+| POST | `/api/v1/kb/chat` | kb.write | RAG 对话（SSE 流式）。Body 字段为 **`message`**（非 `query`） |
+| POST | `/api/v1/kb/search` | kb.read | 语义搜索。Body `{query, top_k, tags?}` |
+
+> **嵌入服务降级**：`/kb/search`、`/kb/chat` 依赖嵌入服务（`embedding_service`，需 `GEMINI_API_KEY`）。未配置时 search 返回 `{results:[], available:false, message:...}`、chat 返回 `data:{"error":...}`，均不抛 500。（向量库重建/接入 LiteLLM 为后续事项。）
 
 ### 会议记录（Meeting）
 
