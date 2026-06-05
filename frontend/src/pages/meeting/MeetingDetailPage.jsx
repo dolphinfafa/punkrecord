@@ -830,12 +830,22 @@ export default function MeetingDetailPage() {
                                     className="summary-option-select"
                                     value={selectedPresetPrompt}
                                     onChange={(e) => {
-                                        // Selecting a preset fills the editable
-                                        // custom-prompt box (default '' clears it),
-                                        // so users can tweak it instead of losing input.
+                                        // Append the preset text to whatever the user
+                                        // already typed (both coexist), instead of
+                                        // overwriting it. Switching presets first strips
+                                        // the previously-appended preset to avoid stacking.
                                         const v = e.target.value;
+                                        setSummaryPrompt((prev) => {
+                                            let base = prev;
+                                            if (selectedPresetPrompt && base.endsWith(selectedPresetPrompt)) {
+                                                base = base
+                                                    .slice(0, base.length - selectedPresetPrompt.length)
+                                                    .replace(/\n+$/, '');
+                                            }
+                                            if (!v) return base;
+                                            return base ? `${base}\n\n${v}` : v;
+                                        });
                                         setSelectedPresetPrompt(v);
-                                        setSummaryPrompt(v);
                                     }}
                                     disabled={summaryStreaming}
                                 >
