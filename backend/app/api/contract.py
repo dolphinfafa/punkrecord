@@ -108,8 +108,15 @@ async def create_contract(
     current_user: User = Depends(require_permission("contract.write"))
 ):
     """Create contract"""
+    # Auto-generate contract_no when omitted, consistent with the web page
+    # default (CNT-<timestamp>); add a short random suffix to avoid collisions.
+    contract_no = (data.contract_no or "").strip()
+    if not contract_no:
+        import secrets as _secrets
+        contract_no = f"CNT-{int(now_cn().timestamp() * 1000)}-{_secrets.token_hex(2)}"
+
     contract = Contract(
-        contract_no=data.contract_no,
+        contract_no=contract_no,
         name=data.name,
         contract_type=ContractType(data.contract_type),
         status=ContractStatus.DRAFT,

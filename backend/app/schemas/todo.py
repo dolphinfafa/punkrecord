@@ -47,6 +47,16 @@ class TodoReviewAction(BaseModel):
     comment: Optional[str] = None  # Required for reject, optional for approve
 
 
+class TodoBlockRequest(BaseModel):
+    """Schema for blocking a todo (reason in request body)"""
+    blocked_reason: Optional[str] = None
+
+
+class TodoDismissRequest(BaseModel):
+    """Schema for dismissing a todo (reason in request body)"""
+    dismiss_reason: Optional[str] = None
+
+
 class TodoResponse(BaseModel):
     """Todo response schema"""
     id: UUID

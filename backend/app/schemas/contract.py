@@ -66,7 +66,7 @@ class PaymentPlanResponse(BaseModel):
 
 class ContractCreate(BaseModel):
     """Contract creation schema"""
-    contract_no: str
+    contract_no: Optional[str] = None  # Auto-generated (CNT-<ts>) when omitted
     name: str
     contract_type: str
     party_a_id: UUID  # 甲方 (Our Entity)

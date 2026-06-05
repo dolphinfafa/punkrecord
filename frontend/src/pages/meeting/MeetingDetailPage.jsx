@@ -830,8 +830,12 @@ export default function MeetingDetailPage() {
                                     className="summary-option-select"
                                     value={selectedPresetPrompt}
                                     onChange={(e) => {
-                                        setSelectedPresetPrompt(e.target.value);
-                                        if (e.target.value) setSummaryPrompt('');
+                                        // Selecting a preset fills the editable
+                                        // custom-prompt box (default '' clears it),
+                                        // so users can tweak it instead of losing input.
+                                        const v = e.target.value;
+                                        setSelectedPresetPrompt(v);
+                                        setSummaryPrompt(v);
                                     }}
                                     disabled={summaryStreaming}
                                 >
@@ -845,10 +849,7 @@ export default function MeetingDetailPage() {
                                 <textarea
                                     className="summary-prompt-textarea"
                                     value={summaryPrompt}
-                                    onChange={(e) => {
-                                        setSummaryPrompt(e.target.value);
-                                        if (e.target.value) setSelectedPresetPrompt('');
-                                    }}
+                                    onChange={(e) => setSummaryPrompt(e.target.value)}
                                     placeholder={hasAudio ? "输入自定义提示词，覆盖预设..." : "输入会议记录内容，AI 将据此生成会议纪要..."}
                                     rows={hasAudio ? 2 : 6}
                                     disabled={summaryStreaming}

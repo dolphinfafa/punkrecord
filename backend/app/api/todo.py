@@ -22,9 +22,11 @@ from app.models.todo import (
 )
 from app.schemas.todo import (
     TodoCreate, TodoUpdate, TodoReviewAction, TodoResponse,
-    LeaveRequestCreate, LeaveRequestResponse
+    LeaveRequestCreate, LeaveRequestResponse,
+    TodoBlockRequest, TodoDismissRequest
 )
-from app.api.project import sync_project_progress
+from app.api.project import sync_project_progress, VALID_DEV_TYPES
+from app.models.project import Project
 from app.core.storage import save_file, get_file, delete_file, get_download_url
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
@@ -54,6 +56,27 @@ def _can_access_todo(todo: TodoItem, current_user: User, session: Session) -> bo
         return True
     assignee = session.get(User, todo.assignee_user_id)
     return bool(assignee and assignee.manager_user_id == current_user.id)
+
+
+def _serialize_todo_images(todo: TodoItem) -> list[dict]:
+    """Public-facing image list for a todo (omits internal stored_name, adds download path)."""
+    link = dict(todo.link or {})
+    images = list(link.get("todo_images") or [])
+    result = []
+    for img in images:
+        img_id = img.get("id")
+        if not img_id:
+            continue
+        result.append({
+            "id": img_id,
+            "file_name": img.get("file_name"),
+            "content_type": img.get("content_type"),
+            "size": img.get("size"),
+            "uploaded_at": img.get("uploaded_at"),
+            # Relative to API base (e.g. http://host/api/v1)
+            "download_path": f"/todo/{todo.id}/images/{img_id}/download",
+        })
+    return result
 
 
 EVENT_LABELS = {
@@ -287,9 +310,20 @@ async def create_todo(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Create new todo item. Notifies the assignee's manager."""
+    """Create new todo item. Notifies the assignee's manager.
+
+    Optional project linking via ``link``:
+      - ``link.project_id`` or ``link.project_name``: associate the task with a
+        project (becomes a PROJECT_TASK shown in that project's task list).
+      - ``link.dev_type``: task type (dev_backend/dev_frontend/dev_ui/dev_product/other),
+        stored in both ``tags`` and ``link.dev_type`` to match project-page tasks.
+    """
     import uuid as _uuid
-    source_id = todo_data.source_id or str(_uuid.uuid4())
+
+    link = dict(todo_data.link or {})
+    tags = list(todo_data.tags or [])
+    source_type_str = todo_data.source_type
+    source_id = todo_data.source_id
 
     our_entity_id = todo_data.our_entity_id
     if not our_entity_id:
@@ -299,11 +333,55 @@ async def create_todo(
     if not our_entity_id:
         raise ValidationException("未找到可用主体，无法创建任务")
 
+    # ── Optional project linkage (by id or name) ──────────────────────────────
+    linked_project_id: Optional[UUID] = None
+    raw_project_id = link.get("project_id")
+    raw_project_name = link.get("project_name")
+    if raw_project_id:
+        try:
+            pid = _uuid.UUID(str(raw_project_id))
+        except (ValueError, TypeError):
+            raise ValidationException("link.project_id 不是合法的项目ID")
+        project = session.get(Project, pid)
+        if not project:
+            raise ValidationException("未找到对应项目（link.project_id）")
+        linked_project_id = project.id
+    elif raw_project_name:
+        name = str(raw_project_name).strip()
+        matches = session.exec(select(Project).where(Project.name == name)).all()
+        if not matches:
+            raise ValidationException(f"未找到名称为「{name}」的项目，请改用 link.project_id")
+        if len(matches) > 1:
+            raise ValidationException(
+                f"存在多个名称为「{name}」的项目，请改用 link.project_id 精确指定"
+            )
+        linked_project_id = matches[0].id
+
+    if linked_project_id:
+        source_type_str = TodoSourceType.PROJECT_TASK.value
+        source_id = str(linked_project_id)
+        link["project_id"] = str(linked_project_id)
+
+    # ── Optional dev_type (task type) ─────────────────────────────────────────
+    dev_type = link.get("dev_type")
+    if dev_type is not None:
+        dev_type = str(dev_type).strip()
+        if dev_type and dev_type not in VALID_DEV_TYPES:
+            raise ValidationException(
+                f"无效的 dev_type，可选值：{', '.join(sorted(VALID_DEV_TYPES))}"
+            )
+        link["dev_type"] = dev_type
+        if dev_type:
+            tags = [dev_type]
+
+    if not source_id:
+        source_id = str(_uuid.uuid4())
+
     # Extract reviewed_by_user_id from link if provided
     reviewed_by = None
-    if todo_data.link and todo_data.link.get("reviewer_user_id"):
+    if link.get("reviewer_user_id"):
         try:
-            reviewed_by = _uuid.UUID(str(todo_data.link["reviewer_user_id"]))
+            reviewed_by = _uuid.UUID(str(link["reviewer_user_id"]))
         except (ValueError, TypeError):
             pass
 
@@ -313,21 +391,28 @@ async def create_todo(
         creator_user_id=current_user.id,
         title=todo_data.title,
         description=todo_data.description,
-        source_type=TodoSourceType(todo_data.source_type),
+        source_type=TodoSourceType(source_type_str),
         source_id=source_id,
         action_type=TodoActionType(todo_data.action_type),
         priority=todo_data.priority,
         status=TodoStatus.OPEN,
         due_at=todo_data.due_at,
         start_at=todo_data.start_at,
-        tags=todo_data.tags,
-        link=todo_data.link,
+        tags=tags,
+        link=link,
         reviewed_by_user_id=reviewed_by,
     )
 
     session.add(new_todo)
     session.commit()
     session.refresh(new_todo)
+
+    # Keep project progress in sync when the task is linked to a project
+    if linked_project_id:
+        try:
+            sync_project_progress(session, linked_project_id)
+        except ValueError:
+            pass
 
     # Notify the assignee and their manager (non-critical, don't fail the request)
     try:
@@ -707,6 +792,77 @@ async def reject_leave_request(
 
 
 # ─── Single todo ─────────────────────────────────────────────────────────────
+
+# ─── Task images lookup (by task id or title) ────────────────────────────────
+# NOTE: this literal "/images" route MUST be declared before "/{todo_id}" so it
+# is not captured by the UUID path param.
+
+@router.get("/images", response_model=dict)
+async def find_todo_images(
+    todo_id: Optional[UUID] = Query(None),
+    title: Optional[str] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.read"))
+):
+    """List images of a task located by id or by exact title.
+
+    Provide either ``todo_id`` or ``title`` (required, choose one). When the
+    title matches multiple accessible tasks, returns the candidate list so the
+    caller can disambiguate with ``todo_id``.
+    """
+    if not todo_id and not (title and title.strip()):
+        raise ValidationException("必须提供 todo_id 或 title 之一")
+
+    if todo_id:
+        todo = session.get(TodoItem, todo_id)
+        if not todo or not _can_access_todo(todo, current_user, session):
+            raise NotFoundException("未找到待办事项")
+        return success_response({
+            "todo_id": str(todo.id),
+            "title": todo.title,
+            "images": _serialize_todo_images(todo),
+        })
+
+    # Locate by exact title among tasks the user can access
+    name = title.strip()
+    candidates = session.exec(select(TodoItem).where(TodoItem.title == name)).all()
+    accessible = [t for t in candidates if _can_access_todo(t, current_user, session)]
+    if not accessible:
+        raise NotFoundException(f"未找到名称为「{name}」的任务")
+    if len(accessible) > 1:
+        return success_response({
+            "ambiguous": True,
+            "message": f"存在多个名称为「{name}」的任务，请改用 todo_id 指定",
+            "candidates": [
+                {"todo_id": str(t.id), "title": t.title, "status": t.status,
+                 "image_count": len(_serialize_todo_images(t))}
+                for t in accessible
+            ],
+        })
+    todo = accessible[0]
+    return success_response({
+        "todo_id": str(todo.id),
+        "title": todo.title,
+        "images": _serialize_todo_images(todo),
+    })
+
+
+@router.get("/{todo_id}/images", response_model=dict)
+async def list_todo_images(
+    todo_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("todo.read"))
+):
+    """List all images attached to a task."""
+    todo = session.get(TodoItem, todo_id)
+    if not todo or not _can_access_todo(todo, current_user, session):
+        raise NotFoundException("未找到待办事项")
+    return success_response({
+        "todo_id": str(todo.id),
+        "title": todo.title,
+        "images": _serialize_todo_images(todo),
+    })
+
 
 @router.get("/{todo_id}", response_model=dict)
 async def get_todo(
@@ -1231,11 +1387,16 @@ async def mark_todo_done(
 @router.post("/{todo_id}/block", response_model=dict)
 async def block_todo(
     todo_id: UUID,
-    blocked_reason: str,
+    payload: Optional[TodoBlockRequest] = None,
+    blocked_reason: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Block todo with reason."""
+    """Block todo with reason. Reason accepted in request body or query."""
+    reason = (payload.blocked_reason if payload else None) or blocked_reason
+    if not reason or not reason.strip():
+        raise ValidationException("缺少阻塞原因 blocked_reason")
+
     todo = session.get(TodoItem, todo_id)
     if not todo:
         raise NotFoundException("未找到待办事项")
@@ -1244,7 +1405,7 @@ async def block_todo(
         raise NotFoundException("未找到待办事项")
 
     todo.status = TodoStatus.BLOCKED
-    todo.blocked_reason = blocked_reason
+    todo.blocked_reason = reason
     todo.updated_at = now_cn()
 
     session.add(todo)
@@ -1270,11 +1431,14 @@ async def block_todo(
 @router.post("/{todo_id}/dismiss", response_model=dict)
 async def dismiss_todo(
     todo_id: UUID,
-    dismiss_reason: str,
+    payload: Optional[TodoDismissRequest] = None,
+    dismiss_reason: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("todo.write"))
 ):
-    """Dismiss todo."""
+    """Dismiss todo. Reason accepted in request body or query."""
+    reason = (payload.dismiss_reason if payload else None) or dismiss_reason
+
     todo = session.get(TodoItem, todo_id)
     if not todo:
         raise NotFoundException("未找到待办事项")
@@ -1283,7 +1447,7 @@ async def dismiss_todo(
         raise NotFoundException("未找到待办事项")
 
     todo.status = TodoStatus.DISMISSED
-    todo.dismiss_reason = dismiss_reason
+    todo.dismiss_reason = reason
     todo.updated_at = now_cn()
 
     session.add(todo)
