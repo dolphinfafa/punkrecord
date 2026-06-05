@@ -129,6 +129,30 @@
     background: rgba(0, 0, 0, 0.03);
 }
 
+/* Tab badges: 我的活动任务 / 团队待我审核 */
+.view-tab-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.view-tab-badge-my {
+    background-color: #3b82f6;
+}
+
+.view-tab-badge-review {
+    background-color: #ef4444;
+}
+
 .todo-filters {
     display: flex;
     gap: 12px;
