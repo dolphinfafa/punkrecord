@@ -28,6 +28,7 @@
 | `kb.py` | `/api/v1/kb` | 企业大脑（文档管理、RAG 对话、语义搜索） |
 | `meeting.py` | `/api/v1/meeting` | 会议记录（音频上传、ASR 转写、AI 总结、归档） |
 | `changelog.py` | `/api/v1/changelog` | 版本更新日志（CRUD，L0 权限控制） |
+| `mcp_server.py` | `/api/v1/mcp` | MCP 服务（Streamable HTTP，FastMCP），AI 客户端直连 |
 
 路由文件位于 `backend/app/api/` 目录。
 
@@ -231,7 +232,21 @@
 |------|------|------|
 | GET | `/health` | 健康检查 |
 | GET | `/` | 根路径 |
+| GET | `/api/v1/mcp-info` | MCP 端点 URL + 工具列表（供前端 MCP 页面） |
 
 ---
 
-*最后更新：2026-04-09*
+## MCP 服务（`/api/v1/mcp`）
+
+`backend/app/api/mcp_server.py` 用官方 **mcp SDK（FastMCP，Streamable HTTP）** 暴露精选工具，AI 客户端（Claude Desktop/Code、Cursor、Cherry Studio…）直连。
+
+- **挂载**：`main.py` 用 `lifespan` 启动 `mcp.session_manager`，`app.mount("/api/v1/mcp", mcp.streamable_http_app())`（`streamable_http_path="/"`）。复用 nginx `/api/` 代理，生产无需改 nginx。
+- **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
+- **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
+- **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
+- **工具（19）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`search_kb`/`list_meetings`；写 `create_todo`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`。
+- **运行环境**：dev 后端由 **PM2** 托管（`punkrecord-backend`，conda env `punkrecord`，`uvicorn --reload`），非 `dev.sh`（其指向的 `punk` env 为旧脚本）。
+
+---
+
+*最后更新：2026-06-08*

@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { todoApi } from '@/api/todo';
 import iamApi from '@/api/iam';
 import changelogApi from '@/api/changelog';
-import agentTokenApi from '@/api/agentToken';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     LayoutDashboard, CheckSquare, Clock, AlertCircle, Plus,
     TrendingUp, Activity, ArrowRight, CalendarClock, FileText, Edit3, Trash2, Save, X,
-    Key, Copy, Check
+    Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -47,13 +46,6 @@ export default function DashboardPage() {
     const [changelogForm, setChangelogForm] = useState({ version: '', title: '', content: '' });
     const [changelogSaving, setChangelogSaving] = useState(false);
     const [selectedChangelogIdx, setSelectedChangelogIdx] = useState(0);
-
-    // Agent Token
-    const [agentTokens, setAgentTokens] = useState([]);
-    const [showTokenCreate, setShowTokenCreate] = useState(false);
-    const [tokenForm, setTokenForm] = useState({ name: '', expires_in_days: '' });
-    const [newToken, setNewToken] = useState(null); // 刚创建的 token 明文
-    const [tokenCopied, setTokenCopied] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -96,12 +88,6 @@ export default function DashboardPage() {
                 // Get Recent Activity (Sort by updated_at desc)
                 const sorted = [...todos].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
                 setRecentActivity(sorted.slice(0, 3));
-
-                // Load Agent Tokens
-                try {
-                    const tokenRes = await agentTokenApi.list();
-                    setAgentTokens(tokenRes.data || []);
-                } catch { /* ignore */ }
 
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
@@ -403,92 +389,6 @@ export default function DashboardPage() {
                                 </div>
                             );
                         })()}
-                    </div>
-
-                    {/* Agent Token Management */}
-                    <div className="section-card" style={{ marginTop: '1.5rem' }}>
-                        <div className="section-header">
-                            <h3><Key size={18} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />Agent 密钥</h3>
-                            <button className="create-btn" style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}
-                                onClick={() => { setShowTokenCreate(true); setNewToken(null); setTokenForm({ name: '', expires_in_days: '' }); }}>
-                                <Plus size={14} /> 生成密钥
-                            </button>
-                        </div>
-
-                        {showTokenCreate && (
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
-                                {newToken ? (
-                                    <div>
-                                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '8px' }}>密钥已生成，请立即复制保存（关闭后无法再查看）：</div>
-                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                            <code style={{ flex: 1, padding: '8px 12px', background: '#1e293b', color: '#4ade80', borderRadius: '6px', fontSize: '0.8rem', wordBreak: 'break-all' }}>{newToken}</code>
-                                            <button className="create-btn" onClick={() => {
-                                                try { navigator.clipboard.writeText(newToken); } catch {
-                                                    const ta = document.createElement('textarea'); ta.value = newToken; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                                                    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                                                }
-                                                setTokenCopied(true); setTimeout(() => setTokenCopied(false), 2000);
-                                            }}>
-                                                {tokenCopied ? <><Check size={14} /> 已复制</> : <><Copy size={14} /> 复制</>}
-                                            </button>
-                                        </div>
-                                        <button className="create-btn" style={{ marginTop: '8px', background: '#64748b' }} onClick={() => { setShowTokenCreate(false); setNewToken(null); }}>关闭</button>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                        <label style={{ flex: 1, minWidth: '150px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>名称</span>
-                                            <input type="text" value={tokenForm.name} onChange={e => setTokenForm(p => ({ ...p, name: e.target.value }))}
-                                                placeholder="如：我的 Claude Agent" style={{ width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', marginTop: '4px' }} />
-                                        </label>
-                                        <label style={{ width: '120px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>有效期</span>
-                                            <select value={tokenForm.expires_in_days} onChange={e => setTokenForm(p => ({ ...p, expires_in_days: e.target.value }))}
-                                                style={{ width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', marginTop: '4px' }}>
-                                                <option value="">永久</option>
-                                                <option value="30">30 天</option>
-                                                <option value="90">90 天</option>
-                                                <option value="180">180 天</option>
-                                            </select>
-                                        </label>
-                                        <button className="create-btn" onClick={async () => {
-                                            try {
-                                                const res = await agentTokenApi.create({ name: tokenForm.name || 'Agent Token', expires_in_days: tokenForm.expires_in_days ? parseInt(tokenForm.expires_in_days) : null });
-                                                setNewToken(res.data.token);
-                                                const listRes = await agentTokenApi.list(); setAgentTokens(listRes.data || []);
-                                            } catch (err) { alert(err?.response?.data?.message || '创建失败'); }
-                                        }}>生成</button>
-                                        <button style={{ padding: '6px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white', cursor: 'pointer' }}
-                                            onClick={() => setShowTokenCreate(false)}>取消</button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {agentTokens.length === 0 && !showTokenCreate ? (
-                            <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>暂无密钥，生成后可供 AI Agent 使用。</div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {agentTokens.map(t => (
-                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                                        <div>
-                                            <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{t.name} <code style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>{t.token_preview}</code></div>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                                                创建: {t.created_at?.slice(0, 10)}
-                                                {t.expires_at && ` · 到期: ${t.expires_at.slice(0, 10)}`}
-                                                {t.last_used_at && ` · 最后使用: ${t.last_used_at.slice(0, 16).replace('T', ' ')}`}
-                                            </div>
-                                        </div>
-                                        <button style={{ padding: '4px 10px', border: '1px solid #fca5a5', borderRadius: '6px', background: 'white', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
-                                            onClick={async () => {
-                                                if (!window.confirm('确认删除此密钥？删除后使用该密钥的 Agent 将无法继续访问。')) return;
-                                                try { await agentTokenApi.remove(t.id); const res = await agentTokenApi.list(); setAgentTokens(res.data || []); }
-                                                catch (err) { alert(err?.response?.data?.message || '删除失败'); }
-                                            }}>删除</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
 

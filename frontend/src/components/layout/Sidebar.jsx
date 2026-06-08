@@ -13,6 +13,7 @@ import {
     Brain,
     Mic,
     MessageSquare,
+    Plug,
     LogOut,
     ChevronLeft,
     ChevronRight
@@ -30,6 +31,7 @@ const MENU_ITEMS = [
     { path: '/kb', label: '企业大脑', icon: Brain, permission: 'kb.read' },
     { path: '/meeting', label: '会议记录', icon: Mic, permission: 'meeting.read' },
     { path: '/wechat-notify', label: '微信通知', icon: MessageSquare, permission: null },
+    { path: '/mcp', label: 'MCP', icon: Plug, permission: null },
 ];
 
 export default function Sidebar() {

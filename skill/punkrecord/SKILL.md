@@ -15,7 +15,9 @@ Agent 需要用户提供 **Agent Token**（格式 `pat_xxx`），通过 HTTP 请
 Authorization: Bearer pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-用户在 PunkRecord 工作台的"Agent 密钥"区域生成 Token。
+用户在 PunkRecord 的「MCP」页面（左侧导航）生成密钥。
+
+> 除本 Skill（REST 文档）外，PunkRecord 也提供 **MCP 服务**：在「MCP」页面可获取 Streamable HTTP 端点（`/api/v1/mcp`）与各客户端（Claude Desktop/Code、Cursor、Cherry Studio）配置片段，用同一 `pat_` 密钥即可让 AI 客户端直接调用工具。
 
 ## API 基地址
 

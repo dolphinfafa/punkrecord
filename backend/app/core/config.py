@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+
+    # MCP service
+    # Internal REST base the MCP tools call in-process (forward caller's pat_ token).
+    # dev: 15085 ; prod override to http://127.0.0.1:9086/api/v1
+    INTERNAL_API_BASE_URL: str = "http://127.0.0.1:15085/api/v1"
+    # Public MCP endpoint shown to users on the MCP page / docs.
+    MCP_PUBLIC_URL: str = "http://14.103.229.153:15085/api/v1/mcp"
     
     @property
     def DATABASE_URL(self) -> str:
