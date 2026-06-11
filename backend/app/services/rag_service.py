@@ -77,9 +77,14 @@ async def rag_chat_stream(
         return
 
     # 1. Retrieve relevant context
-    search_results = await search_documents(
-        user_message, top_k=settings.KB_RAG_TOP_K, session=session
-    )
+    try:
+        search_results = await search_documents(
+            user_message, top_k=settings.KB_RAG_TOP_K, session=session
+        )
+    except RuntimeError as e:
+        logger.warning("RAG retrieval unavailable: %s", e)
+        yield f"data: {json.dumps({'error': '知识库检索服务暂不可用（嵌入服务未配置），请联系管理员。'})}\n\n"
+        return
 
     # Build context from search results
     context_parts = []

@@ -1,0 +1,277 @@
+"""
+PunkRecord MCP server (Streamable HTTP).
+
+Exposes a curated set of PunkRecord operations as MCP tools so AI clients
+(Claude Desktop/Code, Cursor, Cherry Studio, ...) can act on the user's behalf.
+
+Auth: the client sends `Authorization: Bearer pat_xxx` (a PunkRecord Agent Token).
+Each tool forwards that token to the local REST API in-process, so permissions,
+notifications and all business rules stay identical to the web app — zero logic
+duplication.
+"""
+import logging
+from typing import Optional
+
+import httpx
+from mcp.server.fastmcp import FastMCP, Context
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# streamable_http_path="/" so mounting at /api/v1/mcp serves the endpoint exactly there.
+mcp = FastMCP("punkrecord", stateless_http=True, streamable_http_path="/")
+
+
+class AuthError(Exception):
+    """Raised when the MCP request lacks a valid PunkRecord Agent Token."""
+
+
+def _extract_token(ctx: Context) -> str:
+    """Pull the `pat_` Agent Token out of the request's Authorization header."""
+    auth = None
+    try:
+        request = ctx.request_context.request
+        if request is not None:
+            auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    except Exception:  # pragma: no cover - defensive
+        auth = None
+
+    if not auth:
+        raise AuthError(
+            "缺少 Authorization 头。请在 MCP 客户端配置 "
+            "'Authorization: Bearer pat_你的PunkRecord密钥'。"
+        )
+
+    token = auth[7:].strip() if auth[:7].lower() == "bearer " else auth.strip()
+    if not token.startswith("pat_"):
+        raise AuthError("无效的 API Key（应为 pat_ 开头的 PunkRecord Agent Token）。")
+    return token
+
+
+async def _call(
+    ctx: Context,
+    method: str,
+    path: str,
+    *,
+    params: Optional[dict] = None,
+    json: Optional[dict] = None,
+):
+    """Forward the call to the local REST API with the caller's token."""
+    token = _extract_token(ctx)
+    url = settings.INTERNAL_API_BASE_URL.rstrip("/") + path
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.request(method, url, params=params, json=json, headers=headers)
+
+    try:
+        body = resp.json()
+    except Exception:
+        if resp.status_code >= 400:
+            raise RuntimeError(f"请求失败（HTTP {resp.status_code}）")
+        return {"raw": resp.text}
+
+    if resp.status_code >= 400:
+        msg = None
+        if isinstance(body, dict):
+            msg = body.get("message") or body.get("detail")
+        raise RuntimeError(str(msg) if msg else f"请求失败（HTTP {resp.status_code}）")
+
+    # REST envelope is {code, message, data}; return the payload.
+    if isinstance(body, dict) and "data" in body:
+        return body["data"]
+    return body
+
+
+# ─── Read tools ───────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def get_me(ctx: Context) -> dict:
+    """获取当前 API Key 对应的用户信息与权限（id、姓名、permissions 等）。建议先调用以确认身份。"""
+    return await _call(ctx, "GET", "/auth/me")
+
+
+@mcp.tool()
+async def list_my_todos(ctx: Context, status: Optional[str] = None, page_size: int = 20) -> dict:
+    """查看我的待办任务列表。status 可选：open/in_progress/pending_review/done/blocked/dismissed。"""
+    return await _call(ctx, "GET", "/todo/my", params={"status": status, "page_size": page_size})
+
+
+@mcp.tool()
+async def get_todo(ctx: Context, todo_id: str) -> dict:
+    """查看某个任务的详情（含 link.todo_images 图片元数据）。"""
+    return await _call(ctx, "GET", f"/todo/{todo_id}")
+
+
+@mcp.tool()
+async def list_todo_images(ctx: Context, todo_id: str) -> dict:
+    """列出某个任务的全部图片（含 download_path 下载路径）。"""
+    return await _call(ctx, "GET", f"/todo/{todo_id}/images")
+
+
+@mcp.tool()
+async def list_my_leaves(ctx: Context, status: Optional[str] = None) -> dict:
+    """查看我的请假记录。status 可选：pending/approved/rejected。"""
+    return await _call(ctx, "GET", "/todo/leaves/my", params={"status": status})
+
+
+@mcp.tool()
+async def list_projects(ctx: Context, status: Optional[str] = None, page_size: int = 20) -> dict:
+    """查看项目列表。status 可选：active/archived 等。"""
+    return await _call(ctx, "GET", "/project/projects", params={"status": status, "page_size": page_size})
+
+
+@mcp.tool()
+async def get_project(ctx: Context, project_id: str) -> dict:
+    """查看项目详情。"""
+    return await _call(ctx, "GET", f"/project/projects/{project_id}")
+
+
+@mcp.tool()
+async def list_project_todos(ctx: Context, project_id: str) -> dict:
+    """查看某个项目下的全部任务。"""
+    return await _call(ctx, "GET", f"/project/projects/{project_id}/todos")
+
+
+@mcp.tool()
+async def list_contracts(ctx: Context, status: Optional[str] = None, page_size: int = 20) -> dict:
+    """查看合同列表（需 contract.read 权限）。"""
+    return await _call(ctx, "GET", "/contract/contracts", params={"status": status, "page_size": page_size})
+
+
+@mcp.tool()
+async def list_counterparties(ctx: Context, page_size: int = 20) -> dict:
+    """查看交易方（对手方）列表。"""
+    return await _call(ctx, "GET", "/contract/counterparties", params={"page_size": page_size})
+
+
+@mcp.tool()
+async def list_transactions(
+    ctx: Context, date_from: Optional[str] = None, date_to: Optional[str] = None, page_size: int = 20
+) -> dict:
+    """查看财务交易记录（需 finance.read 权限）。日期格式 YYYY-MM-DD。"""
+    return await _call(
+        ctx, "GET", "/finance/transactions",
+        params={"date_from": date_from, "date_to": date_to, "page_size": page_size},
+    )
+
+
+@mcp.tool()
+async def search_kb(ctx: Context, query: str, top_k: int = 5) -> dict:
+    """在企业知识库做语义搜索（需 kb.read 权限）。"""
+    return await _call(ctx, "POST", "/kb/search", json={"query": query, "top_k": top_k})
+
+
+@mcp.tool()
+async def list_meetings(ctx: Context, search: Optional[str] = None, page_size: int = 10) -> dict:
+    """查看会议记录列表（需 meeting.read 权限）。search 可按标题/参会人搜索。"""
+    return await _call(ctx, "GET", "/meeting/records", params={"search": search, "page_size": page_size})
+
+
+# ─── Write tools ──────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def create_todo(
+    ctx: Context,
+    title: str,
+    assignee_user_id: str,
+    priority: str = "p2",
+    due_at: Optional[str] = None,
+    description: Optional[str] = None,
+    project_name: Optional[str] = None,
+    project_id: Optional[str] = None,
+    dev_type: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+) -> dict:
+    """创建任务。
+
+    - assignee_user_id：执行人用户 UUID（可先用 get_me 或 list 接口获取）。
+    - priority：p0-p3（默认 p2）；due_at：ISO 时间，如 2026-06-10T18:00:00。
+    - 关联项目（任选其一）：project_name（项目名精确匹配）或 project_id；
+      dev_type 任务类型：dev_backend/dev_frontend/dev_ui/dev_product/other。
+    - tags：标签数组。
+    """
+    link: dict = {}
+    if project_id:
+        link["project_id"] = project_id
+    if project_name:
+        link["project_name"] = project_name
+    if dev_type:
+        link["dev_type"] = dev_type
+
+    body: dict = {"title": title, "assignee_user_id": assignee_user_id, "priority": priority}
+    if due_at:
+        body["due_at"] = due_at
+    if description:
+        body["description"] = description
+    if tags:
+        body["tags"] = tags
+    if link:
+        body["link"] = link
+    return await _call(ctx, "POST", "/todo", json=body)
+
+
+@mcp.tool()
+async def start_todo(ctx: Context, todo_id: str) -> dict:
+    """开始任务（open → in_progress）。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/start")
+
+
+@mcp.tool()
+async def submit_todo(ctx: Context, todo_id: str) -> dict:
+    """提交任务完成（有审核人则进入待审核，否则直接完成）。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/submit")
+
+
+@mcp.tool()
+async def block_todo(ctx: Context, todo_id: str, blocked_reason: str) -> dict:
+    """阻塞任务，需说明原因。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/block", json={"blocked_reason": blocked_reason})
+
+
+@mcp.tool()
+async def dismiss_todo(ctx: Context, todo_id: str, dismiss_reason: Optional[str] = None) -> dict:
+    """忽略任务，可附原因。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/dismiss", json={"dismiss_reason": dismiss_reason})
+
+
+# ─── Review tools (team tasks awaiting my review) ─────────────────────────────
+
+@mcp.tool()
+async def list_tasks_to_review(ctx: Context) -> dict:
+    """查看团队任务中【需要我审核】的任务（下属上报完成、待我审批的 pending_review 任务）。"""
+    me = await _call(ctx, "GET", "/auth/me")
+    my_id = me.get("id") if isinstance(me, dict) else None
+    return await _call(
+        ctx, "GET", "/todo/team",
+        params={"status": "pending_review", "reviewed_by_user_id": my_id, "page_size": 50},
+    )
+
+
+@mcp.tool()
+async def approve_todo(ctx: Context, todo_id: str, comment: Optional[str] = None) -> dict:
+    """审核通过某个待我审核的任务（pending_review → done）。comment 为可选审批意见。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/approve", json={"comment": comment})
+
+
+@mcp.tool()
+async def reject_todo(ctx: Context, todo_id: str, comment: str) -> dict:
+    """审核驳回某个待我审核的任务（打回为未开始 open）。comment 为驳回理由（必填）。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/reject", json={"comment": comment})
+
+
+@mcp.tool()
+async def create_leave(
+    ctx: Context, leave_type: str, start_at: str, end_at: str, reason: Optional[str] = None
+) -> dict:
+    """提交请假申请。
+
+    - leave_type：annual/maternity/marriage/personal/sick。
+    - 时间格式：上午用 T10:00:00/T12:00:00，下午用 T14:00:00/T19:00:00。
+      例：请一天 start_at=2026-06-10T10:00:00，end_at=2026-06-10T19:00:00。
+    """
+    body = {"leave_type": leave_type, "start_at": start_at, "end_at": end_at}
+    if reason:
+        body["reason"] = reason
+    return await _call(ctx, "POST", "/todo/leaves", json=body)

@@ -27,15 +27,36 @@ async def get_current_user(
     logger.debug("Authentication attempt")
     
     # Prefer explicit Bearer token from frontend, then fallback to cookie.
-    # This avoids account-mismatch when stale cookies exist across logins.
     token = credentials.credentials if credentials else None
     if not token:
         token = request.cookies.get("access_token")
-        
+
     if not token:
         logger.debug("No token found in cookie or header")
         raise UnauthorizedException("Not authenticated")
-    
+
+    # Agent Token path: pat_ prefix
+    if token.startswith("pat_"):
+        from app.models.shared import AgentToken
+        from app.models.base import now_cn
+        agent_token = session.exec(
+            select(AgentToken).where(AgentToken.token == token, AgentToken.is_active == True)
+        ).first()
+        if not agent_token:
+            raise UnauthorizedException("Invalid Agent Token")
+        if agent_token.expires_at and agent_token.expires_at < now_cn():
+            raise UnauthorizedException("Agent Token has expired")
+        # Update last used time
+        agent_token.last_used_at = now_cn()
+        session.add(agent_token)
+        session.commit()
+        user = session.get(User, agent_token.user_id)
+        if not user or user.status != UserStatus.ACTIVE:
+            raise UnauthorizedException("User not found or inactive")
+        logger.debug("Agent Token auth successful: %s", user.username)
+        return user
+
+    # JWT path
     try:
         payload = decode_access_token(token)
         user_id: str = payload.get("sub")
@@ -46,17 +67,16 @@ async def get_current_user(
     except Exception as e:
         logger.debug("Token decode failed: %s: %s", type(e).__name__, str(e))
         raise UnauthorizedException("Invalid authentication credentials")
-    
-    # Get user from database
+
     user = session.get(User, UUID(user_id))
     if user is None:
         logger.debug("User not found in database")
         raise UnauthorizedException("User not found")
-    
+
     if user.status != UserStatus.ACTIVE:
         logger.debug("User is not active: %s", user.status)
         raise UnauthorizedException("User is inactive")
-    
+
     logger.debug("Authentication successful: %s", user.username)
     return user
 

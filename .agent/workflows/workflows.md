@@ -17,6 +17,7 @@
   4. 完成后标记 `profile_completed=true`, `must_change_password=false`，进入系统
 - 管理员可重置员工密码（默认重置为 `punkrecord123`，员工下次登录需修改）
 - 小程序登录后持久化 Token，个人中心页可通过 `/auth/me` 回填用户信息
+- **Agent Token**：用户在工作台"Agent 密钥"区域生成专用 Token（格式 `pat_xxx`），供 AI Agent 通过 `Authorization: Bearer pat_xxx` 调用 API。Token 可设有效期（30/90/180天/永久），支持删除。认证中间件自动识别 `pat_` 前缀并映射到用户。
 
 ### 1.2 任务生命周期
 
@@ -113,6 +114,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
 - 转写完成后可编辑文稿内容和说话人标注
 - AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项
+- 提示词预设与自定义提示词：选择预设会**追加**预设文案到自定义框已有内容之后（两部分共存，提交时合并为 `prompt`），切换预设自动剥离上一次追加段以避免累积
 - 归档到企业大脑：将转写文稿 + 纪要存为知识库文档，自动进入处理管线
 
 ---

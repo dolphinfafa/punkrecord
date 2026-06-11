@@ -1,10 +1,13 @@
 # FastAPI and web framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+# NOTE: requires Python 3.10+ (MCP SDK). Versions below are the verified set
+# that runs the app + the MCP server together.
+fastapi==0.135.1
+starlette==0.52.1
+uvicorn[standard]==0.41.0
 python-multipart==0.0.6
 
 # Database
-sqlmodel==0.0.14
+sqlmodel==0.0.37
 alembic==1.13.1
 pymysql==1.1.0
 cryptography==41.0.7
@@ -16,8 +19,11 @@ bcrypt<5.0.0
 python-multipart==0.0.6
 
 # Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+
+# MCP server (Streamable HTTP). Requires Python 3.10+.
+mcp==1.27.2
 
 # CORS
 fastapi-cors==0.0.6
@@ -25,7 +31,7 @@ fastapi-cors==0.0.6
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3
-httpx==0.26.0
+httpx==0.28.1
 requests>=2.31.0
 
 # Object Storage

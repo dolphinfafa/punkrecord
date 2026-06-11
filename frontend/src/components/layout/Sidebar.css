@@ -50,6 +50,7 @@
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -63,6 +64,57 @@
   width: 100%;
   text-align: left;
   font-size: 14px;
+}
+
+/* Todo badges (我的任务 / 团队待审核) */
+.nav-badges {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 我的任务：未开始 + 进行中 */
+.nav-badge-my {
+  background-color: #89b4fa;
+  color: #11111b;
+}
+
+/* 团队任务：待我审核（需关注，用醒目红） */
+.nav-badge-review {
+  background-color: #f38ba8;
+  color: #11111b;
+}
+
+/* Keep badges readable when the nav item itself is active (blue bg) */
+.nav-item.active .nav-badge-my {
+  background-color: #11111b;
+  color: #89b4fa;
+}
+
+/* Collapsed: single dot on the icon corner */
+.nav-badge-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f38ba8;
 }
 
 .sidebar.collapsed .nav-item {

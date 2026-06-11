@@ -446,14 +446,25 @@ async def semantic_search(
     current_user: User = Depends(require_permission("kb.read")),
 ):
     """Semantic search over the knowledge base."""
-    results = await search_documents(
-        query=data.query,
-        top_k=data.top_k,
-        tags=data.tags,
-        session=session,
-    )
+    try:
+        results = await search_documents(
+            query=data.query,
+            top_k=data.top_k,
+            tags=data.tags,
+            session=session,
+        )
+    except RuntimeError as e:
+        # e.g. embedding service not configured — degrade gracefully
+        logger.warning("Semantic search unavailable: %s", e)
+        return success_response({
+            "results": [],
+            "query": data.query,
+            "available": False,
+            "message": "知识库语义检索服务暂不可用（嵌入服务未配置），请联系管理员。",
+        })
 
     return success_response({
         "results": results,
         "query": data.query,
+        "available": True,
     })

@@ -1,0 +1,72 @@
+---
+name: punkrecord
+description: PunkRecord 企业项目管理平台 API 技能。支持待办管理、请假审批、项目管理、合同、财务、会议记录、知识库等全模块操作。当用户要求查看任务、提交请假、管理项目、查看合同/财务/会议等操作时触发。
+---
+
+# PunkRecord Skill
+
+PunkRecord 是一套企业级项目管理平台，提供 RESTful API 供 AI Agent 代理用户执行操作。
+
+## 认证
+
+Agent 需要用户提供 **Agent Token**（格式 `pat_xxx`），通过 HTTP 请求头进行认证：
+
+```
+Authorization: Bearer pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+用户在 PunkRecord 的「MCP」页面（左侧导航）生成密钥。
+
+> 除本 Skill（REST 文档）外，PunkRecord 也提供 **MCP 服务**：在「MCP」页面可获取 Streamable HTTP 端点（`/api/v1/mcp`）与各客户端（Claude Desktop/Code、Cursor、Cherry Studio）配置片段，用同一 `pat_` 密钥即可让 AI 客户端直接调用工具。
+
+## API 基地址
+
+```
+http://14.103.229.153:15085/api/v1
+```
+
+## 响应格式
+
+所有接口返回统一格式：
+```json
+{"code": 0, "message": "success", "data": { ... }}
+```
+
+错误时：
+```json
+{"code": 400, "message": "错误描述"}
+```
+
+## 能力概览
+
+| 模块 | 能力 |
+|------|------|
+| **认证** | 查看当前用户信息和权限 |
+| **待办事项** | 查看/创建/编辑/状态流转（开始/提交/审核/完成） |
+| **请假管理** | 提交请假申请、查看请假记录 |
+| **项目管理** | 查看项目列表/详情/任务/成员 |
+| **合同管理** | 查看合同/对手方 |
+| **财务管理** | 查看账户/交易记录 |
+| **会议记录** | 查看会议列表/详情/转录/纪要 |
+| **知识库** | 搜索知识库、RAG 对话 |
+| **组织管理** | 查看用户/部门/职位/组织架构 |
+
+## 使用指南
+
+1. 先调用 `GET /auth/me` 确认身份和权限
+2. 根据用户请求调用对应模块 API
+3. 详细 API 参考见 `knowledge/api-reference.md`
+4. 常见操作示例见 `knowledge/examples.md`
+
+## 注意事项
+
+- Token 代表用户身份，所有操作受该用户权限限制
+- **权限模型**：读操作（GET 列表/详情）对任意有效 Token 开放；写操作（创建/更新/状态流转/删除）需对应 `*.write` 权限，无权限返回 403。先调 `GET /auth/me` 查看权限。
+- 请假天数按工作时间计算（周一至周五，上午10-12点，下午14-19点），精度 0.5 天
+- 请假开始/结束时间格式：上午用 `T10:00:00`/`T12:00:00`，下午用 `T14:00:00`/`T19:00:00`
+- 创建任务时 `our_entity_id` 可不传，系统自动使用默认实体
+- 创建任务可用 `link.project_name`/`link.project_id` + `link.dev_type` 一次性关联项目，无需多轮对话
+- 阻塞/忽略任务的原因放**请求体**（`{"blocked_reason":...}` / `{"dismiss_reason":...}`）
+- 创建合同 `contract_no` 可不传（自动生成 `CNT-<时间戳>`）
+- 知识库对话 `POST /kb/chat` 的字段是 **`message`**（不是 `query`）
+- 项目阶段须**按序推进**：更新某阶段前其前序阶段须为 `done` 或 `skipped`

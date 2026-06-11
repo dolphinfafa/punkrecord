@@ -88,6 +88,7 @@ export default function TodoPage() {
     const [reviewerFilter, setReviewerFilter] = useState(user?.id || 'all');
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [todoCounts, setTodoCounts] = useState({ my_active: 0, team_pending_review: 0 });
     const pageSize = 20;
     const [doneExpanded, setDoneExpanded] = useState(false);
     const [doneTodos, setDoneTodos] = useState([]);
@@ -115,6 +116,19 @@ export default function TodoPage() {
         };
         init();
     }, []);
+
+    const fetchCounts = async () => {
+        try {
+            const res = await todoApi.badgeCounts();
+            const data = res?.data || {};
+            setTodoCounts({
+                my_active: data.my_active || 0,
+                team_pending_review: data.team_pending_review || 0,
+            });
+        } catch {
+            // non-critical
+        }
+    };
 
     const fetchDoneTodos = async () => {
         try {
@@ -176,6 +190,7 @@ export default function TodoPage() {
             showNotification('获取任务列表失败', 'error');
         } finally {
             setLoading(false);
+            fetchCounts();
         }
     };
 
@@ -497,12 +512,22 @@ export default function TodoPage() {
                     onClick={() => { setViewMode('my'); setFilter('board'); setAssigneeFilter('all'); setReviewerFilter('all'); setPage(1); }}
                 >
                     <User size={15} /> 我的任务
+                    {todoCounts.my_active > 0 && (
+                        <span className="view-tab-badge view-tab-badge-my" title={`未开始/进行中 ${todoCounts.my_active}`}>
+                            {todoCounts.my_active}
+                        </span>
+                    )}
                 </button>
                 <button
                     className={clsx('view-tab', { active: viewMode === 'team' })}
                     onClick={() => { setViewMode('team'); setFilter('board'); setAssigneeFilter('all'); setReviewerFilter(user?.id || 'all'); setPage(1); }}
                 >
                     <Users size={15} /> 团队任务
+                    {todoCounts.team_pending_review > 0 && (
+                        <span className="view-tab-badge view-tab-badge-review" title={`待我审核 ${todoCounts.team_pending_review}`}>
+                            {todoCounts.team_pending_review}
+                        </span>
+                    )}
                 </button>
             </div>
 

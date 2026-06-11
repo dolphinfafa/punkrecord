@@ -6,7 +6,8 @@ import changelogApi from '@/api/changelog';
 import { useAuth } from '@/contexts/AuthContext';
 import {
     LayoutDashboard, CheckSquare, Clock, AlertCircle, Plus,
-    TrendingUp, Activity, ArrowRight, CalendarClock, FileText, Edit3, Trash2, Save, X
+    TrendingUp, Activity, ArrowRight, CalendarClock, FileText, Edit3, Trash2, Save, X,
+    Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';

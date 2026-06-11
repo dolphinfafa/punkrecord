@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
-    APP_VERSION: str = "1.0.8"
+    APP_VERSION: str = "2.0.0"
     APP_ENV: str = "development"
     DEBUG: bool = False
     
@@ -80,6 +80,15 @@ class Settings(BaseSettings):
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+
+    # MCP service
+    # Internal REST base the MCP tools call in-process (forward caller's pat_ token).
+    # dev: 15085 ; prod override to http://127.0.0.1:9086/api/v1
+    INTERNAL_API_BASE_URL: str = "http://127.0.0.1:15085/api/v1"
+    # Public MCP endpoint shown to users on the MCP page / docs.
+    # Leave empty to auto-derive from the request (X-Forwarded-* / Host);
+    # set explicitly per environment for reliability (recommended in prod).
+    MCP_PUBLIC_URL: str = ""
     
     @property
     def DATABASE_URL(self) -> str:

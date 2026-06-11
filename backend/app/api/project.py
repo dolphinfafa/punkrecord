@@ -534,7 +534,27 @@ async def update_stage_status(
         raise NotFoundException("未找到阶段")
 
     if data.status is not None:
-        stage.status = StageStatus(data.status)
+        new_status = StageStatus(data.status)
+        # Enforce sequential progression: advancing a stage to in_progress/done
+        # requires every earlier stage to be done or skipped (skips must be explicit).
+        if new_status in (StageStatus.IN_PROGRESS, StageStatus.DONE):
+            prior_stages = session.exec(
+                select(ProjectStage)
+                .where(ProjectStage.project_id == project_id)
+                .where(ProjectStage.sequence_no < stage.sequence_no)
+                .order_by(ProjectStage.sequence_no)
+            ).all()
+            blocking = next(
+                (s for s in prior_stages
+                 if s.status not in (StageStatus.DONE, StageStatus.SKIPPED)),
+                None,
+            )
+            if blocking is not None:
+                raise ValidationException(
+                    f"前序阶段「{blocking.stage_name}」尚未完成，"
+                    f"请先完成或跳过(skipped)前序阶段后再更新当前阶段"
+                )
+        stage.status = new_status
         if data.blocked_reason:
             stage.blocked_reason = data.blocked_reason
         if data.skip_reason:

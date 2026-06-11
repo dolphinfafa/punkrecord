@@ -76,6 +76,18 @@ class WeChatMessageTemplate(BaseDBModel, table=True):
     is_active: bool = Field(default=True, nullable=False)
 
 
+class AgentToken(BaseDBModel, table=True):
+    """Personal access token for AI Agent authentication"""
+    __tablename__ = "agent_token"
+
+    user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
+    token: str = Field(nullable=False, unique=True, index=True)
+    name: str = Field(default="", nullable=False)
+    expires_at: Optional[datetime] = Field(default=None)
+    is_active: bool = Field(default=True, nullable=False)
+    last_used_at: Optional[datetime] = Field(default=None)
+
+
 class WeChatNotifyBinding(BaseDBModel, table=True):
     """WeChat notification binding via weixin-msg-service"""
     __tablename__ = "wechat_notify_binding"

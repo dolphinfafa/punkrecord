@@ -68,7 +68,7 @@
 | 页面/组件 | 说明 |
 |-----------|------|
 | `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 上传音频按钮 |
-| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词 + 引用上次会议 + AI 总结 + 参会人/日期显示 + 归档 |
+| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 归档 |
 | `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 + 会议日期选择（默认今天） |
 
 ### API 模块（`api/`）
@@ -169,6 +169,21 @@
 | `pages/todo/TodoPage.jsx` | handleEditTodo 支持上传新图片；canEditTodo 增加 reviewed_by_user_id 权限检查 |
 | `pages/dashboard/DashboardPage.jsx` | "已完成"统计改为仅统计本周（周一至今）完成的任务 |
 
+### v2.0.0 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/dashboard/DashboardPage.jsx` | 新增 Agent 密钥管理区域（版本日志下方）：生成/复制/删除 Token |
+| `api/agentToken.js` | 新增 Agent Token API 层（创建/列表/删除） |
+| `components/layout/Sidebar.jsx` + `Sidebar.css` | "待办事项"导航项右侧两个角标：蓝=我的活动任务(open+in_progress)、红=团队待我审核(pending_review)；挂载/路由切换拉取 + 45s 轮询；折叠态红点。**新增 MCP 导航项**（`/mcp`，Plug 图标，permission:null） |
+| `pages/todo/TodoPage.jsx` + `TodoPage.css` | "我的任务/团队任务"切换标签加同源角标；计数随任务列表刷新（含操作后）同步更新 |
+| `api/todo.js` | 新增 `badgeCounts()` → `GET /todo/badge-counts` |
+| `pages/meeting/MeetingDetailPage.jsx` | 会议纪要选提示词预设改为追加到自定义框（不覆盖），切换预设自动剥离上次追加段 |
+| `pages/mcp/McpPage.jsx` + `McpPage.css` | **新增 MCP 集成页**：介绍 + API 密钥管理（从工作台迁来，复用 agentTokenApi）+ 端点 URL + 客户端配置 Tabs（Streamable HTTP / Stdio）+ 工具列表 + 快速开始 |
+| `api/mcp.js` | 新增 `getInfo()` → `GET /mcp-info`（端点 URL + 工具列表） |
+| `App.jsx` | 新增 `/mcp` 路由 |
+| `pages/dashboard/DashboardPage.jsx` | **移除** Agent 密钥管理区（迁至 MCP 页），清理相关 state/imports |
+
 ---
 
-*最后更新：2026-05-07*
+*最后更新：2026-06-05*

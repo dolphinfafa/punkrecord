@@ -830,8 +830,22 @@ export default function MeetingDetailPage() {
                                     className="summary-option-select"
                                     value={selectedPresetPrompt}
                                     onChange={(e) => {
-                                        setSelectedPresetPrompt(e.target.value);
-                                        if (e.target.value) setSummaryPrompt('');
+                                        // Append the preset text to whatever the user
+                                        // already typed (both coexist), instead of
+                                        // overwriting it. Switching presets first strips
+                                        // the previously-appended preset to avoid stacking.
+                                        const v = e.target.value;
+                                        setSummaryPrompt((prev) => {
+                                            let base = prev;
+                                            if (selectedPresetPrompt && base.endsWith(selectedPresetPrompt)) {
+                                                base = base
+                                                    .slice(0, base.length - selectedPresetPrompt.length)
+                                                    .replace(/\n+$/, '');
+                                            }
+                                            if (!v) return base;
+                                            return base ? `${base}\n\n${v}` : v;
+                                        });
+                                        setSelectedPresetPrompt(v);
                                     }}
                                     disabled={summaryStreaming}
                                 >
@@ -845,10 +859,7 @@ export default function MeetingDetailPage() {
                                 <textarea
                                     className="summary-prompt-textarea"
                                     value={summaryPrompt}
-                                    onChange={(e) => {
-                                        setSummaryPrompt(e.target.value);
-                                        if (e.target.value) setSelectedPresetPrompt('');
-                                    }}
+                                    onChange={(e) => setSummaryPrompt(e.target.value)}
                                     placeholder={hasAudio ? "输入自定义提示词，覆盖预设..." : "输入会议记录内容，AI 将据此生成会议纪要..."}
                                     rows={hasAudio ? 2 : 6}
                                     disabled={summaryStreaming}

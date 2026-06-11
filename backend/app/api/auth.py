@@ -150,3 +150,94 @@ async def get_me(
         "permissions": permissions,
         "job_title_name": job_title_name,
     })
+
+
+# ─── Agent Token Management ─────────────────────────────────────────────────
+
+@router.post("/agent-tokens", response_model=dict)
+async def create_agent_token(
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a new Agent Token for the current user."""
+    import secrets
+    from datetime import datetime, timedelta
+    from app.models.shared import AgentToken
+    from app.models.base import now_cn
+
+    name = data.get("name", "").strip() or "Agent Token"
+    expires_in_days = data.get("expires_in_days")  # None = never expires
+
+    token_value = "pat_" + secrets.token_hex(32)
+    expires_at = None
+    if expires_in_days:
+        expires_at = now_cn() + timedelta(days=int(expires_in_days))
+
+    agent_token = AgentToken(
+        user_id=current_user.id,
+        token=token_value,
+        name=name,
+        expires_at=expires_at,
+        is_active=True,
+    )
+    session.add(agent_token)
+    session.commit()
+    session.refresh(agent_token)
+
+    return success_response({
+        "id": str(agent_token.id),
+        "name": agent_token.name,
+        "token": token_value,  # Only returned once
+        "expires_at": agent_token.expires_at.isoformat() if agent_token.expires_at else None,
+        "created_at": agent_token.created_at.isoformat(),
+    })
+
+
+@router.get("/agent-tokens", response_model=dict)
+async def list_agent_tokens(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """List all Agent Tokens for the current user."""
+    from app.models.shared import AgentToken
+
+    tokens = session.exec(
+        select(AgentToken)
+        .where(AgentToken.user_id == current_user.id)
+        .order_by(AgentToken.created_at.desc())
+    ).all()
+
+    return success_response([
+        {
+            "id": str(t.id),
+            "name": t.name,
+            "token_preview": t.token[:8] + "****" + t.token[-4:],
+            "is_active": t.is_active,
+            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+            "last_used_at": t.last_used_at.isoformat() if t.last_used_at else None,
+            "created_at": t.created_at.isoformat(),
+        }
+        for t in tokens
+    ])
+
+
+@router.delete("/agent-tokens/{token_id}", response_model=dict)
+async def revoke_agent_token(
+    token_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete an Agent Token."""
+    from uuid import UUID as _UUID
+    from app.models.shared import AgentToken
+
+    agent_token = session.get(AgentToken, _UUID(token_id))
+    if not agent_token or agent_token.user_id != current_user.id:
+        from app.core.exceptions import NotFoundException
+        raise NotFoundException("Token not found")
+
+    session.delete(agent_token)
+    session.commit()
+
+    return success_response({"message": "Token has been deleted"})
