@@ -97,12 +97,24 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # MCP service info (for the frontend MCP page)
 @app.get("/api/v1/mcp-info")
-async def mcp_info():
-    """Public MCP endpoint URL + available tool list (for the MCP page)."""
+async def mcp_info(request: Request):
+    """Public MCP endpoint URL + available tool list (for the MCP page).
+
+    URL resolution (so the same frontend build works in every environment):
+      1. explicit ``MCP_PUBLIC_URL`` env (recommended for prod), else
+      2. derive from the request's forwarded host/proto (works behind nginx).
+    """
     from app.core.response import success_response
+
+    url = (settings.MCP_PUBLIC_URL or "").strip()
+    if not url:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+        url = f"{proto}://{host}/api/v1/mcp"
+
     tools = await mcp_server.list_tools()
     return success_response({
-        "url": settings.MCP_PUBLIC_URL,
+        "url": url,
         "tools": [
             {"name": t.name, "description": (t.description or "").strip().split("\n")[0]}
             for t in tools

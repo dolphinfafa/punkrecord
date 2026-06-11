@@ -86,7 +86,9 @@ class Settings(BaseSettings):
     # dev: 15085 ; prod override to http://127.0.0.1:9086/api/v1
     INTERNAL_API_BASE_URL: str = "http://127.0.0.1:15085/api/v1"
     # Public MCP endpoint shown to users on the MCP page / docs.
-    MCP_PUBLIC_URL: str = "http://14.103.229.153:15085/api/v1/mcp"
+    # Leave empty to auto-derive from the request (X-Forwarded-* / Host);
+    # set explicitly per environment for reliability (recommended in prod).
+    MCP_PUBLIC_URL: str = ""
     
     @property
     def DATABASE_URL(self) -> str:
