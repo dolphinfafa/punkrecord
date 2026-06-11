@@ -14,13 +14,22 @@ from typing import Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.transport_security import TransportSecuritySettings
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # streamable_http_path="/" so mounting at /api/v1/mcp serves the endpoint exactly there.
-mcp = FastMCP("punkrecord", stateless_http=True, streamable_http_path="/")
+# Disable DNS-rebinding Host/Origin checks: this is a public, token-authenticated
+# endpoint reached through nginx/Caddy under various hostnames (otherwise the SDK
+# returns "421 Invalid Host header" for any non-localhost Host).
+mcp = FastMCP(
+    "punkrecord",
+    stateless_http=True,
+    streamable_http_path="/",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 class AuthError(Exception):
