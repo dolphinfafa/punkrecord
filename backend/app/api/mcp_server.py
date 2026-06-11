@@ -236,6 +236,31 @@ async def dismiss_todo(ctx: Context, todo_id: str, dismiss_reason: Optional[str]
     return await _call(ctx, "POST", f"/todo/{todo_id}/dismiss", json={"dismiss_reason": dismiss_reason})
 
 
+# ─── Review tools (team tasks awaiting my review) ─────────────────────────────
+
+@mcp.tool()
+async def list_tasks_to_review(ctx: Context) -> dict:
+    """查看团队任务中【需要我审核】的任务（下属上报完成、待我审批的 pending_review 任务）。"""
+    me = await _call(ctx, "GET", "/auth/me")
+    my_id = me.get("id") if isinstance(me, dict) else None
+    return await _call(
+        ctx, "GET", "/todo/team",
+        params={"status": "pending_review", "reviewed_by_user_id": my_id, "page_size": 50},
+    )
+
+
+@mcp.tool()
+async def approve_todo(ctx: Context, todo_id: str, comment: Optional[str] = None) -> dict:
+    """审核通过某个待我审核的任务（pending_review → done）。comment 为可选审批意见。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/approve", json={"comment": comment})
+
+
+@mcp.tool()
+async def reject_todo(ctx: Context, todo_id: str, comment: str) -> dict:
+    """审核驳回某个待我审核的任务（打回为未开始 open）。comment 为驳回理由（必填）。"""
+    return await _call(ctx, "POST", f"/todo/{todo_id}/reject", json={"comment": comment})
+
+
 @mcp.tool()
 async def create_leave(
     ctx: Context, leave_type: str, start_at: str, end_at: str, reason: Optional[str] = None
