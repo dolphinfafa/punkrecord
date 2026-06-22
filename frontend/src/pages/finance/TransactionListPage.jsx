@@ -27,17 +27,18 @@ export default function TransactionListPage() {
     const pageSize = 20;
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         loadData();
-    }, [page, dateFrom, dateTo]);
+    }, [page, dateFrom, dateTo, statusFilter]);
 
     const loadData = async () => {
         try {
             setLoading(true);
             const [txnRes, accRes, contractRes, usersRes, cpRes] = await Promise.all([
-                financeApi.listTransactions({ page, page_size: pageSize, date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+                financeApi.listTransactions({ page, page_size: pageSize, date_from: dateFrom || undefined, date_to: dateTo || undefined, status: statusFilter || undefined }),
                 financeApi.listAccounts({ page_size: 200 }),
                 contractApi.listContracts({ page_size: 200 }),
                 iamApi.listUsers({ page_size: 100 }),
@@ -94,6 +95,26 @@ export default function TransactionListPage() {
         }
     };
 
+    const handleToggleVoid = async (txn) => {
+        const toVoid = !txn.voided;
+        if (toVoid && !window.confirm('确认作废这条交易？作废后将不计入账户余额（仍会显示，标记为作废）。')) return;
+        try {
+            setUpdatingStatusId(txn.id);
+            const res = toVoid
+                ? await financeApi.voidTransaction(txn.id)
+                : await financeApi.unvoidTransaction(txn.id);
+            const updated = res.data || {};
+            setTransactions(prev => prev.map(item => (
+                item.id === txn.id ? { ...item, voided: updated.voided ?? toVoid } : item
+            )));
+        } catch (err) {
+            console.error('Failed to void transaction', err);
+            alert((toVoid ? '作废失败: ' : '恢复失败: ') + (err.response?.data?.message || err.message));
+        } finally {
+            setUpdatingStatusId('');
+        }
+    };
+
     const handleExport = async () => {
         try {
             setExporting(true);
@@ -133,8 +154,23 @@ export default function TransactionListPage() {
                         截止日期
                         <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="form-input" style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem' }} />
                     </label>
-                    {(dateFrom || dateTo) && (
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }} style={{ fontSize: '0.8rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: '#475569' }}>
+                        状态
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                            className="form-input"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                        >
+                            <option value="">全部状态</option>
+                            <option value="unreconciled">未完成</option>
+                            <option value="completed">已完成</option>
+                            <option value="reconciled">已对账</option>
+                            <option value="voided">作废</option>
+                        </select>
+                    </label>
+                    {(dateFrom || dateTo || statusFilter) && (
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); setPage(1); }} style={{ fontSize: '0.8rem' }}>
                             清除筛选
                         </button>
                     )}
@@ -175,7 +211,10 @@ export default function TransactionListPage() {
                             </tr>
                         ) : (
                             transactions.map(txn => (
-                                <tr key={txn.id}>
+                                <tr
+                                    key={txn.id}
+                                    style={txn.voided ? { textDecoration: 'line-through', color: '#94a3b8', background: '#f8fafc' } : undefined}
+                                >
                                     <td>{txn.txn_date || '-'}</td>
                                     <td>{TXN_TYPE_MAP[txn.txn_type] || (txn.txn_direction === 'in' ? '收款' : '付款')}</td>
                                     <td>{txn.purpose || '-'}</td>
@@ -192,32 +231,48 @@ export default function TransactionListPage() {
                                         {Number(txn.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                                     </td>
                                     <td>
-                                        <select
-                                            className="form-select"
-                                            value={txn.reconcile_status || 'unreconciled'}
-                                            disabled={updatingStatusId === txn.id}
-                                            onChange={(e) => handleStatusChange(txn.id, e.target.value)}
-                                            style={{
-                                                minWidth: 120,
-                                                backgroundColor: '#ffffff',
-                                                color: '#0f172a',
-                                                border: '1px solid #cbd5e1'
-                                            }}
-                                        >
-                                            <option value="unreconciled">未完成</option>
-                                            <option value="completed">已完成</option>
-                                            <option value="reconciled">已对账</option>
-                                        </select>
+                                        {txn.voided ? (
+                                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', background: '#fee2e2', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none' }}>
+                                                作废
+                                            </span>
+                                        ) : (
+                                            <select
+                                                className="form-select"
+                                                value={txn.reconcile_status || 'unreconciled'}
+                                                disabled={updatingStatusId === txn.id}
+                                                onChange={(e) => handleStatusChange(txn.id, e.target.value)}
+                                                style={{
+                                                    minWidth: 120,
+                                                    backgroundColor: '#ffffff',
+                                                    color: '#0f172a',
+                                                    border: '1px solid #cbd5e1'
+                                                }}
+                                            >
+                                                <option value="unreconciled">未完成</option>
+                                                <option value="completed">已完成</option>
+                                                <option value="reconciled">已对账</option>
+                                            </select>
+                                        )}
                                     </td>
-                                    <td>
+                                    <td style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                                        {!txn.voided && (
+                                            <button
+                                                className="btn-link"
+                                                onClick={() => {
+                                                    setEditingTransaction(txn);
+                                                    setIsCreateModalOpen(true);
+                                                }}
+                                            >
+                                                编辑
+                                            </button>
+                                        )}
                                         <button
                                             className="btn-link"
-                                            onClick={() => {
-                                                setEditingTransaction(txn);
-                                                setIsCreateModalOpen(true);
-                                            }}
+                                            disabled={updatingStatusId === txn.id}
+                                            onClick={() => handleToggleVoid(txn)}
+                                            style={{ marginLeft: txn.voided ? 0 : '0.5rem', color: txn.voided ? '#2563eb' : '#dc2626' }}
                                         >
-                                            编辑
+                                            {txn.voided ? '恢复' : '作废'}
                                         </button>
                                     </td>
                                 </tr>

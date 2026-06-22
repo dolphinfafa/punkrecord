@@ -127,7 +127,8 @@ class FinanceTransaction(BaseDBModel, table=True):
     
     attachments: list = Field(default=[], sa_column=Column(JSON))
     reconcile_status: ReconcileStatus = Field(default=ReconcileStatus.UNRECONCILED, nullable=False)
-    
+    voided: bool = Field(default=False, nullable=False)  # 作废：仍展示但划线、不计入余额
+
     related_object_type: Optional[str] = None
     related_object_id: Optional[UUID] = None
     

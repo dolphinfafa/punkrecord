@@ -191,6 +191,13 @@
 | `pages/project/components/ProjectTasks.jsx` | 任务列表新增**状态/负责人**筛选（useMemo 客户端过滤），默认隐藏 done+dismissed；计数显示"过滤后/总数" |
 | `pages/meeting/MeetingDetailPage.jsx` | 流式消费处理 `error` 事件（失败时提示而非空白）；说话人姓名输入 `onBlur` 自动保存（不只回车） |
 
+### v2.0.2 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/finance/TransactionListPage.jsx` | 交易明细新增**作废/恢复**按钮（作废行整行 line-through + 红色"作废"徽章）；工具栏新增**状态筛选**（未完成/已完成/已对账/作废，后端筛选） |
+| `api/finance.js` | 新增 `voidTransaction`/`unvoidTransaction`；`listTransactions` 透传 `status` |
+
 ---
 
 *最后更新：2026-06-22*

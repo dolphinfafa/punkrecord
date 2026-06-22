@@ -17,9 +17,9 @@ export const financeApi = {
 
     // Transactions
     listTransactions: async (params = {}) => {
-        const { page = 1, page_size = 20, account_id, txn_direction, date_from, date_to } = params;
+        const { page = 1, page_size = 20, account_id, txn_direction, date_from, date_to, status } = params;
         return client.get('/finance/transactions', {
-            params: { page, page_size, account_id, txn_direction, date_from, date_to }
+            params: { page, page_size, account_id, txn_direction, date_from, date_to, status }
         });
     },
 
@@ -41,6 +41,12 @@ export const financeApi = {
 
     updateTransaction: async (txnId, data) => {
         return client.patch(`/finance/transactions/${txnId}`, data);
+    },
+    voidTransaction: async (txnId) => {
+        return client.post(`/finance/transactions/${txnId}/void`);
+    },
+    unvoidTransaction: async (txnId) => {
+        return client.post(`/finance/transactions/${txnId}/unvoid`);
     },
 
     // Invoices
