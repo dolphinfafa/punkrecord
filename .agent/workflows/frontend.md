@@ -184,6 +184,13 @@
 | `App.jsx` | 新增 `/mcp` 路由 |
 | `pages/dashboard/DashboardPage.jsx` | **移除** Agent 密钥管理区（迁至 MCP 页），清理相关 state/imports |
 
+### v2.0.1 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/project/components/ProjectTasks.jsx` | 任务列表新增**状态/负责人**筛选（useMemo 客户端过滤），默认隐藏 done+dismissed；计数显示"过滤后/总数" |
+| `pages/meeting/MeetingDetailPage.jsx` | 流式消费处理 `error` 事件（失败时提示而非空白）；说话人姓名输入 `onBlur` 自动保存（不只回车） |
+
 ---
 
-*最后更新：2026-06-05*
+*最后更新：2026-06-22*

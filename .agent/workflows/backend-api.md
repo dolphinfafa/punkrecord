@@ -211,7 +211,7 @@
 | GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
 | PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人（支持 `speaker_id`） |
 | PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射 |
-| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要） |
+| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要）。**仅当 LLM 实际产出内容才落库并置 SUMMARIZED；为空/失败时不改状态、不存空总结，SSE 返回 error**（避免"已总结但空"） |
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
 
@@ -244,7 +244,7 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（22）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`search_kb`/`list_meetings`；写 `create_todo`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`（团队待我审核的任务及通过/驳回）。
+- **工具（23）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
 - **运行环境**：dev 后端由 **PM2** 托管（`punkrecord-backend`，conda env `punkrecord`，`uvicorn --reload`），非 `dev.sh`（其指向的 `punk` env 为旧脚本）。
 
 ---

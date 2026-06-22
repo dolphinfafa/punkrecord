@@ -521,20 +521,26 @@ async def summarize_meeting(
             logger.exception("LLM streaming failed: %s", e)
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
-        # Save summary + attendees to DB
-        try:
-            with Session(engine) as db:
-                m = db.get(MeetingRecord, m_id)
-                if m:
-                    m.summary = full_text
-                    m.status = MeetingStatus.SUMMARIZED
-                    if attendees_list:
-                        m.attendees = attendees_list
-                    m.updated_at = now_cn()
-                    db.add(m)
-                    db.commit()
-        except Exception as e:
-            logger.error("Failed to save summary: %s", e)
+        # Only persist when the LLM actually produced content; otherwise keep the
+        # previous status so we never end up with "summarized but empty summary".
+        if full_text.strip():
+            try:
+                with Session(engine) as db:
+                    m = db.get(MeetingRecord, m_id)
+                    if m:
+                        m.summary = full_text
+                        m.status = MeetingStatus.SUMMARIZED
+                        if attendees_list:
+                            m.attendees = attendees_list
+                        m.updated_at = now_cn()
+                        db.add(m)
+                        db.commit()
+            except Exception as e:
+                logger.error("Failed to save summary: %s", e)
+                yield f"data: {json.dumps({'error': '会议纪要保存失败，请重试'}, ensure_ascii=False)}\n\n"
+        else:
+            logger.warning("Empty summary for meeting %s — not persisting", m_id)
+            yield f"data: {json.dumps({'error': 'AI 纪要生成失败：未获取到内容（请检查 AI 服务连通性后重试）'}, ensure_ascii=False)}\n\n"
 
         yield "data: [DONE]\n\n"
 
