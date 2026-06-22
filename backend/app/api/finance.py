@@ -2,6 +2,7 @@
 Finance API endpoints
 """
 from typing import Optional
+from decimal import Decimal
 from app.models.base import now_cn
 from uuid import UUID
 from datetime import datetime, date
@@ -86,6 +87,8 @@ async def list_accounts(
 
         current_balance = account.initial_balance
         for txn in txns:
+            if txn.voided:
+                continue
             if txn.reconcile_status not in {ReconcileStatus.COMPLETED, ReconcileStatus.RECONCILED}:
                 continue
             if txn.txn_direction == TransactionDirection.IN:
@@ -480,7 +483,65 @@ async def get_transaction(
     transaction = session.get(FinanceTransaction, txn_id)
     if not transaction:
         raise NotFoundException("未找到交易")
-    
+
+    return success_response(TransactionResponse.model_validate(transaction))
+
+
+def _contract_pending_delta(contract_type, txn_direction, amount):
+    """The delta a transaction applied to contract.pending_amount when created."""
+    from app.models.contract import ContractType
+    if contract_type == ContractType.SALES:
+        return -amount if txn_direction == TransactionDirection.IN else amount
+    if contract_type == ContractType.PURCHASE:
+        return -amount if txn_direction == TransactionDirection.OUT else amount
+    return Decimal(0)  # third party: no pending change
+
+
+def _set_transaction_voided(session: Session, transaction: FinanceTransaction, voided: bool):
+    """Toggle voided and keep linked contract.pending_amount consistent."""
+    if transaction.voided == voided:
+        return
+    transaction.voided = voided
+    if transaction.contract_id:
+        from app.models.contract import Contract
+        contract = session.get(Contract, transaction.contract_id)
+        if contract:
+            delta = _contract_pending_delta(
+                contract.contract_type, transaction.txn_direction, transaction.amount
+            )
+            # void → reverse the original effect; unvoid → re-apply it
+            contract.pending_amount += -delta if voided else delta
+            session.add(contract)
+    session.add(transaction)
+    session.commit()
+    session.refresh(transaction)
+
+
+@router.post("/transactions/{txn_id}/void", response_model=dict)
+async def void_transaction(
+    txn_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("finance.write"))
+):
+    """作废交易：仍展示但不计入账户余额；同步回退关联合同的待收/待付金额。"""
+    transaction = session.get(FinanceTransaction, txn_id)
+    if not transaction:
+        raise NotFoundException("未找到交易")
+    _set_transaction_voided(session, transaction, True)
+    return success_response(TransactionResponse.model_validate(transaction))
+
+
+@router.post("/transactions/{txn_id}/unvoid", response_model=dict)
+async def unvoid_transaction(
+    txn_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("finance.write"))
+):
+    """恢复已作废的交易。"""
+    transaction = session.get(FinanceTransaction, txn_id)
+    if not transaction:
+        raise NotFoundException("未找到交易")
+    _set_transaction_voided(session, transaction, False)
     return success_response(TransactionResponse.model_validate(transaction))
 
 

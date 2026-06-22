@@ -106,11 +106,12 @@ class TransactionResponse(BaseModel):
     purpose: Optional[str] = None
     attachments: list = Field(default_factory=list)
     reconcile_status: str
+    voided: bool = False
     related_object_type: Optional[str] = None
     related_object_id: Optional[UUID] = None
     created_by_user_id: UUID
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 

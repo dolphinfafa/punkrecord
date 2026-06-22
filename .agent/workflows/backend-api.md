@@ -164,6 +164,8 @@
 |------|------|------|
 | POST/GET/PATCH | `/api/v1/finance/accounts` | 账户 CRUD |
 | POST/GET/PATCH | `/api/v1/finance/transactions` | 交易记录 CRUD（支持全字段编辑，编辑后自动重算关联合同 pending_amount） |
+| POST | `/api/v1/finance/transactions/{id}/void` | 作废交易（`voided=true`，仍展示但不计入账户余额，同步回退关联合同 pending_amount） |
+| POST | `/api/v1/finance/transactions/{id}/unvoid` | 恢复已作废交易 |
 | GET | `/api/v1/finance/transactions` | 交易列表（支持 `date_from`/`date_to` 日期筛选参数） |
 | GET | `/api/v1/finance/transactions/export-excel` | 导出交易记录 Excel（支持日期筛选） |
 | POST/GET | `/api/v1/finance/invoices` | 发票 |

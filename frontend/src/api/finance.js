@@ -42,6 +42,12 @@ export const financeApi = {
     updateTransaction: async (txnId, data) => {
         return client.patch(`/finance/transactions/${txnId}`, data);
     },
+    voidTransaction: async (txnId) => {
+        return client.post(`/finance/transactions/${txnId}/void`);
+    },
+    unvoidTransaction: async (txnId) => {
+        return client.post(`/finance/transactions/${txnId}/unvoid`);
+    },
 
     // Invoices
     listInvoices: async (params = {}) => {
