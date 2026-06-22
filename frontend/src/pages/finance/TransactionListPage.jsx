@@ -27,17 +27,18 @@ export default function TransactionListPage() {
     const pageSize = 20;
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         loadData();
-    }, [page, dateFrom, dateTo]);
+    }, [page, dateFrom, dateTo, statusFilter]);
 
     const loadData = async () => {
         try {
             setLoading(true);
             const [txnRes, accRes, contractRes, usersRes, cpRes] = await Promise.all([
-                financeApi.listTransactions({ page, page_size: pageSize, date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+                financeApi.listTransactions({ page, page_size: pageSize, date_from: dateFrom || undefined, date_to: dateTo || undefined, status: statusFilter || undefined }),
                 financeApi.listAccounts({ page_size: 200 }),
                 contractApi.listContracts({ page_size: 200 }),
                 iamApi.listUsers({ page_size: 100 }),
@@ -153,8 +154,23 @@ export default function TransactionListPage() {
                         截止日期
                         <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="form-input" style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem' }} />
                     </label>
-                    {(dateFrom || dateTo) && (
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }} style={{ fontSize: '0.8rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: '#475569' }}>
+                        状态
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                            className="form-input"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.85rem' }}
+                        >
+                            <option value="">全部状态</option>
+                            <option value="unreconciled">未完成</option>
+                            <option value="completed">已完成</option>
+                            <option value="reconciled">已对账</option>
+                            <option value="voided">作废</option>
+                        </select>
+                    </label>
+                    {(dateFrom || dateTo || statusFilter) && (
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); setPage(1); }} style={{ fontSize: '0.8rem' }}>
                             清除筛选
                         </button>
                     )}

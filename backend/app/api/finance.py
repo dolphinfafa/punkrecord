@@ -332,8 +332,14 @@ def _build_txn_query(
     txn_direction: Optional[str],
     date_from: Optional[date],
     date_to: Optional[date],
+    status: Optional[str] = None,
 ):
-    """Build shared transaction query with filters"""
+    """Build shared transaction query with filters.
+
+    status：交易列表「状态」列筛选，取值
+      voided（作废）/ unreconciled / completed / reconciled。
+      作废态独立；其余按对账状态且排除作废。
+    """
     query = select(FinanceTransaction)
     if account_id:
         query = query.where(FinanceTransaction.account_id == account_id)
@@ -343,6 +349,12 @@ def _build_txn_query(
         query = query.where(FinanceTransaction.txn_date >= date_from)
     if date_to:
         query = query.where(FinanceTransaction.txn_date <= date_to)
+    if status:
+        if status == "voided":
+            query = query.where(FinanceTransaction.voided == True)  # noqa: E712
+        else:
+            query = query.where(FinanceTransaction.voided == False)  # noqa: E712
+            query = query.where(FinanceTransaction.reconcile_status == status)
     return query
 
 
@@ -352,19 +364,20 @@ async def list_transactions(
     txn_direction: Optional[str] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("finance.read"))
 ):
     """List transactions"""
-    query = _build_txn_query(account_id, txn_direction, date_from, date_to)
+    query = _build_txn_query(account_id, txn_direction, date_from, date_to, status)
     query = query.order_by(FinanceTransaction.txn_date.desc())
 
     offset = (page - 1) * page_size
     transactions = session.exec(query.offset(offset).limit(page_size)).all()
 
-    count_query = _build_txn_query(account_id, txn_direction, date_from, date_to)
+    count_query = _build_txn_query(account_id, txn_direction, date_from, date_to, status)
     total = len(session.exec(count_query).all())
 
     return success_response({

@@ -17,9 +17,9 @@ export const financeApi = {
 
     // Transactions
     listTransactions: async (params = {}) => {
-        const { page = 1, page_size = 20, account_id, txn_direction, date_from, date_to } = params;
+        const { page = 1, page_size = 20, account_id, txn_direction, date_from, date_to, status } = params;
         return client.get('/finance/transactions', {
-            params: { page, page_size, account_id, txn_direction, date_from, date_to }
+            params: { page, page_size, account_id, txn_direction, date_from, date_to, status }
         });
     },
 
