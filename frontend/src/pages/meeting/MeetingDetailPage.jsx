@@ -405,6 +405,7 @@ export default function MeetingDetailPage() {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let accumulated = '';
+            let streamError = '';
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -419,7 +420,9 @@ export default function MeetingDetailPage() {
                         if (data === '[DONE]') continue;
                         try {
                             const parsed = JSON.parse(data);
-                            if (parsed.text) {
+                            if (parsed.error) {
+                                streamError = parsed.error;
+                            } else if (parsed.text) {
                                 accumulated += parsed.text;
                                 setSummary(accumulated);
                             }
@@ -429,6 +432,12 @@ export default function MeetingDetailPage() {
                         }
                     }
                 }
+            }
+
+            if (streamError) {
+                setSummary('');
+                alert(streamError);
+                return;
             }
 
             await loadMeeting();
@@ -679,7 +688,7 @@ export default function MeetingDetailPage() {
                                 <Users size={16} />
                                 <span>说话人识别</span>
                                 {savingSpeakers && <Loader2 size={14} className="spin" />}
-                                {!savingSpeakers && <span className="speaker-hint">输入姓名后回车确认</span>}
+                                {!savingSpeakers && <span className="speaker-hint">输入姓名后失焦或回车保存</span>}
                             </div>
                             <div className="speaker-mapping-grid">
                                 {speakerIds.map((sid) => {
@@ -700,8 +709,9 @@ export default function MeetingDetailPage() {
                                                     }))
                                                 }
                                                 onKeyDown={handleSpeakerKeyDown}
+                                                onBlur={handleSaveSpeakers}
                                                 className="speaker-name-input"
-                                                placeholder="输入姓名，回车保存"
+                                                placeholder="输入姓名，失焦或回车保存"
                                                 style={{ borderColor: sc.border + '60' }}
                                             />
                                         </div>

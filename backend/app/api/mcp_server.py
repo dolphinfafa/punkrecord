@@ -222,6 +222,57 @@ async def create_todo(
 
 
 @mcp.tool()
+async def create_bug(
+    ctx: Context,
+    title: str,
+    project_name: Optional[str] = None,
+    project_id: Optional[str] = None,
+    description: Optional[str] = None,
+    actual_result: Optional[str] = None,
+    expected_result: Optional[str] = None,
+    reproduce_steps: Optional[str] = None,
+    priority: str = "p2",
+    assignee_user_id: Optional[str] = None,
+) -> dict:
+    """在项目中创建一个 Bug（会同时出现在项目任务与「Bug 管理」）。
+
+    - 必须关联项目：project_name（精确匹配）或 project_id 二选一。
+    - actual_result（实际表现）/expected_result（期望行为）/reproduce_steps（复现步骤）选填。
+    - assignee_user_id 缺省时分配给当前 API Key 对应用户。
+    - 通过打 tags=["bug"] 与 link.type="bug" 使其被识别为 Bug。
+    """
+    if not project_name and not project_id:
+        raise RuntimeError("创建 Bug 必须指定 project_name 或 project_id")
+
+    if not assignee_user_id:
+        me = await _call(ctx, "GET", "/auth/me")
+        assignee_user_id = me.get("id") if isinstance(me, dict) else None
+
+    link: dict = {"type": "bug"}
+    if project_id:
+        link["project_id"] = project_id
+    if project_name:
+        link["project_name"] = project_name
+    if actual_result:
+        link["actual_result"] = actual_result
+    if expected_result:
+        link["expected_result"] = expected_result
+    if reproduce_steps:
+        link["reproduce_steps"] = reproduce_steps
+
+    body: dict = {
+        "title": title,
+        "assignee_user_id": assignee_user_id,
+        "priority": priority,
+        "tags": ["bug"],
+        "link": link,
+    }
+    if description:
+        body["description"] = description
+    return await _call(ctx, "POST", "/todo", json=body)
+
+
+@mcp.tool()
 async def start_todo(ctx: Context, todo_id: str) -> dict:
     """开始任务（open → in_progress）。"""
     return await _call(ctx, "POST", f"/todo/{todo_id}/start")

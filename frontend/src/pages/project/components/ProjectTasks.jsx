@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
 import TodoModal from '@/components/todo/TodoModal';
@@ -23,8 +23,34 @@ export default function ProjectTasks({ project }) {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showTaskModal, setShowTaskModal] = useState(false);
+    // Default: hide completed (done) and dismissed tasks.
+    const [statusFilter, setStatusFilter] = useState('active');
+    const [assigneeFilter, setAssigneeFilter] = useState('all');
 
     useEffect(() => { loadTasks(); }, [project.id]);
+
+    // Distinct assignees for the 负责人 filter
+    const assigneeOptions = useMemo(() => {
+        const map = new Map();
+        for (const t of tasks) {
+            if (t.assignee_user_id) {
+                map.set(t.assignee_user_id, t.assignee_name || '未命名');
+            }
+        }
+        return Array.from(map, ([id, name]) => ({ id, name }));
+    }, [tasks]);
+
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(t => {
+            if (statusFilter === 'active') {
+                if (t.status === 'done' || t.status === 'dismissed') return false;
+            } else if (statusFilter !== 'all') {
+                if (t.status !== statusFilter) return false;
+            }
+            if (assigneeFilter !== 'all' && t.assignee_user_id !== assigneeFilter) return false;
+            return true;
+        });
+    }, [tasks, statusFilter, assigneeFilter]);
 
     const loadTasks = async () => {
         try {
@@ -58,11 +84,32 @@ export default function ProjectTasks({ project }) {
                     项目任务
                     {tasks.length > 0 && (
                         <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.5rem', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', fontWeight: '600' }}>
-                            {tasks.length}
+                            {filteredTasks.length}/{tasks.length}
                         </span>
                     )}
                 </h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.5rem', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}
+                    >
+                        <option value="active">活跃（隐藏已完成/已忽略）</option>
+                        <option value="all">全部状态</option>
+                        {Object.entries(STATUS_LABELS).map(([v, label]) => (
+                            <option key={v} value={v}>{label}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={assigneeFilter}
+                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.5rem', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}
+                    >
+                        <option value="all">全部负责人</option>
+                        {assigneeOptions.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                    </select>
                     <button
                         onClick={loadTasks}
                         style={{ border: '1px solid #e2e8f0', background: 'white', borderRadius: '6px', padding: '0.35rem 0.6rem', cursor: 'pointer', color: '#64748b' }}
@@ -95,6 +142,10 @@ export default function ProjectTasks({ project }) {
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>
                     暂无任务，请进入“开发进度”页面自动从功能清单生成
                 </div>
+            ) : filteredTasks.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>
+                    当前筛选条件下没有任务
+                </div>
             ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
@@ -105,7 +156,7 @@ export default function ProjectTasks({ project }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {tasks.map(t => {
+                        {filteredTasks.map(t => {
                             const sc = STATUS_COLORS[t.status] || { bg: '#f8fafc', color: '#64748b' };
                             return (
                                 <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
