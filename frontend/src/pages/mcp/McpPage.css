@@ -127,11 +127,18 @@
 /* Tools */
 .mcp-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .mcp-tool {
-    display: flex; flex-direction: column; gap: 2px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
     padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    text-decoration: none; transition: border-color 0.15s, background 0.15s;
 }
+.mcp-tool:hover { background: #eef2ff; border-color: #c7d2fe; }
+.mcp-tool-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mcp-tool code { font-size: 0.82rem; color: #2563eb; font-weight: 600; }
-.mcp-tool span { font-size: 0.76rem; color: #64748b; }
+.mcp-tool span {
+    font-size: 0.76rem; color: #64748b;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mcp-tool-arrow { color: #94a3b8; flex-shrink: 0; }
 
 /* Steps */
 .mcp-steps { margin: 8px 0 0; padding-left: 20px; color: #334155; font-size: 0.88rem; line-height: 1.9; }

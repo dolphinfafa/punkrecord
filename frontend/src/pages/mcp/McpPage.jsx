@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plug, Key, Plus, Copy, Check, Terminal, Boxes, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plug, Key, Plus, Copy, Check, Terminal, Boxes, Zap, ChevronRight } from 'lucide-react';
 import agentTokenApi from '@/api/agentToken';
 import mcpApi from '@/api/mcp';
 import './McpPage.css';
@@ -225,12 +226,16 @@ export default function McpPage() {
             {/* Tools */}
             <section className="mcp-card">
                 <h2><Terminal size={18} /> 可用工具（{info.tools.length}）</h2>
+                <p className="mcp-muted">点击任意工具查看完整参数说明与用法文档。</p>
                 <div className="mcp-tools">
                     {info.tools.map(t => (
-                        <div key={t.name} className="mcp-tool">
-                            <code>{t.name}</code>
-                            <span>{t.description}</span>
-                        </div>
+                        <Link key={t.name} to={`/mcp/tools/${t.name}`} className="mcp-tool">
+                            <div className="mcp-tool-main">
+                                <code>{t.name}</code>
+                                <span>{t.description}</span>
+                            </div>
+                            <ChevronRight size={16} className="mcp-tool-arrow" />
+                        </Link>
                     ))}
                 </div>
             </section>

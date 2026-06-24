@@ -30,6 +30,7 @@ import MeetingListPage from '@/pages/meeting/MeetingListPage';
 import MeetingDetailPage from '@/pages/meeting/MeetingDetailPage';
 import WeChatNotifyPage from '@/pages/wechat-notify/WeChatNotifyPage';
 import McpPage from '@/pages/mcp/McpPage';
+import McpToolDetailPage from '@/pages/mcp/McpToolDetailPage';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -116,6 +117,7 @@ function App() {
             <Route path="wechat-notify" element={<WeChatNotifyPage />} />
 
             <Route path="mcp" element={<McpPage />} />
+            <Route path="mcp/tools/:toolName" element={<McpToolDetailPage />} />
           </Route>
         </Routes>
       </AuthProvider>

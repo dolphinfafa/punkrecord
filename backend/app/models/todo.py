@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID
 from enum import Enum
 from sqlmodel import Field, Column, JSON, SQLModel
+from sqlalchemy import Text
 from app.models.base import BaseDBModel
 
 
@@ -55,8 +56,10 @@ class TodoItem(BaseDBModel, table=True):
     creator_user_id: UUID = Field(foreign_key="users.id", nullable=False)
     
     title: str = Field(nullable=False)
-    description: Optional[str] = None
-    
+    # TEXT 列：描述上限 1 万字符（varchar(255) 容不下），备注同用 TEXT。
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+
     source_type: TodoSourceType = Field(nullable=False, index=True)
     source_id: str = Field(nullable=False, index=True)  # Unique constraint with source_type
     action_type: TodoActionType = Field(nullable=False)

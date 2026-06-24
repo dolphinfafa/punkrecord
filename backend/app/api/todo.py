@@ -391,6 +391,7 @@ async def create_todo(
         creator_user_id=current_user.id,
         title=todo_data.title,
         description=todo_data.description,
+        notes=todo_data.notes,
         source_type=TodoSourceType(source_type_str),
         source_id=source_id,
         action_type=TodoActionType(todo_data.action_type),
@@ -946,6 +947,8 @@ async def update_todo(
         todo.title = todo_data.title
     if todo_data.description is not None:
         todo.description = todo_data.description
+    if todo_data.notes is not None:
+        todo.notes = todo_data.notes
     if todo_data.priority is not None:
         todo.priority = todo_data.priority
     if todo_data.due_at is not None:

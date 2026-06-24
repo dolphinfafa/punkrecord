@@ -116,7 +116,12 @@ async def mcp_info(request: Request):
     return success_response({
         "url": url,
         "tools": [
-            {"name": t.name, "description": (t.description or "").strip().split("\n")[0]}
+            {
+                "name": t.name,
+                # description: 首行用于列表展示；doc: 完整 docstring 供工具详情页渲染。
+                "description": (t.description or "").strip().split("\n")[0],
+                "doc": (t.description or "").strip(),
+            }
             for t in tools
         ],
     })

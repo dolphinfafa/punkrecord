@@ -197,7 +197,12 @@
 |-----------|----------|
 | `pages/finance/TransactionListPage.jsx` | 交易明细新增**作废/恢复**按钮（作废行整行 line-through + 红色"作废"徽章）；工具栏新增**状态筛选**（未完成/已完成/已对账/作废，后端筛选） |
 | `api/finance.js` | 新增 `voidTransaction`/`unvoidTransaction`；`listTransactions` 透传 `status` |
+| `pages/mcp/McpToolDetailPage.jsx` + `.css` | （06-24 增补）**新增** MCP 单工具文档详情页，路由 `/mcp/tools/:toolName`；`react-markdown`+`remark-gfm` 渲染后端返回的完整 docstring（`doc` 字段），含返回链接与空态 |
+| `pages/mcp/McpPage.jsx` + `McpPage.css` | 工具列表项由静态 `div` 改为 `<Link>`，可点击进详情页（hover 高亮 + ChevronRight 箭头，描述单行省略） |
+| `App.jsx` | 新增 `/mcp/tools/:toolName` 路由 |
+| `components/todo/TodoModal.jsx` | 描述 `<textarea>` 加 `maxLength=10000` + 字符计数；**新增「备注」`<textarea>`**（`maxLength=2000` + 计数）；表单 state/提交体加 `notes` |
+| `components/todo/TodoDetailModal.jsx` | 描述区下方**新增「备注」展示区**（条件渲染） |
 
 ---
 
-*最后更新：2026-06-22*
+*最后更新：2026-06-24*
