@@ -335,3 +335,85 @@ async def create_leave(
     if reason:
         body["reason"] = reason
     return await _call(ctx, "POST", "/todo/leaves", json=body)
+
+
+# ─── Finance write tools ──────────────────────────────────────────────────────
+
+# 允许批量写入时直接透传给 REST 层的字段（白名单，避免误传无关键值）。
+_TXN_ALLOWED_FIELDS = {
+    "account_id", "our_entity_id", "txn_type", "txn_direction", "amount",
+    "currency", "txn_date", "counterparty_id", "employee_user_id",
+    "contract_id", "purpose", "channel", "reference_no", "reconcile_status",
+}
+
+
+@mcp.tool()
+async def list_accounts(ctx: Context, page: int = 1, page_size: int = 50) -> dict:
+    """查看财务账户列表（需 finance.read 权限）。
+
+    返回各账户的 id、名称、币种、当前余额等。批量写入交易前，先用本工具
+    拿到目标账户的 account_id（create_transactions 的必填字段）。
+    """
+    return await _call(
+        ctx, "GET", "/finance/accounts",
+        params={"page": page, "page_size": page_size},
+    )
+
+
+@mcp.tool()
+async def create_transactions(ctx: Context, transactions: list[dict]) -> dict:
+    """批量写入财务交易明细（需 finance.write 权限）。一次提交多条，逐条创建，互不影响。
+
+    transactions：交易对象数组，每个对象支持以下字段：
+    - account_id（必填）：账户 UUID，可先用 list_accounts 获取。
+    - amount（必填）：金额，正数。
+    - txn_date（必填）：交易日期，格式 YYYY-MM-DD。
+    - txn_type：receipt（收款）/ payment（付款，默认）/ reimbursement（报销）。
+    - txn_direction：in / out。省略时按 txn_type 自动推断
+      （receipt→in，payment/reimbursement→out）。
+    - currency：币种，默认 CNY。
+    - counterparty_id：交易方 UUID（收/付款用，可用 list_counterparties 获取）。
+    - employee_user_id：报销人 UUID（仅 reimbursement 用）。
+    - contract_id：关联合同 UUID（选填，会自动更新合同待收/待付金额）。
+    - purpose：用途/摘要；channel：渠道；reference_no：流水号；
+      reconcile_status：unreconciled（默认）/ completed / reconciled。
+
+    示例 transactions：
+      [{"account_id": "...", "amount": 1200, "txn_date": "2026-06-24",
+        "txn_type": "payment", "purpose": "办公用品采购"}]
+
+    返回 {total, created, failed, results}，results 按输入顺序逐条给出
+    {index, success, id|error}，便于定位失败行。
+    """
+    if not isinstance(transactions, list):
+        raise RuntimeError("transactions 必须是交易对象数组。")
+    if not transactions:
+        raise RuntimeError("transactions 不能为空，至少传入一条交易。")
+
+    results: list[dict] = []
+    created = 0
+    for index, raw in enumerate(transactions):
+        if not isinstance(raw, dict):
+            results.append({"index": index, "success": False, "error": "该条不是有效的交易对象。"})
+            continue
+
+        # 仅透传白名单字段，并按 txn_type 兜底推断 txn_direction（REST 层会再次校正）。
+        body = {k: v for k, v in raw.items() if k in _TXN_ALLOWED_FIELDS and v is not None}
+        if not body.get("txn_direction"):
+            txn_type = body.get("txn_type", "payment")
+            body["txn_direction"] = "in" if txn_type == "receipt" else "out"
+
+        try:
+            data = await _call(ctx, "POST", "/finance/transactions", json=body)
+            txn_id = data.get("id") if isinstance(data, dict) else None
+            results.append({"index": index, "success": True, "id": txn_id})
+            created += 1
+        except Exception as exc:  # 单条失败不中断整批
+            results.append({"index": index, "success": False, "error": str(exc)})
+
+    return {
+        "total": len(transactions),
+        "created": created,
+        "failed": len(transactions) - created,
+        "results": results,
+    }

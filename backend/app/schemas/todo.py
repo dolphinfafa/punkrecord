@@ -4,7 +4,7 @@ Todo module Pydantic schemas
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TodoCreate(BaseModel):
@@ -12,7 +12,8 @@ class TodoCreate(BaseModel):
     our_entity_id: Optional[UUID] = None
     assignee_user_id: UUID
     title: str
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=10000)
+    notes: Optional[str] = Field(default=None, max_length=2000)
     source_type: str = "custom"
     source_id: str = ""
     action_type: str = "do"
@@ -26,7 +27,8 @@ class TodoCreate(BaseModel):
 class TodoUpdate(BaseModel):
     """Todo update schema"""
     title: Optional[str] = None
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=10000)
+    notes: Optional[str] = Field(default=None, max_length=2000)
     priority: Optional[str] = None
     due_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
@@ -67,6 +69,7 @@ class TodoResponse(BaseModel):
     creator_name: Optional[str] = None
     title: str
     description: Optional[str] = None
+    notes: Optional[str] = None
     source_type: str
     source_id: str
     action_type: str

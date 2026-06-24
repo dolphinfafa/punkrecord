@@ -88,6 +88,11 @@
 
 > **路由顺序**：字面量 `/todo/images` 必须声明在 `/todo/{todo_id}` 之前，否则会被 UUID 路径参数捕获。
 
+**任务字段（v2.0.2 增补，2026-06-24）**：
+- `description`（描述）：列类型 **`TEXT`**，上限 **1 万字符**（原 `varchar(255)`）；`TodoCreate`/`TodoUpdate` 加 `max_length=10000` 校验。
+- `notes`（备注）：**新增**独立字段，列类型 `TEXT`，上限 2000 字符；create/update/response 全支持。与 Bug 专用的 `link.notes` 无关。
+- ⚠️ 生产部署需手动 ALTER（`AUTO_CREATE` 只建新表不改列）：`ALTER TABLE todo_item MODIFY COLUMN description TEXT NULL;` 与 `ALTER TABLE todo_item ADD COLUMN notes TEXT NULL;`（迁移文件 `20260624_0001_todo_desc_text_and_notes.py`）。
+
 **AI Agent 工作流**：AI 修复状态存储在 `TodoItem.link.agent_status` 字段（值为 `ai_fixing` / `ai_fixed`），与 `todo.status` 完全解耦。AI 只需关注 `agent_status`，不改变任务本身的状态。
 
 **PATCH `/api/v1/todo/{todo_id}` 扩展字段**：
@@ -246,9 +251,11 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（23）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（25）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`create_transactions`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
+- **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端由 **PM2** 托管（`punkrecord-backend`，conda env `punkrecord`，`uvicorn --reload`），非 `dev.sh`（其指向的 `punk` env 为旧脚本）。
 
 ---
 
-*最后更新：2026-06-08*
+*最后更新：2026-06-24*

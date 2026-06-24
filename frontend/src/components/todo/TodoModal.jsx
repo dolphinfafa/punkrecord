@@ -8,6 +8,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
     const [formData, setFormData] = useState({
         title: '',
         description: '',
+        notes: '',
         priority: 'p2',
         due_at: '',
         start_at: '',
@@ -62,6 +63,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             setFormData({
                 title: initialData.title || '',
                 description: initialData.description || '',
+                notes: initialData.notes || '',
                 priority: initialData.priority || 'p2',
                 due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 10) : '',
                 start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 10) : '',
@@ -73,6 +75,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             setFormData({
                 title: '',
                 description: '',
+                notes: '',
                 priority: 'p2',
                 due_at: '',
                 start_at: '',
@@ -101,6 +104,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             const submitData = {
                 title: formData.title,
                 description: formData.description || null,
+                notes: formData.notes || null,
                 assignee_user_id: formData.assignee_user_id,
                 priority: formData.priority,
                 due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
@@ -160,7 +164,22 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                             onChange={(e) => handleChange('description', e.target.value)}
                             placeholder="输入任务描述"
                             rows={3}
+                            maxLength={10000}
                         />
+                        <span className="form-helper">{formData.description.length} / 10000</span>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="notes">备注</label>
+                        <textarea
+                            id="notes"
+                            value={formData.notes}
+                            onChange={(e) => handleChange('notes', e.target.value)}
+                            placeholder="补充备注（可选）"
+                            rows={2}
+                            maxLength={2000}
+                        />
+                        <span className="form-helper">{formData.notes.length} / 2000</span>
                     </div>
 
                     <div className="form-group">

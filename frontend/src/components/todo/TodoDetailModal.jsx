@@ -112,6 +112,14 @@ export default function TodoDetailModal({
                         </div>
                     )}
 
+                    {/* Notes */}
+                    {todo.notes && (
+                        <div className="detail-section">
+                            <h4>备注</h4>
+                            <p className="detail-description">{todo.notes}</p>
+                        </div>
+                    )}
+
                     {getBugImages(todo).length > 0 && todo?.link?.project_id && (
                         <div className="detail-section">
                             <h4>Bug 配图（{getBugImages(todo).length}）</h4>
