@@ -70,8 +70,10 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 - 通过财务接口跟踪账户和交易
 - 交易记录支持全字段编辑，编辑后自动重算关联合同的 pending_amount（考虑已付款金额）
-- 交易列表支持按日期范围筛选（date_from / date_to）
-- 交易列表支持导出 Excel（含日期筛选条件）
+- 交易列表支持按日期范围和状态筛选（date_from / date_to / status；status 支持 unreconciled / completed / reconciled / voided）
+- 交易可作废/恢复；作废后仍展示但不计入账户余额，并同步回退关联合同的待收/待付金额
+- 已作废交易可永久删除；正常交易必须先作废再删除，避免误删有效流水
+- 交易列表支持导出 Excel（含日期与状态筛选条件，作废交易状态列显示“作废”）
 - 金额字段统一使用 Number() 转换确保千分位格式正确（账户余额、合同金额、交易金额）
 - 报销和发票是独立但关联的工作流
 
@@ -105,9 +107,9 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 - 上传音频文件 → 后台异步调用豆包 ASR 转写（含说话人分离）
 - **无音频创建**：可仅通过标题/类型/日期创建会议记录，进入详情页后手动填写参会人员，在自定义提示词中填写会议记录，AI 直接生成纪要；也可后续补传音频触发 ASR 转录
-- **大文件自动切片**：音频 > 300MB 时自动用 ffmpeg 切片（重编码为 mp3），每片独立提交 ASR
+- **大文件/长音频自动切片**：音频 > 300MB 或时长 > 25 分钟时自动用 ffmpeg 切片；切片统一输出 16k 单声道 mp3，按精确 seek 截取，切片间保留 5 秒重叠并在合并时按时间+文本相似度去重，减少边界漏识别和转录时间轴错位
   - 切片说话人 ID 带 chunk 前缀：`chunk1_speaker_0`、`chunk2_speaker_0`
-  - 时间戳自动加偏移，segment_index 全局递增
+  - 时间戳自动加回原音频偏移，segment_index 按开始时间全局递增
   - 单片文件不加前缀，保持向后兼容
   - 用户手动将不同 chunk 的说话人改为同一名字 → AI 纪要自动视为同一人
 - 每片 ASR 超时 20 分钟，ASR 返回 0 segments 时标记为 `failed`（而非 `transcribed`）
@@ -244,7 +246,7 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 - **启停**：`./dev.sh start|stop|restart|status`
 
 ### Deploy 环境（生产服务器）
-- **后端**：端口 9086（uvicorn, Python 3.9, venv, pm2 守护）
+- **后端**：端口 9086（uvicorn, Python 3.10+, venv/conda, pm2 守护）
 - **前端**：Nginx serve `frontend/dist/`
 - **数据库**：`punkrecord_deploy`
 - **部署**：`git pull origin main` + `pm2 restart punkrecord-api` + 前端需构建 dist 后 rsync
@@ -258,4 +260,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-04-09*
+*最后更新：2026-07-01*

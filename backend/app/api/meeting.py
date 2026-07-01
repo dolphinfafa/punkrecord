@@ -85,6 +85,9 @@ async def _run_asr(meeting_id: UUID):
                 )
                 session.add(segment)
 
+            duration_seconds = result.get("duration_seconds")
+            if duration_seconds is not None:
+                meeting.duration_seconds = int(duration_seconds)
             meeting.status = MeetingStatus.TRANSCRIBED
             session.add(meeting)
             session.commit()

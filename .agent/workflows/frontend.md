@@ -203,6 +203,14 @@
 | `components/todo/TodoModal.jsx` | 描述 `<textarea>` 加 `maxLength=10000` + 字符计数；**新增「备注」`<textarea>`**（`maxLength=2000` + 计数）；表单 state/提交体加 `notes` |
 | `components/todo/TodoDetailModal.jsx` | 描述区下方**新增「备注」展示区**（条件渲染） |
 
+### v2.0.3 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/finance/TransactionListPage.jsx` | 作废行新增永久删除按钮；导出 Excel 按 axios blob 响应直接下载并带上状态筛选 |
+| `api/finance.js` | 新增 `deleteTransaction`；`exportTransactions` 透传 `status` |
+| `pages/meeting/MeetingDetailPage.jsx` | 转录片段播放使用 `??` 读取 `start_time/end_time`，保留 0 秒合法时间点，避免点击首段时跳转到错误位置 |
+
 ---
 
-*最后更新：2026-06-24*
+*最后更新：2026-07-01*

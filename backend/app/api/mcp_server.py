@@ -157,12 +157,33 @@ async def list_counterparties(ctx: Context, page_size: int = 20) -> dict:
 
 @mcp.tool()
 async def list_transactions(
-    ctx: Context, date_from: Optional[str] = None, date_to: Optional[str] = None, page_size: int = 20
+    ctx: Context,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    account_id: Optional[str] = None,
+    txn_direction: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
 ) -> dict:
-    """查看财务交易记录（需 finance.read 权限）。日期格式 YYYY-MM-DD。"""
+    """查看财务交易记录（需 finance.read 权限）。
+
+    - 日期格式：YYYY-MM-DD。
+    - txn_direction：in / out。
+    - status：unreconciled / completed / reconciled / voided；voided 表示作废交易。
+    - account_id：财务账户 UUID，可先用 list_accounts 获取。
+    """
     return await _call(
         ctx, "GET", "/finance/transactions",
-        params={"date_from": date_from, "date_to": date_to, "page_size": page_size},
+        params={
+            "date_from": date_from,
+            "date_to": date_to,
+            "account_id": account_id,
+            "txn_direction": txn_direction,
+            "status": status,
+            "page": page,
+            "page_size": page_size,
+        },
     )
 
 
@@ -417,3 +438,29 @@ async def create_transactions(ctx: Context, transactions: list[dict]) -> dict:
         "failed": len(transactions) - created,
         "results": results,
     }
+
+
+@mcp.tool()
+async def void_transaction(ctx: Context, txn_id: str) -> dict:
+    """作废一条财务交易（需 finance.write 权限）。
+
+    作废后交易仍会保留并可通过 list_transactions(status="voided") 查询，
+    但不再计入账户余额；如有关联合同，会同步回退合同待收/待付金额。
+    """
+    return await _call(ctx, "POST", f"/finance/transactions/{txn_id}/void")
+
+
+@mcp.tool()
+async def unvoid_transaction(ctx: Context, txn_id: str) -> dict:
+    """恢复一条已作废的财务交易（需 finance.write 权限）。"""
+    return await _call(ctx, "POST", f"/finance/transactions/{txn_id}/unvoid")
+
+
+@mcp.tool()
+async def delete_voided_transaction(ctx: Context, txn_id: str) -> dict:
+    """永久删除一条已作废的财务交易（需 finance.write 权限）。
+
+    仅允许删除 voided=true 的交易；正常交易必须先调用 void_transaction 作废，
+    再调用本工具删除，避免误删有效流水。
+    """
+    return await _call(ctx, "DELETE", f"/finance/transactions/{txn_id}")

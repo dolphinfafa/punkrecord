@@ -11,7 +11,7 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 | 任务管理（Todo） | 个人/团队任务、状态机、图片附件、请假申请与审批（自动创建审批任务） |
 | 合同管理 | 合同 CRUD、交易方管理（含编辑）、付款计划、AI 生成合同 |
 | 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、Bug 管理（编辑/配图CRUD/筛选/Agent状态）、验收报告 |
-| 财务管理 | 账户、交易记录（编辑/日期筛选/Excel导出）、发票、报销 |
+| 财务管理 | 账户、交易记录（编辑、日期/状态筛选、作废/恢复、删除已作废交易、Excel导出）、发票、报销 |
 | AI 能力 | AI 对话、功能清单生成、合同起草（LiteLLM/Gemini） |
 | 企业大脑（KB） | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
 | 版本日志 | 首页版本更新日志（L0 可编辑），版本选择查看，Markdown 渲染 |
@@ -73,7 +73,7 @@ punkrecord/
 ## 环境要求
 
 - **Node.js**: v16+
-- **Python**: 3.9+（生产服务器为 3.9，不支持 `X | None` 语法）
+- **Python**: 3.10+（MCP 服务依赖 3.10+；开发环境使用 `punkrecord`）
 - **MySQL**: 8.0+
 - **Conda**: 用于 Python 环境管理（推荐）
 
@@ -87,7 +87,7 @@ punkrecord/
 
 ```bash
 cd backend
-conda activate punk            # 激活 conda 环境
+conda activate punkrecord      # 激活 conda 环境
 pip install -r requirements.txt # 安装依赖
 python init_database.py         # 初始化数据库（首次）
 uvicorn app.main:app --reload --host 0.0.0.0 --port 15085

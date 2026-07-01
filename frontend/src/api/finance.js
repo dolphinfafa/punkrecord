@@ -24,9 +24,9 @@ export const financeApi = {
     },
 
     exportTransactions: async (params = {}) => {
-        const { date_from, date_to, account_id, txn_direction } = params;
+        const { date_from, date_to, account_id, txn_direction, status } = params;
         return client.get('/finance/transactions/export', {
-            params: { date_from, date_to, account_id, txn_direction },
+            params: { date_from, date_to, account_id, txn_direction, status },
             responseType: 'blob'
         });
     },
@@ -47,6 +47,9 @@ export const financeApi = {
     },
     unvoidTransaction: async (txnId) => {
         return client.post(`/finance/transactions/${txnId}/unvoid`);
+    },
+    deleteTransaction: async (txnId) => {
+        return client.delete(`/finance/transactions/${txnId}`);
     },
 
     // Invoices

@@ -729,6 +729,8 @@ export default function MeetingDetailPage() {
                             segments.map((segment, index) => {
                                 const sid = segment.speaker_id || segment.speaker || '';
                                 const sc = getSpeakerColor(sid, speakerIds);
+                                const segmentStart = segment.start_time ?? segment.start ?? 0;
+                                const segmentEnd = segment.end_time ?? segment.end ?? segmentStart;
                                 return (
                                     <div
                                         key={index}
@@ -772,20 +774,16 @@ export default function MeetingDetailPage() {
                                             </div>
                                             <button
                                                 className={`segment-time ${playingSegmentIndex === index ? 'segment-time-playing' : ''}`}
-                                                onClick={() => handleSeek(
-                                                    segment.start_time || segment.start,
-                                                    segment.end_time || segment.end,
-                                                    index
-                                                )}
+                                                onClick={() => handleSeek(segmentStart, segmentEnd, index)}
                                                 title={playingSegmentIndex === index ? '点击停止' : '点击播放此片段'}
                                             >
                                                 {playingSegmentIndex === index
                                                     ? <Square size={10} fill="currentColor" />
                                                     : <Play size={12} />
                                                 }
-                                                {formatTime(segment.start_time || segment.start)}
+                                                {formatTime(segmentStart)}
                                                 {' - '}
-                                                {formatTime(segment.end_time || segment.end)}
+                                                {formatTime(segmentEnd)}
                                             </button>
                                         </div>
                                         <textarea

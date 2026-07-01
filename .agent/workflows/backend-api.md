@@ -171,8 +171,9 @@
 | POST/GET/PATCH | `/api/v1/finance/transactions` | 交易记录 CRUD（支持全字段编辑，编辑后自动重算关联合同 pending_amount） |
 | POST | `/api/v1/finance/transactions/{id}/void` | 作废交易（`voided=true`，仍展示但不计入账户余额，同步回退关联合同 pending_amount） |
 | POST | `/api/v1/finance/transactions/{id}/unvoid` | 恢复已作废交易 |
+| DELETE | `/api/v1/finance/transactions/{id}` | 删除已作废交易（仅 `voided=true` 可删除，正常交易需先作废） |
 | GET | `/api/v1/finance/transactions` | 交易列表（支持 `date_from`/`date_to` 日期筛选 + `status` 状态筛选：unreconciled/completed/reconciled/voided，voided 独立、其余排除作废） |
-| GET | `/api/v1/finance/transactions/export-excel` | 导出交易记录 Excel（支持日期筛选） |
+| GET | `/api/v1/finance/transactions/export` | 导出交易记录 Excel（支持日期和状态筛选；Content-Disposition 使用 ASCII fallback + UTF-8 URL 编码文件名，避免中文文件名响应头报错） |
 | POST/GET | `/api/v1/finance/invoices` | 发票 |
 | POST/GET | `/api/v1/finance/reimbursements` | 报销 |
 
@@ -209,7 +210,7 @@
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
-| POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR |
+| POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；大文件/长音频会统一转为 16k 单声道 mp3 后按大小或 25 分钟时长切片，切片间保留 5 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
 | PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表 |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
@@ -251,11 +252,12 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（25）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`create_transactions`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（28）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
 - **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
+- **财务交易作废工具（v2.0.3，2026-07-01）**：`list_transactions` 支持 `account_id`/`txn_direction`/`status`/日期/分页筛选，`status=voided` 可查看作废交易；`void_transaction`/`unvoid_transaction`/`delete_voided_transaction` 分别转发财务交易作废、恢复和删除已作废交易。写操作需 `finance.write` 权限。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端由 **PM2** 托管（`punkrecord-backend`，conda env `punkrecord`，`uvicorn --reload`），非 `dev.sh`（其指向的 `punk` env 为旧脚本）。
 
 ---
 
-*最后更新：2026-06-24*
+*最后更新：2026-07-01*

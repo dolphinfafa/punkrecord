@@ -13,15 +13,16 @@ Query:  POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/query
 """
 import asyncio
 import base64
+from difflib import SequenceMatcher
 import json
 import logging
 import math
 import os
+import re
 import subprocess
-import tempfile
 import uuid
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, NamedTuple, Optional
 
 import httpx
 
@@ -35,10 +36,21 @@ RESOURCE_ID = "volc.bigasr.auc"
 
 POLL_INTERVAL = 3   # seconds
 MAX_POLL_TIME = 1200  # 20 minutes per chunk
-MAX_CHUNK_SIZE_MB = 300  # split threshold (300MB file → ~400MB base64, within API limit)
+MAX_CHUNK_SIZE_MB = 300  # split threshold (300MB file -> ~400MB base64, within API limit)
+MAX_CHUNK_DURATION_SECONDS = 25 * 60  # Long recordings are split even when compressed below size limit.
+CHUNK_OVERLAP_SECONDS = 5.0  # Keep boundary speech from being clipped by ASR.
 
 # Formats natively supported by Volcengine ASR
 ASR_SUPPORTED_FORMATS = {"wav", "mp3", "ogg", "raw"}
+
+
+class AudioChunk(NamedTuple):
+    path: str
+    time_offset: float
+    nominal_start: float
+    nominal_end: float
+    audio_format: str
+    is_temp: bool
 
 
 def _build_headers(request_id: str) -> dict:
@@ -60,20 +72,44 @@ def _get_local_path(stored_name: str) -> str:
     return str(local_path)
 
 
+def _get_audio_format(content_type: str, local_path: str) -> str:
+    """Resolve ASR format from content type first, then file extension."""
+    format_map = {
+        "audio/mpeg": "mp3", "audio/mp3": "mp3",
+        "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+        "audio/m4a": "m4a", "audio/x-m4a": "m4a", "audio/mp4": "m4a",
+        "audio/ogg": "ogg", "audio/flac": "flac",
+        "audio/aac": "aac", "audio/x-ms-wma": "wma", "audio/amr": "amr",
+    }
+    normalized_type = (content_type or "").split(";", 1)[0].strip().lower()
+    audio_format = format_map.get(normalized_type)
+    if audio_format:
+        return audio_format
+
+    suffix = Path(local_path).suffix.lower().lstrip(".")
+    ext_map = {"mpga": "mp3", "mpeg": "mp3", "wave": "wav", "mp4": "m4a"}
+    return ext_map.get(suffix, suffix or "mp3")
+
+
 def _transcode_to_mp3(local_path: str) -> str:
     """
-    Transcode an unsupported audio file to mp3 using ffmpeg.
+    Transcode an unsupported audio file to a normalized mp3 for ASR.
     Returns the path to the transcoded mp3 file.
     """
-    mp3_path = str(Path(local_path).with_suffix(".mp3"))
+    source = Path(local_path)
+    mp3_path = str(source.with_name(f"{source.stem}_asr.mp3"))
     if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
         logger.info("Transcoded file already exists: %s", mp3_path)
         return mp3_path
 
     logger.info("Transcoding %s -> %s", local_path, mp3_path)
     result = subprocess.run(
-        ["ffmpeg", "-y", "-i", local_path, "-acodec", "libmp3lame", "-q:a", "2", mp3_path],
-        capture_output=True, text=True, timeout=300,
+        [
+            "ffmpeg", "-y", "-i", local_path,
+            "-vn", "-map", "0:a:0", "-ac", "1", "-ar", "16000",
+            "-acodec", "libmp3lame", "-q:a", "4", mp3_path,
+        ],
+        capture_output=True, text=True, timeout=600,
     )
     if result.returncode != 0:
         logger.error("ffmpeg failed: %s", result.stderr[-500:])
@@ -92,52 +128,171 @@ def _get_audio_duration(local_path: str) -> float:
     )
     if result.returncode != 0:
         raise RuntimeError(f"ffprobe failed: {result.stderr[:200]}")
-    return float(result.stdout.strip())
+    duration_text = result.stdout.strip()
+    if not duration_text:
+        raise RuntimeError("ffprobe returned empty duration")
+    return float(duration_text)
 
 
-def _split_audio(local_path: str, max_size_mb: int = MAX_CHUNK_SIZE_MB) -> List[Tuple[str, float]]:
+def _split_audio(
+    local_path: str,
+    audio_format: str,
+    max_size_mb: int = MAX_CHUNK_SIZE_MB,
+    max_duration_seconds: int = MAX_CHUNK_DURATION_SECONDS,
+) -> List[AudioChunk]:
     """
-    Split audio file into chunks if it exceeds max_size_mb.
+    Split audio into normalized mp3 chunks when size or duration is too large.
 
-    Returns list of (chunk_path, time_offset_seconds).
-    For files within limit, returns [(original_path, 0.0)].
-    Temporary chunk files are created in the same directory.
+    Returns chunks with exact original-audio offsets. Each generated chunk has a
+    small overlap around boundaries, then merge logic removes duplicate text.
     """
     file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
-    if file_size_mb <= max_size_mb:
-        return [(local_path, 0.0)]
+    try:
+        duration = _get_audio_duration(local_path)
+    except Exception:
+        if file_size_mb <= max_size_mb:
+            logger.warning("Could not read audio duration; submitting original file without splitting")
+            return [AudioChunk(local_path, 0.0, 0.0, 0.0, audio_format, False)]
+        raise
 
-    duration = _get_audio_duration(local_path)
-    num_chunks = math.ceil(file_size_mb / max_size_mb)
-    chunk_duration = duration / num_chunks
+    chunks_by_size = max(1, math.ceil(file_size_mb / max_size_mb))
+    chunks_by_duration = max(1, math.ceil(duration / max_duration_seconds)) if duration > 0 else 1
+    num_chunks = max(chunks_by_size, chunks_by_duration)
 
-    logger.info("Splitting %.1fMB audio (%.0fs) into %d chunks of ~%.0fs each",
-                file_size_mb, duration, num_chunks, chunk_duration)
+    if num_chunks <= 1:
+        return [AudioChunk(local_path, 0.0, 0.0, duration, audio_format, False)]
+
+    nominal_duration = duration / num_chunks
+    logger.info(
+        "Splitting %.1fMB audio (%.1fs) into %d chunks of ~%.1fs each",
+        file_size_mb, duration, num_chunks, nominal_duration,
+    )
 
     chunks = []
     parent_dir = str(Path(local_path).parent)
     stem = Path(local_path).stem
-    suffix = Path(local_path).suffix
 
     for i in range(num_chunks):
-        offset = i * chunk_duration
-        chunk_path = os.path.join(parent_dir, f"{stem}_chunk{i+1}{suffix}")
+        nominal_start = i * nominal_duration
+        nominal_end = duration if i == num_chunks - 1 else (i + 1) * nominal_duration
+        actual_start = max(0.0, nominal_start - (CHUNK_OVERLAP_SECONDS if i > 0 else 0.0))
+        actual_end = min(duration, nominal_end + (CHUNK_OVERLAP_SECONDS if i < num_chunks - 1 else 0.0))
+        actual_duration = max(0.1, actual_end - actual_start)
+        chunk_path = os.path.join(parent_dir, f"{stem}_chunk{i + 1}.mp3")
 
+        # Put -ss after -i for accurate timestamps. Fast input seeking can land
+        # on a nearby keyframe and causes transcript/audio mismatch at boundaries.
         result = subprocess.run(
-            ["ffmpeg", "-y", "-ss", str(offset), "-t", str(chunk_duration),
-             "-i", local_path, "-acodec", "libmp3lame", "-q:a", "2", chunk_path],
-            capture_output=True, text=True, timeout=600,
+            [
+                "ffmpeg", "-y", "-i", local_path,
+                "-ss", f"{actual_start:.3f}", "-t", f"{actual_duration:.3f}",
+                "-vn", "-map", "0:a:0", "-ac", "1", "-ar", "16000",
+                "-acodec", "libmp3lame", "-q:a", "4", chunk_path,
+            ],
+            capture_output=True, text=True, timeout=900,
         )
         if result.returncode != 0:
-            logger.error("ffmpeg split chunk %d failed: %s", i+1, result.stderr[-300:])
-            raise RuntimeError(f"Audio split failed at chunk {i+1}")
+            logger.error("ffmpeg split chunk %d failed: %s", i + 1, result.stderr[-300:])
+            raise RuntimeError(f"Audio split failed at chunk {i + 1}")
+        if not os.path.exists(chunk_path) or os.path.getsize(chunk_path) <= 0:
+            raise RuntimeError(f"Audio split produced empty chunk at chunk {i + 1}")
 
         chunk_size = os.path.getsize(chunk_path) / (1024 * 1024)
-        logger.info("Chunk %d: offset=%.1fs, size=%.1fMB, path=%s",
-                     i+1, offset, chunk_size, chunk_path)
-        chunks.append((chunk_path, offset))
+        logger.info(
+            "Chunk %d: nominal=%.1f-%.1fs actual=%.1f-%.1fs size=%.1fMB path=%s",
+            i + 1, nominal_start, nominal_end, actual_start, actual_end, chunk_size, chunk_path,
+        )
+        chunks.append(AudioChunk(chunk_path, actual_start, nominal_start, nominal_end, "mp3", True))
 
     return chunks
+
+
+def _normalize_text_for_dedupe(text: str) -> str:
+    """Normalize ASR text for comparing overlapped chunk duplicates."""
+    lowered = (text or "").lower()
+    return re.sub(r"[\s，。！？、,.!?;；:：\"'“”‘’（）()\[\]{}<>《》\-—_…]+", "", lowered)
+
+
+def _text_similarity(left: str, right: str) -> float:
+    left_norm = _normalize_text_for_dedupe(left)
+    right_norm = _normalize_text_for_dedupe(right)
+    if not left_norm or not right_norm:
+        return 0.0
+    if left_norm == right_norm:
+        return 1.0
+    shorter, longer = sorted((left_norm, right_norm), key=len)
+    if len(shorter) >= 4 and shorter in longer:
+        return len(shorter) / len(longer)
+    return SequenceMatcher(None, left_norm, right_norm).ratio()
+
+
+def _is_near_or_overlapping(candidate: dict, existing: dict) -> bool:
+    c_start = float(candidate.get("start_time") or 0.0)
+    c_end = float(candidate.get("end_time") or c_start)
+    e_start = float(existing.get("start_time") or 0.0)
+    e_end = float(existing.get("end_time") or e_start)
+    if c_end < c_start:
+        c_end = c_start
+    if e_end < e_start:
+        e_end = e_start
+    tolerance = CHUNK_OVERLAP_SECONDS + 2.0
+    return c_start <= e_end + tolerance and e_start <= c_end + tolerance
+
+
+def _is_duplicate_segment(candidate: dict, existing_segments: List[dict]) -> bool:
+    for existing in reversed(existing_segments[-12:]):
+        if not _is_near_or_overlapping(candidate, existing):
+            continue
+        if _text_similarity(candidate.get("content", ""), existing.get("content", "")) >= 0.92:
+            return True
+    return False
+
+
+def _merge_chunk_segments(chunks: List[AudioChunk], chunk_results: List[dict]) -> tuple:
+    """Merge chunk-relative ASR segments into original-audio timestamps."""
+    is_multi_chunk = len(chunks) > 1
+    merged = []
+    warnings = []
+
+    for chunk_idx, (chunk, result) in enumerate(zip(chunks, chunk_results)):
+        chunk_segments = result.get("segments", []) or []
+        if not chunk_segments and not (result.get("text") or "").strip():
+            warnings.append(f"chunk {chunk_idx + 1} returned no transcript segments")
+            logger.warning("ASR chunk %d returned no transcript segments", chunk_idx + 1)
+
+        for seg in chunk_segments:
+            content = (seg.get("content") or "").strip()
+            if not content:
+                continue
+            rel_start = float(seg.get("start_time") or 0.0)
+            rel_end = float(seg.get("end_time") or rel_start)
+            start_time = max(0.0, rel_start + chunk.time_offset)
+            end_time = max(start_time, rel_end + chunk.time_offset)
+
+            candidate = {
+                "speaker_id": seg.get("speaker_id", ""),
+                "start_time": round(start_time, 2),
+                "end_time": round(end_time, 2),
+                "content": content,
+            }
+
+            if is_multi_chunk and _is_duplicate_segment(candidate, merged):
+                logger.info(
+                    "Dropping duplicate overlap segment at %.2f-%.2fs: %s",
+                    candidate["start_time"], candidate["end_time"], content[:50],
+                )
+                continue
+
+            if is_multi_chunk:
+                candidate["speaker_id"] = f"chunk{chunk_idx + 1}_{candidate['speaker_id']}"
+            merged.append(candidate)
+
+    merged.sort(key=lambda item: (item["start_time"], item["end_time"]))
+    for index, segment in enumerate(merged):
+        segment["segment_index"] = index
+
+    text = "\n".join(segment["content"] for segment in merged)
+    return merged, text, warnings
 
 
 async def _submit_single_chunk(local_path: str, audio_format: str) -> dict:
@@ -235,8 +390,8 @@ async def _submit_single_chunk(local_path: str, audio_format: str) -> dict:
 
 async def submit_asr_task(stored_name: str, content_type: str = "audio/mpeg") -> dict:
     """
-    Submit audio for ASR processing. Large files are automatically split
-    into chunks (≤ MAX_CHUNK_SIZE_MB each) and submitted sequentially.
+    Submit audio for ASR processing. Large or long files are split into
+    normalized chunks and submitted sequentially.
 
     Speaker IDs are namespaced per chunk for multi-chunk files:
     - Single chunk: speaker_0, speaker_1 (unchanged)
@@ -244,84 +399,70 @@ async def submit_asr_task(stored_name: str, content_type: str = "audio/mpeg") ->
 
     Returns dict with segments and full text.
     """
-    format_map = {
-        "audio/mpeg": "mp3", "audio/mp3": "mp3",
-        "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
-        "audio/m4a": "m4a", "audio/x-m4a": "m4a", "audio/mp4": "m4a",
-        "audio/ogg": "ogg", "audio/flac": "flac",
-        "audio/aac": "aac", "audio/x-ms-wma": "wma", "audio/amr": "amr",
-    }
-    audio_format = format_map.get(content_type, "mp3")
+    original_path = _get_local_path(stored_name)
+    local_path = original_path
+    audio_format = _get_audio_format(content_type, local_path)
+    temp_original_path: Optional[str] = None
 
-    local_path = _get_local_path(stored_name)
-
-    # Transcode unsupported formats
+    # Transcode unsupported formats before splitting so chunk output format and
+    # ASR-declared format always match.
     if audio_format not in ASR_SUPPORTED_FORMATS:
         try:
             local_path = _transcode_to_mp3(local_path)
+            temp_original_path = local_path
             audio_format = "mp3"
             logger.info("Using transcoded file: %s", local_path)
         except Exception as e:
-            logger.error("Transcode failed: %s, trying original", e)
+            logger.error("Transcode failed: %s", e)
+            return {"error": f"Audio transcode failed: {e}", "segments": [], "text": ""}
 
-    # Split if needed
+    chunks: List[AudioChunk] = []
+    chunk_results = []
     try:
-        chunks = _split_audio(local_path)
+        chunks = _split_audio(local_path, audio_format)
+
+        for chunk_idx, chunk in enumerate(chunks):
+            chunk_num = chunk_idx + 1
+            logger.info(
+                "Processing chunk %d/%d (offset=%.1fs, format=%s)",
+                chunk_num, len(chunks), chunk.time_offset, chunk.audio_format,
+            )
+
+            result = await _submit_single_chunk(chunk.path, chunk.audio_format)
+            if result.get("error"):
+                logger.error("Chunk %d failed: %s", chunk_num, result["error"])
+                return result
+            chunk_results.append(result)
+
+        all_segments, full_text, warnings = _merge_chunk_segments(chunks, chunk_results)
+        duration = max((chunk.nominal_end for chunk in chunks), default=None)
+        response = {
+            "segments": all_segments,
+            "text": full_text,
+            "duration_seconds": round(duration) if duration is not None else None,
+        }
+        if warnings:
+            response["warnings"] = warnings
+        return response
     except Exception as e:
-        logger.error("Audio split failed: %s", e)
-        return {"error": f"Audio split failed: {e}", "segments": [], "text": ""}
-
-    is_multi_chunk = len(chunks) > 1
-    all_segments = []
-    all_text_parts = []
-    global_seg_index = 0
-
-    for chunk_idx, (chunk_path, time_offset) in enumerate(chunks):
-        chunk_num = chunk_idx + 1
-        logger.info("Processing chunk %d/%d (offset=%.1fs)", chunk_num, len(chunks), time_offset)
-
-        result = await _submit_single_chunk(chunk_path, audio_format)
-
-        if result.get("error"):
-            logger.error("Chunk %d failed: %s", chunk_num, result["error"])
-            # Clean up temp chunk files
-            _cleanup_chunks(chunks, local_path)
-            return result  # Propagate error
-
-        for seg in result.get("segments", []):
-            # Namespace speaker_id for multi-chunk
-            speaker_id = seg["speaker_id"]
-            if is_multi_chunk:
-                speaker_id = f"chunk{chunk_num}_{speaker_id}"
-
-            all_segments.append({
-                "segment_index": global_seg_index,
-                "speaker_id": speaker_id,
-                "start_time": round(seg["start_time"] + time_offset, 2),
-                "end_time": round(seg["end_time"] + time_offset, 2),
-                "content": seg["content"],
-            })
-            global_seg_index += 1
-
-        chunk_text = result.get("text", "")
-        if chunk_text:
-            all_text_parts.append(chunk_text)
-
-    # Clean up temp chunk files
-    _cleanup_chunks(chunks, local_path)
-
-    return {
-        "segments": all_segments,
-        "text": "\n".join(all_text_parts),
-    }
-
-
-def _cleanup_chunks(chunks: List[Tuple[str, float]], original_path: str):
-    """Remove temporary chunk files (not the original)."""
-    for chunk_path, _ in chunks:
-        if chunk_path != original_path and os.path.exists(chunk_path):
+        logger.exception("ASR processing failed: %s", e)
+        error_msg = str(e) or type(e).__name__
+        return {"error": error_msg, "segments": [], "text": ""}
+    finally:
+        _cleanup_chunks(chunks, local_path)
+        if temp_original_path and temp_original_path != original_path:
             try:
-                os.remove(chunk_path)
+                os.remove(temp_original_path)
+            except OSError:
+                pass
+
+
+def _cleanup_chunks(chunks: List[AudioChunk], original_path: str):
+    """Remove temporary chunk files (not the submitted original)."""
+    for chunk in chunks:
+        if chunk.is_temp and chunk.path != original_path and os.path.exists(chunk.path):
+            try:
+                os.remove(chunk.path)
             except OSError:
                 pass
 

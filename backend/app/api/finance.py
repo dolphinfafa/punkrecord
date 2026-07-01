@@ -2,6 +2,7 @@
 Finance API endpoints
 """
 from typing import Optional
+from urllib.parse import quote
 from decimal import Decimal
 from app.models.base import now_cn
 from uuid import UUID
@@ -11,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import require_permission
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import AtlasException, NotFoundException
 from app.core.response import success_response
 from app.models.iam import User, OurEntity, OurEntityStatus
 from app.models.finance import (
@@ -395,6 +396,7 @@ async def export_transactions(
     txn_direction: Optional[str] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    status: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("finance.read"))
 ):
@@ -403,7 +405,7 @@ async def export_transactions(
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-    query = _build_txn_query(account_id, txn_direction, date_from, date_to)
+    query = _build_txn_query(account_id, txn_direction, date_from, date_to, status)
     query = query.order_by(FinanceTransaction.txn_date.desc())
     transactions = session.exec(query).all()
 
@@ -454,7 +456,7 @@ async def export_transactions(
             accounts_map.get(txn.account_id, "-"),
             counterparty,
             contracts_map.get(txn.contract_id, "-") if txn.contract_id else "-",
-            status_map.get(txn.reconcile_status, txn.reconcile_status),
+            "作废" if txn.voided else status_map.get(txn.reconcile_status, txn.reconcile_status),
         ]
         for col_idx, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -479,10 +481,17 @@ async def export_transactions(
         filename += f"_{date_to}"
     filename += ".xlsx"
 
+    encoded_filename = quote(filename.encode("utf-8"))
+    ascii_filename = "transactions.xlsx"
+
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename={ascii_filename}; filename*=UTF-8''{encoded_filename}"
+            )
+        }
     )
 
 
@@ -556,6 +565,24 @@ async def unvoid_transaction(
         raise NotFoundException("未找到交易")
     _set_transaction_voided(session, transaction, False)
     return success_response(TransactionResponse.model_validate(transaction))
+
+
+@router.delete("/transactions/{txn_id}", response_model=dict)
+async def delete_voided_transaction(
+    txn_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("finance.write"))
+):
+    """删除已作废的交易明细。正常交易必须先作废，避免误删有效流水。"""
+    transaction = session.get(FinanceTransaction, txn_id)
+    if not transaction:
+        raise NotFoundException("未找到交易")
+    if not transaction.voided:
+        raise AtlasException("只能删除已作废的交易明细，请先作废后再删除")
+
+    session.delete(transaction)
+    session.commit()
+    return success_response({"message": "交易明细已删除"})
 
 
 # Invoice endpoints

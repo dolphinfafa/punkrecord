@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Trash2 } from 'lucide-react';
 import financeApi from '@/api/finance';
 import { contractApi } from '@/api/contract';
 import iamApi from '@/api/iam';
@@ -115,25 +115,65 @@ export default function TransactionListPage() {
         }
     };
 
+    const handleDeleteVoided = async (txn) => {
+        if (!txn.voided) return;
+        if (!window.confirm('确认永久删除这条已作废交易？删除后无法恢复。')) return;
+        try {
+            setUpdatingStatusId(txn.id);
+            await financeApi.deleteTransaction(txn.id);
+            const remaining = transactions.filter(item => item.id !== txn.id);
+            setTransactions(remaining);
+            setTotal(prev => Math.max(0, prev - 1));
+            if (remaining.length === 0 && page > 1) {
+                setPage(prev => prev - 1);
+            } else {
+                await loadData();
+            }
+        } catch (err) {
+            console.error('Failed to delete voided transaction', err);
+            alert('删除失败: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setUpdatingStatusId('');
+        }
+    };
+
+    const resolveExportError = async (err) => {
+        const data = err.response?.data;
+        if (data instanceof Blob) {
+            try {
+                const text = await data.text();
+                const parsed = JSON.parse(text);
+                return parsed.message || parsed.detail || text;
+            } catch {
+                return '服务器返回了无法识别的导出错误';
+            }
+        }
+        return err.response?.data?.message || err.message;
+    };
+
     const handleExport = async () => {
         try {
             setExporting(true);
-            const res = await financeApi.exportTransactions({
+            const blob = await financeApi.exportTransactions({
                 date_from: dateFrom || undefined,
                 date_to: dateTo || undefined,
+                status: statusFilter || undefined,
             });
-            const url = URL.createObjectURL(new Blob([res.data]));
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             let filename = '交易明细';
             if (dateFrom) filename += `_${dateFrom}`;
             if (dateTo) filename += `_${dateTo}`;
+            if (statusFilter) filename += `_${statusFilter}`;
             filename += '.xlsx';
             a.download = filename;
+            document.body.appendChild(a);
             a.click();
+            a.remove();
             URL.revokeObjectURL(url);
         } catch (err) {
-            alert('导出失败: ' + (err.response?.data?.message || err.message));
+            alert('导出失败: ' + await resolveExportError(err));
         } finally {
             setExporting(false);
         }
@@ -274,6 +314,17 @@ export default function TransactionListPage() {
                                         >
                                             {txn.voided ? '恢复' : '作废'}
                                         </button>
+                                        {txn.voided && (
+                                            <button
+                                                className="btn-link"
+                                                disabled={updatingStatusId === txn.id}
+                                                onClick={() => handleDeleteVoided(txn)}
+                                                style={{ marginLeft: '0.5rem', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                                            >
+                                                <Trash2 size={13} />
+                                                删除
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))
