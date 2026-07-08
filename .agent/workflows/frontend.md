@@ -68,7 +68,7 @@
 | 页面/组件 | 说明 |
 |-----------|------|
 | `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 上传音频按钮 |
-| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 归档 |
+| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 重新转写 + 归档 |
 | `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 + 会议日期选择（默认今天） |
 
 ### API 模块（`api/`）
@@ -211,6 +211,16 @@
 | `api/finance.js` | 新增 `deleteTransaction`；`exportTransactions` 透传 `status` |
 | `pages/meeting/MeetingDetailPage.jsx` | 转录片段播放使用 `??` 读取 `start_time/end_time`，保留 0 秒合法时间点，避免点击首段时跳转到错误位置 |
 
+### v2.0.4 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/contract/ContractListPage.jsx` | 合同列表新增附件数量按钮，打开附件管理弹窗；附件变更后同步更新列表行和当前选中合同 |
+| `pages/contract/components/ContractAttachmentsModal.jsx` + `.css` | 新增合同附件管理弹窗，支持 PDF/图片上传、查看/下载、删除；限制单文件 20MB |
+| `api/contract.js` | 新增 `listAttachments`、`uploadAttachment`、`deleteAttachment`、`getAttachmentViewUrl`、`getAttachmentDownloadUrl` |
+| `pages/meeting/MeetingDetailPage.jsx` | 音频区新增“重新转写”按钮；修正详情页通过 `audio_file_name/audio_file_size` 判断是否存在音频，避免后端未返回 `audio_stored_name` 时误判无音频 |
+| `api/meeting.js` | 新增 `retranscribe(id)` |
+
 ---
 
-*最后更新：2026-07-01*
+*最后更新：2026-07-08*

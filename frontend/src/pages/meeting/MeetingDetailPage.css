@@ -182,6 +182,12 @@
     border-radius: 4px;
 }
 
+.audio-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
 .audio-loading,
 .audio-unavailable {
     text-align: center;

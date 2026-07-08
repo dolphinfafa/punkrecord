@@ -3,14 +3,18 @@ Contract API endpoints
 """
 from typing import Optional
 from app.models.base import now_cn
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user, require_permission
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.core.response import success_response
+from app.core.storage import delete_file, get_download_url, get_file, save_file
 from app.models.iam import User
 from app.models.contract import (
     Contract, Counterparty, ContractPaymentPlan,
@@ -20,10 +24,69 @@ from app.models.contract import (
 from app.schemas.contract import (
     CounterpartyCreate, CounterpartyResponse,
     ContractCreate, ContractUpdate, ContractResponse,
-    PaymentPlanResponse
+    ContractAttachmentResponse, PaymentPlanResponse
 )
 
 router = APIRouter(prefix="/contract", tags=["Contract"])
+
+MAX_CONTRACT_ATTACHMENT_SIZE = 20 * 1024 * 1024
+ALLOWED_CONTRACT_ATTACHMENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
+    "image/tiff",
+}
+ALLOWED_CONTRACT_ATTACHMENT_SUFFIXES = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+}
+
+
+def _validate_contract_attachment(file: UploadFile, file_bytes: bytes) -> str:
+    """Validate contract attachment and return the safe suffix."""
+    if not file.filename:
+        raise ValidationException("附件文件名不能为空")
+    if not file_bytes:
+        raise ValidationException("附件内容不能为空")
+    if len(file_bytes) > MAX_CONTRACT_ATTACHMENT_SIZE:
+        raise ValidationException("附件大小不能超过 20MB")
+
+    content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    suffix = Path(file.filename).suffix.lower()
+    if (
+        content_type not in ALLOWED_CONTRACT_ATTACHMENT_TYPES
+        and suffix not in ALLOWED_CONTRACT_ATTACHMENT_SUFFIXES
+    ):
+        raise ValidationException("合同附件仅支持 PDF 或图片格式")
+    return suffix[:20]
+
+
+def _find_contract_attachment(contract: Contract, attachment_id: str) -> dict:
+    attachment = next((a for a in (contract.attachments or []) if a.get("id") == attachment_id), None)
+    if not attachment:
+        raise NotFoundException("未找到附件")
+    return attachment
+
+
+def _attachment_response(attachment: dict) -> dict:
+    """Return public attachment metadata for API responses."""
+    return ContractAttachmentResponse(
+        id=attachment.get("id", ""),
+        file_name=attachment.get("file_name") or "attachment",
+        content_type=attachment.get("content_type") or "application/octet-stream",
+        size=int(attachment.get("size") or 0),
+        uploaded_at=attachment.get("uploaded_at") or "",
+    ).model_dump()
 
 
 # Counterparty endpoints
@@ -223,6 +286,156 @@ async def get_contract(
         raise NotFoundException("未找到合同")
     
     return success_response(ContractResponse.model_validate(contract))
+
+
+@router.get("/contracts/{contract_id}/attachments", response_model=dict)
+async def list_contract_attachments(
+    contract_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.read"))
+):
+    """List attachments for a contract."""
+    contract = session.get(Contract, contract_id)
+    if not contract:
+        raise NotFoundException("未找到合同")
+    return success_response([_attachment_response(attachment) for attachment in (contract.attachments or [])])
+
+
+@router.post("/contracts/{contract_id}/attachments", response_model=dict)
+async def upload_contract_attachment(
+    contract_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.write"))
+):
+    """Upload a PDF/image attachment for a contract."""
+    contract = session.get(Contract, contract_id)
+    if not contract:
+        raise NotFoundException("未找到合同")
+
+    file_bytes = await file.read()
+    safe_suffix = _validate_contract_attachment(file, file_bytes)
+    content_type = (file.content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
+    attachment_id = uuid4().hex
+    stored_name = f"{contract_id}_{attachment_id}{safe_suffix}"
+    save_file("contract-attachments", stored_name, file_bytes, content_type)
+
+    attachment = {
+        "id": attachment_id,
+        "file_name": file.filename,
+        "stored_name": stored_name,
+        "content_type": content_type,
+        "size": len(file_bytes),
+        "uploaded_at": now_cn().isoformat(),
+    }
+    attachments = list(contract.attachments or [])
+    attachments.append(attachment)
+    contract.attachments = attachments
+    contract.updated_at = now_cn()
+    session.add(contract)
+    session.commit()
+
+    return success_response(_attachment_response(attachment))
+
+
+@router.get("/contracts/{contract_id}/attachments/{attachment_id}/view")
+async def view_contract_attachment(
+    contract_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.read"))
+):
+    """View a PDF/image contract attachment inline."""
+    contract = session.get(Contract, contract_id)
+    if not contract:
+        raise NotFoundException("未找到合同")
+
+    attachment = _find_contract_attachment(contract, attachment_id)
+    stored_name = attachment.get("stored_name")
+    if not stored_name:
+        raise NotFoundException("附件元数据异常")
+
+    url = get_download_url("contract-attachments", stored_name)
+    if url:
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("contract-attachments", stored_name)
+    except FileNotFoundError:
+        raise NotFoundException("附件文件不存在")
+
+    return FileResponse(
+        path=local_path,
+        media_type=attachment.get("content_type") or "application/octet-stream",
+        filename=attachment.get("file_name") or "attachment",
+        content_disposition_type="inline",
+    )
+
+
+@router.get("/contracts/{contract_id}/attachments/{attachment_id}/download")
+async def download_contract_attachment(
+    contract_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.read"))
+):
+    """Download a contract attachment."""
+    contract = session.get(Contract, contract_id)
+    if not contract:
+        raise NotFoundException("未找到合同")
+
+    attachment = _find_contract_attachment(contract, attachment_id)
+    stored_name = attachment.get("stored_name")
+    if not stored_name:
+        raise NotFoundException("附件元数据异常")
+
+    url = get_download_url("contract-attachments", stored_name)
+    if url:
+        return RedirectResponse(url)
+
+    try:
+        _, local_path = get_file("contract-attachments", stored_name)
+    except FileNotFoundError:
+        raise NotFoundException("附件文件不存在")
+
+    return FileResponse(
+        path=local_path,
+        media_type=attachment.get("content_type") or "application/octet-stream",
+        filename=attachment.get("file_name") or "attachment",
+    )
+
+
+@router.delete("/contracts/{contract_id}/attachments/{attachment_id}", response_model=dict)
+async def delete_contract_attachment(
+    contract_id: UUID,
+    attachment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("contract.write"))
+):
+    """Delete a contract attachment."""
+    contract = session.get(Contract, contract_id)
+    if not contract:
+        raise NotFoundException("未找到合同")
+
+    attachments = list(contract.attachments or [])
+    idx = next((i for i, item in enumerate(attachments) if item.get("id") == attachment_id), None)
+    if idx is None:
+        raise NotFoundException("未找到附件")
+
+    removed = attachments.pop(idx)
+    stored_name = removed.get("stored_name")
+    if stored_name:
+        try:
+            delete_file("contract-attachments", stored_name)
+        except Exception:
+            pass
+
+    contract.attachments = attachments
+    contract.updated_at = now_cn()
+    session.add(contract)
+    session.commit()
+
+    return success_response({"message": "附件已删除"})
 
 
 @router.patch("/contracts/{contract_id}", response_model=dict)

@@ -26,6 +26,7 @@ export const meetingApi = {
     getTranscript: (id) => client.get(`/meeting/records/${id}/transcript`),
     updateTranscript: (id, data) => client.patch(`/meeting/records/${id}/transcript`, data),
     updateSpeakers: (id, data) => client.put(`/meeting/records/${id}/speakers`, data),
+    retranscribe: (id) => client.post(`/meeting/records/${id}/retranscribe`),
     archiveToKB: (id) => client.post(`/meeting/records/${id}/archive`),
     getAudioUrl: (id) => `/api/v1/meeting/records/${id}/audio`,
 };

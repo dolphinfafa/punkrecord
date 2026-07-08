@@ -1,4 +1,5 @@
 import client from './client';
+import axios from 'axios';
 
 export const contractApi = {
     // Contracts
@@ -28,6 +29,36 @@ export const contractApi = {
 
     getPaymentPlans: async (contractId) => {
         return client.get(`/contract/contracts/${contractId}/payment-plans`);
+    },
+
+    listAttachments: async (contractId) => {
+        return client.get(`/contract/contracts/${contractId}/attachments`);
+    },
+
+    uploadAttachment: async (contractId, file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return client.post(`/contract/contracts/${contractId}/attachments`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+
+    deleteAttachment: async (contractId, attachmentId) => {
+        return client.delete(`/contract/contracts/${contractId}/attachments/${attachmentId}`);
+    },
+
+    viewAttachmentUrl: (contractId, attachmentId) => {
+        return `/api/v1/contract/contracts/${contractId}/attachments/${attachmentId}/view`;
+    },
+
+    downloadAttachment: async (contractId, attachmentId) => {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        return axios.get(`/api/v1/contract/contracts/${contractId}/attachments/${attachmentId}/download`, {
+            responseType: 'blob',
+            withCredentials: true,
+            headers,
+        });
     },
 
     // Counterparties

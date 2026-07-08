@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '@/components/common/Modal';
 import contractApi from '@/api/contract';
-import axios from 'axios';
 
 export default function CreateContractModal({ isOpen, onClose, onSuccess, initialData = null }) {
     const [formData, setFormData] = useState({

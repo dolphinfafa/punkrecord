@@ -60,7 +60,7 @@
 
 | 模型 | 说明 |
 |------|------|
-| `Contract` | 合同 |
+| `Contract` | 合同（含 `attachments` JSON 附件元数据，文件存储在 `contract-attachments`） |
 | `Counterparty` | 对手方 |
 | `ContractPaymentPlan` | 付款计划 |
 

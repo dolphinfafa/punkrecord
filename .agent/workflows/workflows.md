@@ -94,6 +94,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 - 合同编辑支持修改 status 字段（编辑模式下显示状态下拉框）
 - 编辑 amount_total 时自动重算 pending_amount（扣除已付款金额）
+- 合同支持多个附件（PDF/图片）：合同列表可查看附件数量并打开附件管理弹窗；附件支持上传、查看/下载和删除，文件元数据保存在 `contract.attachments` JSON，实际文件存储在 `contract-attachments`。
 
 ### 1.8 版本更新日志
 
@@ -107,11 +108,14 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 - 上传音频文件 → 后台异步调用豆包 ASR 转写（含说话人分离）
 - **无音频创建**：可仅通过标题/类型/日期创建会议记录，进入详情页后手动填写参会人员，在自定义提示词中填写会议记录，AI 直接生成纪要；也可后续补传音频触发 ASR 转录
-- **大文件/长音频自动切片**：音频 > 300MB 或时长 > 25 分钟时自动用 ffmpeg 切片；切片统一输出 16k 单声道 mp3，按精确 seek 截取，切片间保留 5 秒重叠并在合并时按时间+文本相似度去重，减少边界漏识别和转录时间轴错位
+- **大文件/长音频自动切片**：音频会统一归一化为 16k 单声道 mp3；音频 > 300MB 或时长 > 45 分钟时自动用 ffmpeg 精确切片，切片间保留 12 秒重叠并在合并时按时间+文本相似度去重，减少边界漏识别和转录时间轴错位
   - 切片说话人 ID 带 chunk 前缀：`chunk1_speaker_0`、`chunk2_speaker_0`
   - 时间戳自动加回原音频偏移，segment_index 按开始时间全局递增
   - 单片文件不加前缀，保持向后兼容
   - 用户手动将不同 chunk 的说话人改为同一名字 → AI 纪要自动视为同一人
+- ASR 后处理会平滑局部孤立的超短说话人分段，降低会议任务安排中短句被误分成新 speaker 的概率。
+- 会议详情页支持“重新转写”：已有音频可再次触发 ASR，新结果成功后才替换旧转写；若 ASR 失败，旧分段保留。
+- 当前豆包 ASR 对低声、远场或快速语速内容仍可能原始漏识别；代码层面已避免切片/格式导致的漏字，但无法从单一 ASR 返回中恢复完全未识别的句子，必要时需人工校正或接入备用 ASR。
 - 每片 ASR 超时 20 分钟，ASR 返回 0 segments 时标记为 `failed`（而非 `transcribed`）
 - 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
 - 转写完成后可编辑文稿内容和说话人标注
@@ -260,4 +264,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-07-01*
+*最后更新：2026-07-08*

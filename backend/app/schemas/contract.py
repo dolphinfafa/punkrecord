@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CounterpartyCreate(BaseModel):
@@ -102,6 +102,15 @@ class ContractUpdate(BaseModel):
     expire_date: Optional[date] = None
 
 
+class ContractAttachmentResponse(BaseModel):
+    """Contract attachment metadata."""
+    id: str
+    file_name: str
+    content_type: str
+    size: int
+    uploaded_at: str
+
+
 class ContractResponse(BaseModel):
     """Contract response schema"""
     id: UUID
@@ -121,8 +130,23 @@ class ContractResponse(BaseModel):
     effective_date: Optional[date] = None
     expire_date: Optional[date] = None
     summary: Optional[str] = None
+    attachments: List[ContractAttachmentResponse] = []
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def normalize_attachments(cls, value):
+        normalized = []
+        for item in value or []:
+            normalized.append({
+                "id": item.get("id", ""),
+                "file_name": item.get("file_name") or "attachment",
+                "content_type": item.get("content_type") or "application/octet-stream",
+                "size": int(item.get("size") or 0),
+                "uploaded_at": item.get("uploaded_at") or "",
+            })
+        return normalized

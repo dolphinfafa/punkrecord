@@ -36,11 +36,11 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | Todo | 任务全生命周期、看板拖拽、团队协作、图片附件 |
 | Leave | 请假申请与审批、额度自动扣减、年度重置 |
 | Project | B2B/B2C 项目管理、阶段流转、开发进度、Bug 管理、验收报告 |
-| Contract | 三方合同管理、AI 智能生成、Word 导出 |
+| Contract | 三方合同管理、PDF/图片附件、AI 智能生成、Word 导出 |
 | Finance | 账户、交易、发票、报销、实时余额 |
 | Beli | 积分激励体系、规则引擎、自动结算 |
 | KB (企业大脑) | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
-| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、说话人标注/切换、会议日期、参会人自动提取、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
+| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、重新转写、说话人标注/切换、会议日期、参会人自动提取、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
 
 平台提供三个客户端：Web 管理后台、微信小程序（移动端）、RESTful API。
 
@@ -398,6 +398,7 @@ Meeting 模块（会议记录）
 | `amount_total` | Decimal(18,2) | 必填 | 合同总金额 |
 | `pending_amount` | Decimal(18,2) | 必填 | 待收/付金额 |
 | `content_doc` | str | 可选 | Markdown 合同内容 |
+| `attachments` | JSON | 默认 [] | 合同附件元数据（PDF/图片，文件存储在 `contract-attachments`） |
 
 #### FinanceTransaction（交易记录）
 
@@ -723,6 +724,7 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | RAG 企业知识对话 | `POST /api/v1/kb/chat` | Embedding检索→ChromaDB→上下文拼接→Gemini流式回答 |
 | 文档智能摘要/标签 | 上传文档后台自动触发 | Gemini 自动生成摘要和分类标签 |
 | 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要 |
+| 会议重新转写 | `POST /api/v1/meeting/records/{id}/retranscribe` | 对已有音频重新触发豆包 ASR，成功后替换旧分段 |
 | 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
 **AI 技术栈**：LiteLLM 代理（统一调用 Gemini 等模型） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）

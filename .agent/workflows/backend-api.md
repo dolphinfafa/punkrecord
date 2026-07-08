@@ -138,6 +138,10 @@
 | GET/PATCH | `/api/v1/contract/contracts/{id}` | 合同详情/更新 |
 | POST | `/api/v1/contract/contracts/{id}/submit` | 提交合同 |
 | GET | `/api/v1/contract/contracts/{id}/payment-plans` | 付款计划 |
+| GET/POST | `/api/v1/contract/contracts/{id}/attachments` | 合同附件列表/上传。仅支持 PDF 和图片，单文件最大 20MB，元数据存入 `contract.attachments` JSON，文件存储在 `contract-attachments` bucket/目录 |
+| GET | `/api/v1/contract/contracts/{id}/attachments/{attachment_id}/view` | 查看合同附件（PDF/图片 inline） |
+| GET | `/api/v1/contract/contracts/{id}/attachments/{attachment_id}/download` | 下载合同附件 |
+| DELETE | `/api/v1/contract/contracts/{id}/attachments/{attachment_id}` | 删除合同附件并清理文件 |
 
 ### 项目管理
 
@@ -210,7 +214,8 @@
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
-| POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；大文件/长音频会统一转为 16k 单声道 mp3 后按大小或 25 分钟时长切片，切片间保留 5 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
+| POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；音频会统一归一化为 16k 单声道 mp3。大文件/长音频按大小或 45 分钟时长切片，切片间保留 12 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
+| POST | `/api/v1/meeting/records/{id}/retranscribe` | meeting.write | 对已有音频重新转写；新 ASR 成功后才替换旧分段，失败时保留旧转写 |
 | PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表 |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
@@ -252,12 +257,13 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（28）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（35）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
 - **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
 - **财务交易作废工具（v2.0.3，2026-07-01）**：`list_transactions` 支持 `account_id`/`txn_direction`/`status`/日期/分页筛选，`status=voided` 可查看作废交易；`void_transaction`/`unvoid_transaction`/`delete_voided_transaction` 分别转发财务交易作废、恢复和删除已作废交易。写操作需 `finance.write` 权限。
+- **合同附件与会议工具（v2.0.4，2026-07-08）**：新增 `get_contract`/`list_contract_attachments`/`upload_contract_attachment`/`delete_contract_attachment`，附件工具会返回 `view_path`/`download_path`；新增 `get_meeting`/`get_meeting_transcript`/`retranscribe_meeting`，用于查看会议详情、转写分段和触发重新转写。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
-- **运行环境**：dev 后端由 **PM2** 托管（`punkrecord-backend`，conda env `punkrecord`，`uvicorn --reload`），非 `dev.sh`（其指向的 `punk` env 为旧脚本）。
+- **运行环境**：dev 后端使用 conda env `punkrecord`；`dev.sh` 已指向 `/opt/miniconda3/envs/punkrecord/bin/python`，避免误用旧 `punk` 环境。
 
 ---
 
-*最后更新：2026-07-01*
+*最后更新：2026-07-08*

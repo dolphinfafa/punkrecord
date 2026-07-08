@@ -7,7 +7,7 @@ FRONTEND_PORT=15173
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_LOG="/tmp/punkrecord-backend-zheyang-dev.log"
 FRONTEND_LOG="/tmp/punkrecord-frontend-zheyang-dev.log"
-PYTHON="/opt/miniconda3/envs/punk/bin/python"
+PYTHON="/opt/miniconda3/envs/punkrecord/bin/python"
 
 case "${1:-start}" in
   start)

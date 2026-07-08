@@ -1,0 +1,157 @@
+.contract-attachment-dropzone {
+    display: flex;
+    min-height: 132px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #334155;
+    cursor: pointer;
+    transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.contract-attachment-dropzone:hover,
+.contract-attachment-dropzone.dragging {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.contract-attachment-dropzone svg {
+    color: #2563eb;
+}
+
+.contract-attachment-dropzone small {
+    color: #64748b;
+}
+
+.contract-attachment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0 10px;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.contract-attachment-header span {
+    color: #64748b;
+}
+
+.contract-attachment-empty {
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px dashed #d1d5db;
+    border-radius: 8px;
+    color: #64748b;
+    background: #f8fafc;
+}
+
+.contract-attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.contract-attachment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.contract-attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.contract-attachment-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #eef2ff;
+    color: #2563eb;
+    flex: 0 0 auto;
+}
+
+.contract-attachment-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.contract-attachment-meta span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.contract-attachment-name {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #111827;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 420px;
+}
+
+.contract-attachment-name:hover {
+    color: #2563eb;
+}
+
+.contract-attachment-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.contract-attachment-actions button {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.contract-attachment-actions button:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #111827;
+}
+
+.contract-attachment-actions button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.contract-attachment-actions button.danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
+}

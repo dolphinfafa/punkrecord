@@ -10,6 +10,7 @@ notifications and all business rules stay identical to the web app — zero logi
 duplication.
 """
 import logging
+import base64
 from typing import Optional
 
 import httpx
@@ -65,6 +66,7 @@ async def _call(
     *,
     params: Optional[dict] = None,
     json: Optional[dict] = None,
+    files: Optional[dict] = None,
 ):
     """Forward the call to the local REST API with the caller's token."""
     token = _extract_token(ctx)
@@ -72,7 +74,7 @@ async def _call(
     headers = {"Authorization": f"Bearer {token}"}
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.request(method, url, params=params, json=json, headers=headers)
+        resp = await client.request(method, url, params=params, json=json, files=files, headers=headers)
 
     try:
         body = resp.json()
@@ -91,6 +93,23 @@ async def _call(
     if isinstance(body, dict) and "data" in body:
         return body["data"]
     return body
+
+
+def _attachment_urls(contract_id: str, attachment_id: str) -> dict:
+    base = f"/api/v1/contract/contracts/{contract_id}/attachments/{attachment_id}"
+    return {
+        "view_path": f"{base}/view",
+        "download_path": f"{base}/download",
+    }
+
+
+def _attach_contract_urls(contract_id: str, attachment: dict) -> dict:
+    if not isinstance(attachment, dict):
+        return attachment
+    attachment_id = attachment.get("id")
+    if attachment_id:
+        return {**attachment, **_attachment_urls(contract_id, attachment_id)}
+    return attachment
 
 
 # ─── Read tools ───────────────────────────────────────────────────────────────
@@ -150,6 +169,28 @@ async def list_contracts(ctx: Context, status: Optional[str] = None, page_size: 
 
 
 @mcp.tool()
+async def get_contract(ctx: Context, contract_id: str) -> dict:
+    """查看合同详情（需 contract.read 权限），返回基础信息和附件元数据。"""
+    data = await _call(ctx, "GET", f"/contract/contracts/{contract_id}")
+    if isinstance(data, dict):
+        attachments = data.get("attachments") or []
+        data["attachments"] = [_attach_contract_urls(contract_id, item) for item in attachments]
+    return data
+
+
+@mcp.tool()
+async def list_contract_attachments(ctx: Context, contract_id: str) -> dict:
+    """列出某个合同的附件（PDF/图片），返回 view_path/download_path 供查看或下载。"""
+    attachments = await _call(ctx, "GET", f"/contract/contracts/{contract_id}/attachments")
+    if isinstance(attachments, list):
+        return {
+            "items": [_attach_contract_urls(contract_id, item) for item in attachments],
+            "total": len(attachments),
+        }
+    return attachments
+
+
+@mcp.tool()
 async def list_counterparties(ctx: Context, page_size: int = 20) -> dict:
     """查看交易方（对手方）列表。"""
     return await _call(ctx, "GET", "/contract/counterparties", params={"page_size": page_size})
@@ -197,6 +238,21 @@ async def search_kb(ctx: Context, query: str, top_k: int = 5) -> dict:
 async def list_meetings(ctx: Context, search: Optional[str] = None, page_size: int = 10) -> dict:
     """查看会议记录列表（需 meeting.read 权限）。search 可按标题/参会人搜索。"""
     return await _call(ctx, "GET", "/meeting/records", params={"search": search, "page_size": page_size})
+
+
+@mcp.tool()
+async def get_meeting(ctx: Context, meeting_id: str) -> dict:
+    """查看会议详情（需 meeting.read 权限），包含音频状态、说话人映射、纪要等。"""
+    return await _call(ctx, "GET", f"/meeting/records/{meeting_id}")
+
+
+@mcp.tool()
+async def get_meeting_transcript(ctx: Context, meeting_id: str) -> dict:
+    """查看会议转写分段（需 meeting.read 权限）。"""
+    segments = await _call(ctx, "GET", f"/meeting/records/{meeting_id}/transcript")
+    if isinstance(segments, list):
+        return {"items": segments, "total": len(segments)}
+    return segments
 
 
 # ─── Write tools ──────────────────────────────────────────────────────────────
@@ -356,6 +412,60 @@ async def create_leave(
     if reason:
         body["reason"] = reason
     return await _call(ctx, "POST", "/todo/leaves", json=body)
+
+
+# ─── Contract write tools ─────────────────────────────────────────────────────
+
+@mcp.tool()
+async def upload_contract_attachment(
+    ctx: Context,
+    contract_id: str,
+    file_name: str,
+    content_base64: str,
+    content_type: str = "application/pdf",
+) -> dict:
+    """上传合同附件（需 contract.write 权限）。
+
+    - contract_id：合同 UUID。
+    - file_name：原始文件名，后缀应为 .pdf 或图片格式。
+    - content_base64：文件内容的 Base64 字符串。
+    - content_type：application/pdf 或 image/png/image/jpeg 等。
+    单个文件大小仍受 REST 接口 20MB 限制。
+    """
+    if not file_name:
+        raise RuntimeError("file_name 不能为空。")
+    try:
+        file_bytes = base64.b64decode(content_base64, validate=True)
+    except Exception as exc:
+        raise RuntimeError("content_base64 不是有效的 Base64 文件内容。") from exc
+    if not file_bytes:
+        raise RuntimeError("文件内容不能为空。")
+
+    files = {"file": (file_name, file_bytes, content_type)}
+    attachment = await _call(
+        ctx,
+        "POST",
+        f"/contract/contracts/{contract_id}/attachments",
+        files=files,
+    )
+    if isinstance(attachment, dict):
+        return _attach_contract_urls(contract_id, attachment)
+    return attachment
+
+
+@mcp.tool()
+async def delete_contract_attachment(ctx: Context, contract_id: str, attachment_id: str) -> dict:
+    """删除某个合同附件（需 contract.write 权限）。"""
+    return await _call(ctx, "DELETE", f"/contract/contracts/{contract_id}/attachments/{attachment_id}")
+
+
+@mcp.tool()
+async def retranscribe_meeting(ctx: Context, meeting_id: str) -> dict:
+    """重新转写已有音频的会议（需 meeting.write 权限）。
+
+    新 ASR 成功后会替换当前转写分段；如果 ASR 失败，旧分段会保留。
+    """
+    return await _call(ctx, "POST", f"/meeting/records/{meeting_id}/retranscribe")
 
 
 # ─── Finance write tools ──────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, FileText, ExternalLink, Calendar, Users, DollarSign, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { Plus, FileText, Calendar, ChevronLeft, ChevronRight, Paperclip } from 'lucide-react';
 import contractApi from '@/api/contract';
 import CreateContractModal from './components/CreateContractModal';
+import ContractAttachmentsModal from './components/ContractAttachmentsModal';
 
 // Status mapping
 const STATUS_MAP = {
@@ -24,16 +25,13 @@ export default function ContractListPage() {
     const [error, setError] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingContract, setEditingContract] = useState(null);
+    const [attachmentContract, setAttachmentContract] = useState(null);
     const [counterpartyMap, setCounterpartyMap] = useState({});
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const pageSize = 20;
 
-    useEffect(() => {
-        loadContracts();
-    }, [page]);
-
-    const loadContracts = async () => {
+    const loadContracts = useCallback(async () => {
         try {
             setLoading(true);
             const [contractRes, cpRes] = await Promise.all([
@@ -52,7 +50,11 @@ export default function ContractListPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [page]);
+
+    useEffect(() => {
+        loadContracts();
+    }, [loadContracts]);
 
     const handleEdit = (contract) => {
         setEditingContract(contract);
@@ -62,6 +64,15 @@ export default function ContractListPage() {
     const handleCreate = () => {
         setEditingContract(null);
         setIsCreateModalOpen(true);
+    };
+
+    const handleAttachmentsChanged = (contractId, attachments) => {
+        setContracts(prev => prev.map(item => (
+            item.id === contractId ? { ...item, attachments } : item
+        )));
+        setAttachmentContract(prev => (
+            prev?.id === contractId ? { ...prev, attachments } : prev
+        ));
     };
 
     if (loading) return <div className="page-content"><div className="loading">加载中...</div></div>;
@@ -96,13 +107,14 @@ export default function ContractListPage() {
                             <th className="text-right">待付款金额</th>
                             <th>签约日期</th>
                             <th>状态</th>
+                            <th>附件</th>
                             <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
                         {contracts.length === 0 ? (
                             <tr>
-                                <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <td colSpan="11" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                         <FileText size={48} opacity={0.5} />
                                         <p>暂无合同数据</p>
@@ -149,6 +161,17 @@ export default function ContractListPage() {
                                         <td>
                                             <button
                                                 className="btn-link"
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                                onClick={() => setAttachmentContract(contract)}
+                                                title="查看合同附件"
+                                            >
+                                                <Paperclip size={15} />
+                                                {contract.attachments?.length || 0}
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="btn-link"
                                                 style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                                                 onClick={() => handleEdit(contract)}
                                             >
@@ -184,6 +207,13 @@ export default function ContractListPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={loadContracts}
                 initialData={editingContract}
+            />
+
+            <ContractAttachmentsModal
+                isOpen={!!attachmentContract}
+                onClose={() => setAttachmentContract(null)}
+                contract={attachmentContract}
+                onChanged={handleAttachmentsChanged}
             />
         </div>
     );

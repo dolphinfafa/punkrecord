@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
-import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    Play, Square, Check, AlertCircle, ExternalLink, X, Upload
+    Play, Square, Check, AlertCircle, ExternalLink, X, Upload, RefreshCw
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -69,7 +68,6 @@ function formatTime(seconds) {
 export default function MeetingDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
     const audioRef = useRef(null);
 
     const [meeting, setMeeting] = useState(null);
@@ -82,7 +80,6 @@ export default function MeetingDetailPage() {
     const [playingSegmentIndex, setPlayingSegmentIndex] = useState(null);
 
     // Transcript
-    const [transcript, setTranscript] = useState(null);
     const [segments, setSegments] = useState([]);
     const [editedSegments, setEditedSegments] = useState({});
     const [speakerMapping, setSpeakerMapping] = useState({});
@@ -111,6 +108,7 @@ export default function MeetingDetailPage() {
 
     // Audio upload (for meetings without audio)
     const [uploadingAudio, setUploadingAudio] = useState(false);
+    const [retranscribing, setRetranscribing] = useState(false);
 
     // Attendees (for meetings without audio)
     const [attendeesInput, setAttendeesInput] = useState('');
@@ -186,7 +184,6 @@ export default function MeetingDetailPage() {
         try {
             const response = await meetingApi.getTranscript(id);
             const data = response.data;
-            setTranscript(data);
             setSegments(Array.isArray(data) ? data : (data?.segments || []));
         } catch (err) {
             console.error('Error loading transcript:', err);
@@ -231,7 +228,9 @@ export default function MeetingDetailPage() {
             setLoading(true);
             const data = await loadMeeting();
             if (data) {
-                loadAudio();
+                if (data.audio_file_name || Number(data.audio_file_size || 0) > 0) {
+                    loadAudio();
+                }
                 if (['transcribed', 'summarized', 'summarizing', 'archived'].includes(data.status)) {
                     loadTranscript();
                 }
@@ -463,6 +462,22 @@ export default function MeetingDetailPage() {
         }
     };
 
+    const handleRetranscribe = async () => {
+        if (!window.confirm('确定要重新转写该会议音频吗？新转写成功后会替换当前转录文本。')) return;
+        try {
+            setRetranscribing(true);
+            const response = await meetingApi.retranscribe(id);
+            setMeeting(response.data);
+            setEditedSegments({});
+            setEditedSpeakers({});
+            alert('已开始重新转写，请稍后查看结果');
+        } catch (err) {
+            alert(err.response?.data?.message || err.message || '重新转写失败');
+        } finally {
+            setRetranscribing(false);
+        }
+    };
+
     const getSpeakerName = (speakerId) => {
         if (speakerMapping && speakerMapping[speakerId]) {
             return speakerMapping[speakerId];
@@ -524,7 +539,7 @@ export default function MeetingDetailPage() {
     const hasTranscript = ['transcribed', 'summarized', 'archived'].includes(meeting.status);
     const hasSummary = ['summarized', 'archived'].includes(meeting.status) || summary;
     const isArchived = meeting.status === 'archived';
-    const hasAudio = !!meeting.audio_stored_name;
+    const hasAudio = !!meeting.audio_file_name || Number(meeting.audio_file_size || 0) > 0;
 
     return (
         <div className="meeting-detail-container">
@@ -602,6 +617,7 @@ export default function MeetingDetailPage() {
                                         await meetingApi.uploadAudio(id, file);
                                         const res = await meetingApi.getMeeting(id);
                                         setMeeting(res.data);
+                                        loadAudio();
                                     } catch (err) {
                                         alert(err?.response?.data?.message || '上传失败');
                                     } finally {
@@ -620,6 +636,18 @@ export default function MeetingDetailPage() {
                         </div>
                     )}
                 </div>
+                {hasAudio && !isProcessing && (
+                    <div className="audio-actions-row">
+                        <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={handleRetranscribe}
+                            disabled={retranscribing}
+                        >
+                            {retranscribing ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+                            重新转写
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Section 1b: Attendees (for meetings without transcript from audio) */}

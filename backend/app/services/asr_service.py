@@ -37,11 +37,16 @@ RESOURCE_ID = "volc.bigasr.auc"
 POLL_INTERVAL = 3   # seconds
 MAX_POLL_TIME = 1200  # 20 minutes per chunk
 MAX_CHUNK_SIZE_MB = 300  # split threshold (300MB file -> ~400MB base64, within API limit)
-MAX_CHUNK_DURATION_SECONDS = 25 * 60  # Long recordings are split even when compressed below size limit.
-CHUNK_OVERLAP_SECONDS = 5.0  # Keep boundary speech from being clipped by ASR.
+MAX_CHUNK_DURATION_SECONDS = 45 * 60  # Fewer chunks improves speaker continuity.
+CHUNK_OVERLAP_SECONDS = 12.0  # Keep boundary speech from being clipped by ASR.
+SHORT_TURN_MAX_DURATION_SECONDS = 2.5
+SHORT_TURN_MAX_GAP_SECONDS = 6.0
+LOCAL_SPEAKER_SUPPORT_WINDOW_SECONDS = 10.0
 
-# Formats natively supported by Volcengine ASR
-ASR_SUPPORTED_FORMATS = {"wav", "mp3", "ogg", "raw"}
+# ASR submissions are normalized to 16 kHz mono MP3. In dev tests with
+# Xunfei-recorder PCM-in-WAV files, Volcengine BigModel recovered quiet short
+# phrases more reliably from normalized MP3 than from WAV/raw submissions.
+ASR_SUBMISSION_FORMAT = "mp3"
 
 
 class AudioChunk(NamedTuple):
@@ -91,32 +96,32 @@ def _get_audio_format(content_type: str, local_path: str) -> str:
     return ext_map.get(suffix, suffix or "mp3")
 
 
-def _transcode_to_mp3(local_path: str) -> str:
+def _normalize_to_asr_audio(local_path: str) -> str:
     """
-    Transcode an unsupported audio file to a normalized mp3 for ASR.
-    Returns the path to the transcoded mp3 file.
+    Normalize any supported input audio to the canonical format used for ASR.
+    Returns the path to the normalized audio file.
     """
     source = Path(local_path)
-    mp3_path = str(source.with_name(f"{source.stem}_asr.mp3"))
-    if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
-        logger.info("Transcoded file already exists: %s", mp3_path)
-        return mp3_path
+    normalized_path = str(source.with_name(f"{source.stem}_asr.{ASR_SUBMISSION_FORMAT}"))
+    if os.path.exists(normalized_path) and os.path.getsize(normalized_path) > 0:
+        logger.info("Normalized ASR file already exists: %s", normalized_path)
+        return normalized_path
 
-    logger.info("Transcoding %s -> %s", local_path, mp3_path)
+    logger.info("Normalizing audio for ASR: %s -> %s", local_path, normalized_path)
     result = subprocess.run(
         [
             "ffmpeg", "-y", "-i", local_path,
             "-vn", "-map", "0:a:0", "-ac", "1", "-ar", "16000",
-            "-acodec", "libmp3lame", "-q:a", "4", mp3_path,
+            "-acodec", "libmp3lame", "-q:a", "2", normalized_path,
         ],
         capture_output=True, text=True, timeout=600,
     )
     if result.returncode != 0:
         logger.error("ffmpeg failed: %s", result.stderr[-500:])
-        raise RuntimeError(f"Audio transcode failed: {result.stderr[-200:]}")
+        raise RuntimeError(f"Audio normalization failed: {result.stderr[-200:]}")
 
-    logger.info("Transcode done: %s (%.1f KB)", mp3_path, os.path.getsize(mp3_path) / 1024)
-    return mp3_path
+    logger.info("Audio normalization done: %s (%.1f KB)", normalized_path, os.path.getsize(normalized_path) / 1024)
+    return normalized_path
 
 
 def _get_audio_duration(local_path: str) -> float:
@@ -178,7 +183,7 @@ def _split_audio(
         actual_start = max(0.0, nominal_start - (CHUNK_OVERLAP_SECONDS if i > 0 else 0.0))
         actual_end = min(duration, nominal_end + (CHUNK_OVERLAP_SECONDS if i < num_chunks - 1 else 0.0))
         actual_duration = max(0.1, actual_end - actual_start)
-        chunk_path = os.path.join(parent_dir, f"{stem}_chunk{i + 1}.mp3")
+        chunk_path = os.path.join(parent_dir, f"{stem}_chunk{i + 1}.{ASR_SUBMISSION_FORMAT}")
 
         # Put -ss after -i for accurate timestamps. Fast input seeking can land
         # on a nearby keyframe and causes transcript/audio mismatch at boundaries.
@@ -187,7 +192,7 @@ def _split_audio(
                 "ffmpeg", "-y", "-i", local_path,
                 "-ss", f"{actual_start:.3f}", "-t", f"{actual_duration:.3f}",
                 "-vn", "-map", "0:a:0", "-ac", "1", "-ar", "16000",
-                "-acodec", "libmp3lame", "-q:a", "4", chunk_path,
+                "-acodec", "libmp3lame", "-q:a", "2", chunk_path,
             ],
             capture_output=True, text=True, timeout=900,
         )
@@ -202,7 +207,7 @@ def _split_audio(
             "Chunk %d: nominal=%.1f-%.1fs actual=%.1f-%.1fs size=%.1fMB path=%s",
             i + 1, nominal_start, nominal_end, actual_start, actual_end, chunk_size, chunk_path,
         )
-        chunks.append(AudioChunk(chunk_path, actual_start, nominal_start, nominal_end, "mp3", True))
+        chunks.append(AudioChunk(chunk_path, actual_start, nominal_start, nominal_end, ASR_SUBMISSION_FORMAT, True))
 
     return chunks
 
@@ -226,7 +231,7 @@ def _text_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left_norm, right_norm).ratio()
 
 
-def _is_near_or_overlapping(candidate: dict, existing: dict) -> bool:
+def _has_duplicate_timing(candidate: dict, existing: dict) -> bool:
     c_start = float(candidate.get("start_time") or 0.0)
     c_end = float(candidate.get("end_time") or c_start)
     e_start = float(existing.get("start_time") or 0.0)
@@ -235,17 +240,95 @@ def _is_near_or_overlapping(candidate: dict, existing: dict) -> bool:
         c_end = c_start
     if e_end < e_start:
         e_end = e_start
-    tolerance = CHUNK_OVERLAP_SECONDS + 2.0
-    return c_start <= e_end + tolerance and e_start <= c_end + tolerance
+    overlap = min(c_end, e_end) - max(c_start, e_start)
+    shortest_duration = max(0.1, min(c_end - c_start, e_end - e_start))
+    if overlap >= shortest_duration * 0.35:
+        return True
+    return abs(c_start - e_start) <= 2.5
 
 
-def _is_duplicate_segment(candidate: dict, existing_segments: List[dict]) -> bool:
+def _find_duplicate_segment(candidate: dict, existing_segments: List[dict]) -> Optional[dict]:
     for existing in reversed(existing_segments[-12:]):
-        if not _is_near_or_overlapping(candidate, existing):
+        if not _has_duplicate_timing(candidate, existing):
             continue
-        if _text_similarity(candidate.get("content", ""), existing.get("content", "")) >= 0.92:
+        if _text_similarity(candidate.get("content", ""), existing.get("content", "")) >= 0.95:
+            return existing
+    return None
+
+
+def _segment_duration(segment: dict) -> float:
+    start = float(segment.get("start_time") or 0.0)
+    end = float(segment.get("end_time") or start)
+    return max(0.0, end - start)
+
+
+def _gap_between(left: dict, right: dict) -> float:
+    left_end = float(left.get("end_time") or left.get("start_time") or 0.0)
+    right_start = float(right.get("start_time") or left_end)
+    return max(0.0, right_start - left_end)
+
+
+def _time_gap(left: dict, right: dict) -> float:
+    left_start = float(left.get("start_time") or 0.0)
+    left_end = float(left.get("end_time") or left_start)
+    right_start = float(right.get("start_time") or 0.0)
+    right_end = float(right.get("end_time") or right_start)
+    return max(0.0, max(left_start, right_start) - min(left_end, right_end))
+
+
+def _has_local_speaker_support(segments: List[dict], current_index: int, speaker_id: str) -> bool:
+    current = segments[current_index]
+    for idx, segment in enumerate(segments):
+        if idx == current_index or segment.get("speaker_id") != speaker_id:
+            continue
+        if _time_gap(current, segment) <= LOCAL_SPEAKER_SUPPORT_WINDOW_SECONDS:
             return True
     return False
+
+
+def _smooth_short_speaker_turns(segments: List[dict]) -> List[dict]:
+    """
+    Smooth isolated, very short speaker turns between two nearby turns from the
+    same speaker. BigModel often emits one-off speakers for quiet task-assignment
+    phrases; preserving that raw ID makes speaker mapping look worse.
+    """
+    if len(segments) < 3:
+        return segments
+
+    smoothed = [dict(segment) for segment in segments]
+
+    for idx in range(1, len(smoothed) - 1):
+        previous = smoothed[idx - 1]
+        current = smoothed[idx]
+        following = smoothed[idx + 1]
+        previous_speaker = previous.get("speaker_id")
+        current_speaker = current.get("speaker_id")
+        following_speaker = following.get("speaker_id")
+
+        if not previous_speaker or not current_speaker or not following_speaker:
+            continue
+        if previous_speaker != following_speaker or current_speaker == previous_speaker:
+            continue
+        if _has_local_speaker_support(smoothed, idx, current_speaker):
+            continue
+        if _segment_duration(current) > SHORT_TURN_MAX_DURATION_SECONDS:
+            continue
+        if _gap_between(previous, current) > SHORT_TURN_MAX_GAP_SECONDS:
+            continue
+        if _gap_between(current, following) > SHORT_TURN_MAX_GAP_SECONDS:
+            continue
+
+        logger.info(
+            "Smoothing isolated short speaker turn %.2f-%.2fs from %s to %s: %s",
+            float(current.get("start_time") or 0.0),
+            float(current.get("end_time") or 0.0),
+            current_speaker,
+            previous_speaker,
+            (current.get("content") or "")[:50],
+        )
+        current["speaker_id"] = previous_speaker
+
+    return smoothed
 
 
 def _merge_chunk_segments(chunks: List[AudioChunk], chunk_results: List[dict]) -> tuple:
@@ -253,6 +336,7 @@ def _merge_chunk_segments(chunks: List[AudioChunk], chunk_results: List[dict]) -
     is_multi_chunk = len(chunks) > 1
     merged = []
     warnings = []
+    speaker_aliases = {}
 
     for chunk_idx, (chunk, result) in enumerate(zip(chunks, chunk_results)):
         chunk_segments = result.get("segments", []) or []
@@ -264,19 +348,23 @@ def _merge_chunk_segments(chunks: List[AudioChunk], chunk_results: List[dict]) -
             content = (seg.get("content") or "").strip()
             if not content:
                 continue
+            raw_speaker_id = seg.get("speaker_id", "")
             rel_start = float(seg.get("start_time") or 0.0)
             rel_end = float(seg.get("end_time") or rel_start)
             start_time = max(0.0, rel_start + chunk.time_offset)
             end_time = max(start_time, rel_end + chunk.time_offset)
 
             candidate = {
-                "speaker_id": seg.get("speaker_id", ""),
+                "speaker_id": raw_speaker_id,
                 "start_time": round(start_time, 2),
                 "end_time": round(end_time, 2),
                 "content": content,
             }
 
-            if is_multi_chunk and _is_duplicate_segment(candidate, merged):
+            duplicate = _find_duplicate_segment(candidate, merged) if is_multi_chunk else None
+            if duplicate:
+                if raw_speaker_id:
+                    speaker_aliases[(chunk_idx, raw_speaker_id)] = duplicate.get("speaker_id", "")
                 logger.info(
                     "Dropping duplicate overlap segment at %.2f-%.2fs: %s",
                     candidate["start_time"], candidate["end_time"], content[:50],
@@ -284,10 +372,14 @@ def _merge_chunk_segments(chunks: List[AudioChunk], chunk_results: List[dict]) -
                 continue
 
             if is_multi_chunk:
-                candidate["speaker_id"] = f"chunk{chunk_idx + 1}_{candidate['speaker_id']}"
+                candidate["speaker_id"] = (
+                    speaker_aliases.get((chunk_idx, raw_speaker_id))
+                    or f"chunk{chunk_idx + 1}_{raw_speaker_id}"
+                )
             merged.append(candidate)
 
     merged.sort(key=lambda item: (item["start_time"], item["end_time"]))
+    merged = _smooth_short_speaker_turns(merged)
     for index, segment in enumerate(merged):
         segment["segment_index"] = index
 
@@ -315,15 +407,13 @@ async def _submit_single_chunk(local_path: str, audio_format: str) -> dict:
         "audio": {
             "data": audio_data,
             "format": audio_format,
-            "codec": "raw",
-            "rate": 16000,
-            "bits": 16,
-            "channel": 1,
+            "language": "zh-CN",
         },
         "request": {
             "model_name": "bigmodel",
             "enable_itn": True,
             "enable_punc": True,
+            "show_utterances": True,
             "enable_speaker_info": True,
             "enable_emotion_detection": False,
             "enable_gender_detection": False,
@@ -401,20 +491,16 @@ async def submit_asr_task(stored_name: str, content_type: str = "audio/mpeg") ->
     """
     original_path = _get_local_path(stored_name)
     local_path = original_path
-    audio_format = _get_audio_format(content_type, local_path)
     temp_original_path: Optional[str] = None
 
-    # Transcode unsupported formats before splitting so chunk output format and
-    # ASR-declared format always match.
-    if audio_format not in ASR_SUPPORTED_FORMATS:
-        try:
-            local_path = _transcode_to_mp3(local_path)
-            temp_original_path = local_path
-            audio_format = "mp3"
-            logger.info("Using transcoded file: %s", local_path)
-        except Exception as e:
-            logger.error("Transcode failed: %s", e)
-            return {"error": f"Audio transcode failed: {e}", "segments": [], "text": ""}
+    try:
+        local_path = _normalize_to_asr_audio(original_path)
+        temp_original_path = local_path
+        audio_format = ASR_SUBMISSION_FORMAT
+        logger.info("Using normalized ASR audio: %s", local_path)
+    except Exception as e:
+        logger.error("Audio normalization failed: %s", e)
+        return {"error": f"Audio normalization failed: {e}", "segments": [], "text": ""}
 
     chunks: List[AudioChunk] = []
     chunk_results = []

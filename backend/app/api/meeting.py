@@ -74,6 +74,13 @@ async def _run_asr(meeting_id: UUID):
                 session.commit()
                 return
 
+            old_segments = session.exec(
+                select(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting_id)
+            ).all()
+            for old_segment in old_segments:
+                session.delete(old_segment)
+            session.flush()
+
             for seg in segments:
                 segment = MeetingTranscriptSegment(
                     meeting_id=meeting.id,
@@ -212,6 +219,32 @@ async def upload_audio(
     meeting.audio_stored_name = stored_name
     meeting.audio_content_type = content_type
     meeting.audio_file_size = len(file_data)
+    meeting.status = MeetingStatus.TRANSCRIBING
+    meeting.updated_at = now_cn()
+    session.add(meeting)
+    session.commit()
+    session.refresh(meeting)
+
+    asyncio.ensure_future(_run_asr(meeting.id))
+
+    return success_response(_enrich_meeting(meeting, session).model_dump())
+
+
+@router.post("/records/{meeting_id}/retranscribe", response_model=dict)
+async def retranscribe_audio(
+    meeting_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    """Re-run ASR for a meeting's existing audio."""
+    meeting = session.get(MeetingRecord, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+    if not meeting.audio_stored_name:
+        raise AtlasException("该会议没有音频文件，无法重新转写")
+    if meeting.status in (MeetingStatus.UPLOADING, MeetingStatus.TRANSCRIBING):
+        raise AtlasException("音频正在处理中，请稍后再试")
+
     meeting.status = MeetingStatus.TRANSCRIBING
     meeting.updated_at = now_cn()
     session.add(meeting)
