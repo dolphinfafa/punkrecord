@@ -154,7 +154,8 @@ pytest -q tests/test_project_workflow.py
 
 ```bash
 npm run dev        # 开发服务器
-npm run build      # 构建
+VITE_BASE=/ npm run build  # 生产根域名构建；子路径部署可覆盖 VITE_BASE
+npm run build              # 本地/默认构建
 npm run lint       # 代码检查
 npm run preview    # 预览构建结果
 ```
@@ -256,7 +257,7 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 - **后端**：端口 9086（uvicorn, Python 3.10+, venv/conda, pm2 守护）
 - **前端**：Nginx serve `frontend/dist/`
 - **数据库**：`punkrecord_deploy`
-- **部署**：`git pull origin main` + `pm2 restart punkrecord-api` + 前端需构建 dist 后 rsync
+- **部署**：`git pull origin main` + `pm2 restart punkrecord-api` + 前端用 `VITE_BASE=/ npm run build` 构建 `dist`
 
 ### 端口分配（zheyang 用户专属范围 15000-19999）
 | 服务 | 端口 |

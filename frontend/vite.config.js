@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: process.env.VITE_BASE || '/punkrecord/',
+  base: process.env.VITE_BASE || '/',
   plugins: [react()],
   resolve: {
     alias: {

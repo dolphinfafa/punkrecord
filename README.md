@@ -68,7 +68,7 @@ punkrecord/
 生产部署流程：
 1. 开发机 `git push origin main`
 2. 生产机 `git pull origin main` + `pm2 restart punkrecord-api`
-3. 前端需在开发机 `npm run build` 后 `rsync dist/` 到生产机（生产无 Node.js）
+3. 前端根域名部署需使用 `VITE_BASE=/ npm run build`，再将 `dist/` 发布到生产静态目录
 
 ## 环境要求
 

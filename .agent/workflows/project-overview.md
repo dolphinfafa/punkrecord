@@ -560,7 +560,7 @@ ApprovalInstance
 ### 6.1 技术栈
 
 - **框架**：React 19.2.0 + React Router 7.12.0
-- **构建**：Vite 7.x（路径别名 `@` -> `./src`，代理 `/punkrecord/api` -> `localhost:15085`）
+- **构建**：Vite 7.x（路径别名 `@` -> `./src`，默认 `base=/`；子路径部署可用 `VITE_BASE=/punkrecord/` 覆盖；开发代理 `/punkrecord/api` -> `localhost:15085`）
 - **状态管理**：React Context API（AuthContext 管理登录态）
 - **HTTP 客户端**：Axios 1.13.2（拦截器统一注入 Token、处理 401）
 - **样式**：Tailwind CSS 原子化类名 + 页面级作用域
