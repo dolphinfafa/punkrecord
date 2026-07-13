@@ -1,0 +1,124 @@
+.image-paste-upload {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.image-paste-zone {
+    width: 100%;
+    min-height: 74px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 12px;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.image-paste-zone input {
+    display: none;
+}
+
+.image-paste-zone:hover:not(.disabled),
+.image-paste-zone:focus-visible,
+.image-paste-zone.dragging {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+    outline: none;
+}
+
+.image-paste-zone.disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.image-paste-zone span {
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.image-paste-zone small {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.76rem;
+    color: #64748b;
+}
+
+.image-paste-upload.compact .image-paste-zone {
+    min-height: 72px;
+    width: 72px;
+    padding: 6px;
+    font-size: 12px;
+}
+
+.image-paste-upload.compact {
+    width: auto;
+}
+
+.image-paste-upload.compact .image-paste-zone span {
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.image-paste-preview-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+.image-paste-preview {
+    border: 1px solid #dbe3ee;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.image-paste-preview img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    background: #f1f5f9;
+}
+
+.image-paste-preview-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 5px 6px;
+    font-size: 0.76rem;
+    color: #334155;
+}
+
+.image-paste-preview-meta span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.image-paste-preview-meta button {
+    border: 0;
+    background: transparent;
+    color: #b91c1c;
+    cursor: pointer;
+    display: inline-flex;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.image-paste-error {
+    color: #b91c1c;
+    font-size: 0.78rem;
+}

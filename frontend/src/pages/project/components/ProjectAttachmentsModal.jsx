@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Upload, Paperclip, Trash2, Download, CloudUpload, File as FileIcon, Loader2 } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import projectApi from '@/api/project';
+import { getImageFilesFromClipboard } from '@/utils/clipboardImages';
 import './ProjectAttachmentsModal.css';
 
 function formatSize(bytes) {
@@ -89,6 +90,16 @@ export default function ProjectAttachmentsModal({ isOpen, onClose, projectId, pr
         }
     };
 
+    const handlePaste = async (e) => {
+        if (uploading) return;
+        const files = getImageFilesFromClipboard(e.clipboardData);
+        if (!files.length) return;
+        e.preventDefault();
+        for (const file of files) {
+            await handleUpload(file);
+        }
+    };
+
     const handleClickDropzone = () => {
         if (!uploading && fileInputRef.current) {
             fileInputRef.current.click();
@@ -132,7 +143,9 @@ export default function ProjectAttachmentsModal({ isOpen, onClose, projectId, pr
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                onPaste={handlePaste}
                 onClick={handleClickDropzone}
+                tabIndex={0}
             >
                 <input
                     ref={fileInputRef}
@@ -153,7 +166,7 @@ export default function ProjectAttachmentsModal({ isOpen, onClose, projectId, pr
                         <>
                             <CloudUpload className="attachment-dropzone-icon" size={48} strokeWidth={1.5} />
                             <span className="attachment-dropzone-title">点击或拖拽文件到此处上传</span>
-                            <span className="attachment-dropzone-subtitle">单个文件最大 20 MB</span>
+                            <span className="attachment-dropzone-subtitle">单个文件最大 20 MB；支持粘贴截图</span>
                         </>
                     )}
                 </div>

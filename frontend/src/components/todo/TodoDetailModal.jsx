@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import clsx from 'clsx';
 import BugImagePreview from '@/components/common/BugImagePreview';
 import TodoImagePreview from '@/components/common/TodoImagePreview';
+import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 import './TodoDetailModal.css';
 
 const PRIORITY_LABELS = { p0: 'P0 紧急', p1: 'P1 高', p2: 'P2 中', p3: 'P3 低' };
@@ -69,9 +70,7 @@ export default function TodoDetailModal({
     };
     const todoImages = Array.isArray(todo?.link?.todo_images) ? todo.link.todo_images : [];
 
-    const handleUploadImages = async (event) => {
-        const files = Array.from(event.target.files || []);
-        event.target.value = '';
+    const handleUploadImages = async (files) => {
         if (!files.length || !onUploadImages) return;
         try {
             setUploading(true);
@@ -149,16 +148,13 @@ export default function TodoDetailModal({
                                 </div>
                             ))}
                             {canEdit && (
-                                <label className="todo-image-upload">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        onChange={handleUploadImages}
-                                        disabled={uploading}
-                                    />
-                                    {uploading ? '上传中...' : '+ 上传图片'}
-                                </label>
+                                <ImagePasteUpload
+                                    compact
+                                    disabled={uploading}
+                                    label={uploading ? '上传中...' : '上传图片'}
+                                    onFiles={handleUploadImages}
+                                    maxSizeMB={10}
+                                />
                             )}
                         </div>
                     </div>

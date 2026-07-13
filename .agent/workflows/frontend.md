@@ -52,6 +52,7 @@
 |------|------|------|
 | Bug 图片预览 | `components/common/BugImagePreview.jsx` | 缩略图 + 放大查看 |
 | Bug 详情弹窗 | `components/common/BugDetailModal.jsx` | 全字段详情 + 图片画廊 |
+| 图片粘贴上传 | `components/common/ImagePasteUpload.jsx` | 图片选择/拖拽/Ctrl+V 粘贴 + 缩略图预览，复用于待办、Bug、身份证图片等表单 |
 | 任务图片预览 | `components/common/TodoImagePreview.jsx` | 任务附件预览 + 放大 |
 
 ### 企业大脑页面（`pages/kb/`）
@@ -67,16 +68,16 @@
 
 | 页面/组件 | 说明 |
 |-----------|------|
-| `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 上传音频按钮 |
-| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 重新转写 + 归档 |
-| `components/UploadAudioModal.jsx` | 拖拽上传音频弹窗 + 会议日期选择（默认今天） |
+| `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 创建会议按钮 |
+| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 重新转写 + 上传/替换 Word/PDF 文稿 + 归档 |
+| `components/UploadAudioModal.jsx` | 创建会议弹窗，支持空白创建、上传音频、上传 Word/PDF 文稿三种导入方式 |
 
 ### API 模块（`api/`）
 
 | 文件 | 说明 |
 |------|------|
 | `kb.js` | 企业大脑 API（文档 CRUD、对话、搜索） |
-| `meeting.js` | 会议记录 API（会议 CRUD、转写、总结、归档） |
+| `meeting.js` | 会议记录 API（会议 CRUD、转写、文稿导入、总结、归档） |
 | `changelog.js` | 版本更新日志 API（列表、创建、更新、删除） |
 
 ---
@@ -221,6 +222,21 @@
 | `pages/meeting/MeetingDetailPage.jsx` | 音频区新增“重新转写”按钮；修正详情页通过 `audio_file_name/audio_file_size` 判断是否存在音频，避免后端未返回 `audio_stored_name` 时误判无音频 |
 | `api/meeting.js` | 新增 `retranscribe(id)` |
 
+### v2.0.5 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `components/common/ImagePasteUpload.jsx` + `.css` | 新增通用图片上传控件，支持点击选择、拖拽、Ctrl+V 粘贴截图，并生成缩略图预览 |
+| `utils/clipboardImages.js` | 新增剪贴板图片提取、无文件名粘贴图片命名、图片文件合并工具 |
+| `components/todo/TodoModal.jsx` | 创建/编辑待办的图片上传改为可粘贴图片并显示缩略图，创建前不再只显示文件名 |
+| `components/todo/TodoDetailModal.jsx` | 任务详情新增粘贴上传图片入口，并读取规范化后的 `link.todo_images` 展示已上传图片 |
+| `pages/project/components/BugManagementModal.jsx` | Bug 配图上传改用可粘贴图片控件，支持截图后直接粘贴 |
+| `pages/auth/ProfileSetupPage.jsx`、`pages/iam/UserListPage.jsx` | 身份证图片上传支持粘贴并显示预览 |
+| `pages/contract/components/ContractAttachmentsModal.jsx`、`pages/project/components/ProjectAttachmentsModal.jsx` | 合同/项目附件上传区支持粘贴截图；PDF/普通文件仍可点击或拖拽上传 |
+| `pages/meeting/components/UploadAudioModal.jsx` + `.css` | 创建会议弹窗新增导入方式切换：空白、音频、文稿；文稿模式支持 Word `.docx` / PDF |
+| `pages/meeting/MeetingDetailPage.jsx` + `.css` | 会议详情支持上传/替换文稿；无音频文稿分段显示静态“文稿”标识，不再显示不可播放时间按钮 |
+| `api/meeting.js` | 新增 `uploadTranscript(id, file)` |
+
 ---
 
-*最后更新：2026-07-08*
+*最后更新：2026-07-13*

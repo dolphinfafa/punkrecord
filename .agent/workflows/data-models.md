@@ -45,7 +45,7 @@
 
 | 模型 | 说明 |
 |------|------|
-| `TodoItem` | 任务项（含状态机、图片附件）。`link` JSON 字段新增 `agent_status`（`ai_fixing`/`ai_fixed`），独立于 `status` 字段，用于 AI Agent Bug 修复状态追踪 |
+| `TodoItem` | 任务项（含状态机、图片附件）。`link` JSON 字段包含 `todo_images` 图片元数据和 `agent_status`（`ai_fixing`/`ai_fixed`）；`agent_status` 独立于 `status` 字段，用于 AI Agent Bug 修复状态追踪。v2.0.5 起 API 返回前会规范化 `link.todo_images` 并补齐下载路径 |
 | `LeaveRequest` | 请假申请 |
 
 ### 项目管理
@@ -87,7 +87,7 @@
 | 模型 | 说明 |
 |------|------|
 | `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID、会议日期、参会人员） |
-| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容） |
+| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；无时间码文稿导入时 `start_time`/`end_time` 可为空 |
 
 ### 共享模块（Shared）- 版本日志
 
@@ -97,4 +97,4 @@
 
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-07-13*

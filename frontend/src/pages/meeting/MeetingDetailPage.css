@@ -185,7 +185,22 @@
 .audio-actions-row {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
     margin-top: 12px;
+}
+
+.meeting-import-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    flex-wrap: wrap;
+}
+
+.meeting-import-hint {
+    color: #94a3b8;
+    font-size: 0.85rem;
 }
 
 .audio-loading,
@@ -341,6 +356,17 @@
 .segment-time-playing:hover {
     background: #fecaca;
     color: #b91c1c;
+}
+
+.segment-time-static {
+    cursor: default;
+    background: #f8fafc;
+    color: #94a3b8;
+}
+
+.segment-time-static:hover {
+    background: #f8fafc;
+    color: #94a3b8;
 }
 
 .segment-text {

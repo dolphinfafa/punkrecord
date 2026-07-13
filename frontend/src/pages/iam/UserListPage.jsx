@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import iamApi from '@/api/iam';
+import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 import './IAMPage.css';
 
 const STATUS_LABELS = { active: '在职', inactive: '停用' };
@@ -163,6 +164,17 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
         }
     };
 
+    const handleIdCardUpload = async (file, successText) => {
+        if (!file || !initialData?.id) return;
+        try {
+            await iamApi.uploadIdCardImage(initialData.id, file);
+            showNotification(successText);
+            onClose();
+        } catch {
+            showNotification('上传失败', 'error');
+        }
+    };
+
     if (!isOpen) return null;
     return (
         <div className="iam-modal-overlay" onClick={onClose}>
@@ -285,24 +297,20 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                                             ) : (
                                                 <span style={{ fontSize: '12px', color: '#94a3b8' }}>加载中...</span>
                                             )}
-                                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#3b82f6', cursor: 'pointer' }}>
-                                                <Upload size={12} /> 重新上传
-                                                <input type="file" accept="image/*" hidden onChange={async (e) => {
-                                                    if (e.target.files[0]) {
-                                                        try { await iamApi.uploadIdCardImage(initialData.id, e.target.files[0]); showNotification('身份证图片已更新'); onClose(); } catch { showNotification('上传失败', 'error'); }
-                                                    }
-                                                }} />
-                                            </label>
+                                            <ImagePasteUpload
+                                                compact
+                                                label="重新上传"
+                                                onFiles={(files) => handleIdCardUpload(files[0], '身份证图片已更新')}
+                                                maxSizeMB={10}
+                                            />
                                         </div>
                                     ) : (
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '1px dashed #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#64748b' }}>
-                                            <Upload size={14} /> 上传身份证图片
-                                            <input type="file" accept="image/*" hidden onChange={async (e) => {
-                                                if (e.target.files[0]) {
-                                                    try { await iamApi.uploadIdCardImage(initialData.id, e.target.files[0]); showNotification('身份证图片已上传'); onClose(); } catch { showNotification('上传失败', 'error'); }
-                                                }
-                                            }} />
-                                        </label>
+                                        <ImagePasteUpload
+                                            label="上传身份证图片"
+                                            onFiles={(files) => handleIdCardUpload(files[0], '身份证图片已上传')}
+                                            multiple={false}
+                                            maxSizeMB={10}
+                                        />
                                     )}
                                 </div>
                                 <div className="iam-form-group">

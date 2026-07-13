@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 import client from '@/api/client';
+import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 import './TodoModal.css';
 
 export default function TodoModal({ isOpen, onClose, onSubmit, initialData = null, mode = 'create', currentUserId, fixedProjectId = null }) {
@@ -242,16 +243,12 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                                 已有 {initialData.link.todo_images.length} 张图片（可在任务详情中查看和删除）
                             </div>
                         )}
-                        <input
-                            id="images"
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={(e) => handleChange('images', Array.from(e.target.files || []))}
+                        <ImagePasteUpload
+                            files={formData.images || []}
+                            onChange={(files) => handleChange('images', files)}
+                            label={mode === 'edit' ? '添加新图片' : '添加任务图片'}
+                            maxSizeMB={10}
                         />
-                        {formData.images?.length > 0 && (
-                            <span className="form-helper">已选择 {formData.images.length} 张新图片</span>
-                        )}
                     </div>
 
                     <div className="form-row">

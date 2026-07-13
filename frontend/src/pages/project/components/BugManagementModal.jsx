@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
 import BugDetailModal from '@/components/common/BugDetailModal';
+import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 
 const STATUS_LABELS = {
     open: '待处理',
@@ -779,27 +780,12 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                 </div>
                             )}
                             {/* Add new images */}
-                            <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={(e) => {
-                                    const newFiles = Array.from(e.target.files || []);
-                                    setField('screenshot_files', [...(form.screenshot_files || []), ...newFiles]);
-                                    e.target.value = '';
-                                }}
-                                style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px', background: '#fff' }}
+                            <ImagePasteUpload
+                                files={form.screenshot_files || []}
+                                onChange={(files) => setField('screenshot_files', files)}
+                                label="添加 Bug 配图"
+                                maxSizeMB={20}
                             />
-                            {(form.screenshot_files || []).length > 0 && (
-                                <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                    {(form.screenshot_files || []).map((file, idx) => (
-                                        <div key={`${file.name}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '5px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '0.75rem', color: '#15803d' }}>
-                                            <span>{file.name}</span>
-                                            <button type="button" onClick={() => setField('screenshot_files', (form.screenshot_files || []).filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 0 }}><X size={12} /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                         <label style={{ marginTop: '10px', display: 'block', fontSize: '0.83rem', color: '#334155' }}>
                             备注

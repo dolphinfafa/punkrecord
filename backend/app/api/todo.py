@@ -41,6 +41,10 @@ def _enrich_todo(todo: TodoItem, session: Session) -> TodoResponse:
     assignee = session.get(User, todo.assignee_user_id)
     creator = session.get(User, todo.creator_user_id)
     data = TodoResponse.model_validate(todo)
+    link = dict(data.link or {})
+    if "todo_images" in link:
+        link["todo_images"] = _serialize_todo_images(todo)
+        data.link = link
     data.assignee_name = assignee.display_name if assignee else None
     data.creator_name = creator.display_name if creator else None
     if todo.reviewed_by_user_id:

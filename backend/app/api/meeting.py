@@ -5,6 +5,7 @@ import asyncio
 from app.models.base import now_cn
 import json
 import logging
+import re
 from typing import Optional
 from uuid import UUID, uuid4
 from datetime import date, datetime
@@ -17,7 +18,7 @@ from sqlmodel import Session, select
 
 from app.core.database import get_session, engine
 from app.core.auth import require_permission
-from app.core.exceptions import NotFoundException, AtlasException
+from app.core.exceptions import NotFoundException, AtlasException, ValidationException
 from app.core.response import success_response
 from app.core.config import settings
 from app.core.storage import save_file, get_file, delete_file, get_download_url
@@ -30,10 +31,42 @@ from app.schemas.meeting import (
     TranscriptBatchUpdate, SpeakerMappingUpdate, SummarizeRequest,
 )
 from app.services.asr_service import submit_asr_task
+from app.services.document_parser import extract_text
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/meeting", tags=["Meeting"])
+
+MAX_TRANSCRIPT_DOCUMENT_SIZE = 20 * 1024 * 1024
+TRANSCRIPT_DOCUMENT_TYPES = {
+    "application/pdf": "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+TRANSCRIPT_DOCUMENT_SUFFIX_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+METADATA_LABELS = {
+    "会议标题",
+    "会议主题",
+    "会议时间",
+    "会议日期",
+    "会议地点",
+    "参会人",
+    "参会人员",
+    "主持人",
+    "记录人",
+}
+SPEAKER_LINE_RE = re.compile(
+    r"^\s*(?:[-*•\d]+[.、)]\s*)?"
+    r"(?:\[(?P<bracket_time>[^\]]{4,32})\]\s*)?"
+    r"(?:(?P<time>\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?"
+    r"(?:\s*(?:-|~|～|至|到)\s*\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)?)\s+)?"
+    r"(?P<speaker>(?:讲话人|说话人|发言人|speaker|SPEAKER)[\s_-]*\d+|[^:：\s]{1,24})"
+    r"\s*[:：]\s*(?P<content>.*)$",
+    re.IGNORECASE,
+)
+TIME_TOKEN_RE = re.compile(r"\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?")
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,6 +77,136 @@ def _enrich_meeting(meeting: MeetingRecord, session: Session) -> MeetingResponse
     data = MeetingResponse.model_validate(meeting)
     data.creator_name = creator.display_name if creator else None
     return data
+
+
+def _normalize_transcript_content_type(file: UploadFile) -> str:
+    content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    suffix = Path(file.filename or "").suffix.lower()
+    if content_type in TRANSCRIPT_DOCUMENT_TYPES:
+        return TRANSCRIPT_DOCUMENT_TYPES[content_type]
+    if suffix in TRANSCRIPT_DOCUMENT_SUFFIX_TYPES:
+        return TRANSCRIPT_DOCUMENT_SUFFIX_TYPES[suffix]
+    raise ValidationException("会议文稿仅支持 Word（.docx）或 PDF 格式")
+
+
+def _parse_time_value(value: str | None) -> Optional[float]:
+    if not value:
+        return None
+    parts = value.split(":")
+    try:
+        if len(parts) == 2:
+            minutes, seconds = parts
+            return int(minutes) * 60 + float(seconds)
+        if len(parts) == 3:
+            hours, minutes, seconds = parts
+            return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    except ValueError:
+        return None
+    return None
+
+
+def _parse_time_range(raw: str | None) -> tuple[Optional[float], Optional[float]]:
+    if not raw:
+        return None, None
+    tokens = TIME_TOKEN_RE.findall(raw)
+    if not tokens:
+        return None, None
+    start = _parse_time_value(tokens[0])
+    end = _parse_time_value(tokens[1]) if len(tokens) > 1 else None
+    return start, end
+
+
+def _speaker_id_for_label(label: str, aliases: dict[str, str], mapping: dict[str, str]) -> str:
+    label = " ".join((label or "").strip().split())
+    compact = re.sub(r"\s+", "", label)
+    numbered = re.match(r"^(讲话人|说话人|发言人|speaker|SPEAKER)[_-]?(\d+)$", compact, re.IGNORECASE)
+    if numbered:
+        speaker_id = f"speaker_{int(numbered.group(2))}"
+        mapping.setdefault(speaker_id, f"讲话人{int(numbered.group(2))}")
+        aliases[label] = speaker_id
+        return speaker_id
+
+    if label in aliases:
+        return aliases[label]
+
+    speaker_id = f"speaker_{len(aliases) + 1}"
+    aliases[label] = speaker_id
+    mapping.setdefault(speaker_id, label)
+    return speaker_id
+
+
+def _segment_duration(content: str) -> float:
+    return max(1.0, min(12.0, len(content or "") / 8))
+
+
+def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
+    """Parse speaker-labelled transcript text into meeting segments."""
+    normalized_text = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized_text:
+        return [], {}
+
+    segments: list[dict] = []
+    speaker_aliases: dict[str, str] = {}
+    speaker_mapping: dict[str, str] = {}
+    current: Optional[dict] = None
+
+    def close_current() -> None:
+        nonlocal current
+        if not current:
+            return
+        current["content"] = current["content"].strip()
+        if current["content"]:
+            if current["end_time"] <= current["start_time"]:
+                current["end_time"] = current["start_time"] + _segment_duration(current["content"])
+            current["segment_index"] = len(segments)
+            segments.append(current)
+        current = None
+
+    for raw_line in normalized_text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            close_current()
+            continue
+
+        match = SPEAKER_LINE_RE.match(line)
+        if match and match.group("speaker").strip() in METADATA_LABELS:
+            continue
+        if match:
+            close_current()
+            speaker_label = match.group("speaker").strip()
+            speaker_id = _speaker_id_for_label(speaker_label, speaker_aliases, speaker_mapping)
+            start, end = _parse_time_range(match.group("time") or match.group("bracket_time"))
+            fallback_start = segments[-1]["end_time"] if segments else 0.0
+            content = (match.group("content") or "").strip()
+            current = {
+                "segment_index": len(segments),
+                "speaker_id": speaker_id,
+                "start_time": float(start if start is not None else fallback_start),
+                "end_time": float(end if end is not None else (start if start is not None else fallback_start)),
+                "content": content,
+                "has_time": start is not None,
+            }
+            continue
+
+        if current:
+            current["content"] = f"{current['content']}\n{line}".strip()
+        else:
+            current = {
+                "segment_index": len(segments),
+                "speaker_id": "speaker_1",
+                "start_time": segments[-1]["end_time"] if segments else 0.0,
+                "end_time": segments[-1]["end_time"] if segments else 0.0,
+                "content": line,
+                "has_time": False,
+            }
+            speaker_mapping.setdefault("speaker_1", "讲话人1")
+
+    close_current()
+
+    for index, segment in enumerate(segments):
+        segment["segment_index"] = index
+
+    return segments, speaker_mapping
 
 
 async def _run_asr(meeting_id: UUID):
@@ -254,6 +417,79 @@ async def retranscribe_audio(
     asyncio.ensure_future(_run_asr(meeting.id))
 
     return success_response(_enrich_meeting(meeting, session).model_dump())
+
+
+@router.post("/records/{meeting_id}/upload-transcript", response_model=dict)
+async def upload_transcript_document(
+    meeting_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    """Upload an already-recognized Word/PDF transcript and import its segments."""
+    meeting = session.get(MeetingRecord, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+    if meeting.status in (MeetingStatus.UPLOADING, MeetingStatus.TRANSCRIBING):
+        raise AtlasException("会议正在处理中，请稍后再上传文稿")
+    if meeting.status == MeetingStatus.ARCHIVED:
+        raise AtlasException("已归档会议不能替换文稿")
+    if not file.filename:
+        raise ValidationException("文稿文件名不能为空")
+
+    content_type = _normalize_transcript_content_type(file)
+    file_data = await file.read()
+    if not file_data:
+        raise ValidationException("文稿文件不能为空")
+    if len(file_data) > MAX_TRANSCRIPT_DOCUMENT_SIZE:
+        raise ValidationException("文稿文件不能超过 20MB")
+
+    try:
+        text = extract_text(file_data, content_type, file.filename)
+    except Exception as exc:
+        logger.exception("Failed to extract meeting transcript document: %s", exc)
+        raise ValidationException("文稿解析失败，请确认文件为可复制文字的 Word/PDF")
+
+    segments, speaker_mapping = _parse_transcript_text(text)
+    if not segments:
+        raise ValidationException("文稿中未解析到有效转写内容")
+
+    old_segments = session.exec(
+        select(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting_id)
+    ).all()
+    for old_segment in old_segments:
+        session.delete(old_segment)
+    session.flush()
+
+    for segment_data in segments:
+        session.add(MeetingTranscriptSegment(
+            meeting_id=meeting.id,
+            segment_index=segment_data["segment_index"],
+            speaker_id=segment_data["speaker_id"],
+            start_time=segment_data["start_time"],
+            end_time=segment_data["end_time"],
+            content=segment_data["content"],
+        ))
+
+    meeting.speaker_mapping = speaker_mapping
+    if speaker_mapping and not meeting.attendees:
+        meeting.attendees = list(speaker_mapping.values())
+    if any(segment.get("has_time") for segment in segments):
+        meeting.duration_seconds = int(max((segment["end_time"] for segment in segments), default=0)) or None
+    elif not meeting.audio_stored_name:
+        meeting.duration_seconds = None
+    meeting.summary = None
+    meeting.status = MeetingStatus.TRANSCRIBED
+    meeting.updated_at = now_cn()
+    session.add(meeting)
+    session.commit()
+    session.refresh(meeting)
+
+    return success_response({
+        "meeting": _enrich_meeting(meeting, session).model_dump(),
+        "segments": len(segments),
+        "speakers": speaker_mapping,
+    })
 
 
 # ─── 1c. Update attendees ──────────────────────────────────────────────────

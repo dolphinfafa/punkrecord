@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import contractApi from '@/api/contract';
+import { getImageFilesFromClipboard } from '@/utils/clipboardImages';
 import './ContractAttachmentsModal.css';
 
 function formatSize(bytes) {
@@ -112,6 +113,16 @@ export default function ContractAttachmentsModal({ isOpen, onClose, contract, on
         }
     };
 
+    const handlePaste = async (event) => {
+        if (uploading) return;
+        const files = getImageFilesFromClipboard(event.clipboardData);
+        if (!files.length) return;
+        event.preventDefault();
+        for (const file of files) {
+            await handleUpload(file);
+        }
+    };
+
     const handleView = async (item) => {
         try {
             const response = await contractApi.downloadAttachment(contractId, item.id);
@@ -161,6 +172,7 @@ export default function ContractAttachmentsModal({ isOpen, onClose, contract, on
             <div
                 className={`contract-attachment-dropzone ${dragging ? 'dragging' : ''}`}
                 onClick={() => !uploading && fileInputRef.current?.click()}
+                tabIndex={0}
                 onDragOver={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -172,6 +184,7 @@ export default function ContractAttachmentsModal({ isOpen, onClose, contract, on
                     setDragging(false);
                 }}
                 onDrop={handleDrop}
+                onPaste={handlePaste}
             >
                 <input
                     ref={fileInputRef}
@@ -195,7 +208,7 @@ export default function ContractAttachmentsModal({ isOpen, onClose, contract, on
                     <>
                         <CloudUpload size={34} />
                         <span>点击或拖拽上传合同附件</span>
-                        <small>支持 PDF、图片；单个文件最大 20MB；可一次选择多个文件</small>
+                        <small>支持 PDF、图片；单个文件最大 20MB；可选择多个文件或粘贴截图</small>
                     </>
                 )}
             </div>

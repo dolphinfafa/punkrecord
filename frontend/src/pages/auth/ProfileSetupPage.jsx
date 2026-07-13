@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Loader2, Upload } from 'lucide-react';
 import authApi from '@/api/auth';
 import iamApi from '@/api/iam';
+import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 import './LoginPage.css';
 
 const EDUCATION_OPTIONS = [
@@ -135,13 +136,15 @@ export default function ProfileSetupPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         <div className="form-group">
                             <label>身份证照片</label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 12px', border: '1px dashed #45475a', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#a6adc8', background: '#1e1e2e' }}>
-                                <Upload size={16} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {idCardFile ? idCardFile.name : '点击选择图片'}
-                                </span>
-                                <input type="file" accept="image/*" hidden onChange={e => setIdCardFile(e.target.files[0])} />
-                            </label>
+                            <ImagePasteUpload
+                                files={idCardFile ? [idCardFile] : []}
+                                onChange={(files) => setIdCardFile(files[0] || null)}
+                                multiple={false}
+                                compact
+                                className="profile-image-paste"
+                                label="身份证图片"
+                                maxSizeMB={10}
+                            />
                         </div>
                         <div className="form-group">
                             <label>简历 (PDF)</label>

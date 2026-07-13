@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { meetingApi } from '@/api/meeting';
-import { Plus, X, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, X, Loader2, AlertCircle, FileAudio, FileText, ClipboardEdit } from 'lucide-react';
 import './UploadAudioModal.css';
 
 const MEETING_TYPES = [
@@ -16,6 +16,9 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
     const [title, setTitle] = useState('');
     const [meetingType, setMeetingType] = useState('morning');
     const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [inputMode, setInputMode] = useState('blank');
+    const [audioFile, setAudioFile] = useState(null);
+    const [transcriptFile, setTranscriptFile] = useState(null);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState('');
 
@@ -24,12 +27,30 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
             setError('请输入会议标题');
             return;
         }
+        if (inputMode === 'audio' && !audioFile) {
+            setError('请选择会议音频');
+            return;
+        }
+        if (inputMode === 'transcript' && !transcriptFile) {
+            setError('请选择 Word 或 PDF 文稿');
+            return;
+        }
 
         try {
             setCreating(true);
             setError('');
-            const res = await meetingApi.createMeeting(title.trim(), meetingType, meetingDate);
-            onSuccess(res.data);
+            const res = await meetingApi.createMeeting(
+                title.trim(),
+                meetingType,
+                meetingDate,
+                inputMode === 'audio' ? audioFile : null
+            );
+            let data = res.data;
+            if (inputMode === 'transcript' && data?.id) {
+                const transcriptRes = await meetingApi.uploadTranscript(data.id, transcriptFile);
+                data = transcriptRes.data?.meeting || data;
+            }
+            onSuccess(data);
         } catch (err) {
             setError(err?.response?.data?.message || err.message || '创建失败，请重试');
         } finally {
@@ -90,6 +111,69 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                             disabled={creating}
                         />
                     </div>
+
+                    <div className="form-group">
+                        <label className="form-label">导入方式</label>
+                        <div className="meeting-input-mode-tabs">
+                            <button
+                                type="button"
+                                className={inputMode === 'blank' ? 'active' : ''}
+                                onClick={() => setInputMode('blank')}
+                                disabled={creating}
+                            >
+                                <Plus size={15} /> 空白
+                            </button>
+                            <button
+                                type="button"
+                                className={inputMode === 'audio' ? 'active' : ''}
+                                onClick={() => setInputMode('audio')}
+                                disabled={creating}
+                            >
+                                <FileAudio size={15} /> 音频
+                            </button>
+                            <button
+                                type="button"
+                                className={inputMode === 'transcript' ? 'active' : ''}
+                                onClick={() => setInputMode('transcript')}
+                                disabled={creating}
+                            >
+                                <ClipboardEdit size={15} /> 文稿
+                            </button>
+                        </div>
+                    </div>
+
+                    {inputMode === 'audio' && (
+                        <div className="form-group">
+                            <label className="file-pick-zone">
+                                <FileAudio size={18} />
+                                <span>{audioFile ? audioFile.name : '选择会议音频'}</span>
+                                <input
+                                    type="file"
+                                    accept="audio/*"
+                                    hidden
+                                    disabled={creating}
+                                    onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                                />
+                            </label>
+                        </div>
+                    )}
+
+                    {inputMode === 'transcript' && (
+                        <div className="form-group">
+                            <label className="file-pick-zone">
+                                <FileText size={18} />
+                                <span>{transcriptFile ? transcriptFile.name : '选择 Word 或 PDF 文稿'}</span>
+                                <input
+                                    type="file"
+                                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                                    hidden
+                                    disabled={creating}
+                                    onChange={(e) => setTranscriptFile(e.target.files?.[0] || null)}
+                                />
+                            </label>
+                            <span className="form-helper">文稿中按“讲话人1：内容”“张三：内容”等格式分段。</span>
+                        </div>
+                    )}
 
                     {error && (
                         <div className="upload-error">

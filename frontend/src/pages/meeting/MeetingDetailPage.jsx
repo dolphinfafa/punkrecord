@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    Play, Square, Check, AlertCircle, ExternalLink, X, Upload, RefreshCw
+    Play, Square, Check, AlertCircle, ExternalLink, X, Upload, RefreshCw, FileText
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -108,6 +108,7 @@ export default function MeetingDetailPage() {
 
     // Audio upload (for meetings without audio)
     const [uploadingAudio, setUploadingAudio] = useState(false);
+    const [uploadingTranscript, setUploadingTranscript] = useState(false);
     const [retranscribing, setRetranscribing] = useState(false);
 
     // Attendees (for meetings without audio)
@@ -478,6 +479,25 @@ export default function MeetingDetailPage() {
         }
     };
 
+    const handleUploadTranscript = async (file) => {
+        if (!file) return;
+        try {
+            setUploadingTranscript(true);
+            const response = await meetingApi.uploadTranscript(id, file);
+            const nextMeeting = response.data?.meeting;
+            if (nextMeeting) setMeeting(nextMeeting);
+            await loadTranscript();
+            await loadMeeting();
+            setEditedSegments({});
+            setEditedSpeakers({});
+            alert(`文稿已导入，共 ${response.data?.segments || 0} 段`);
+        } catch (err) {
+            alert(err.response?.data?.message || err.message || '上传文稿失败');
+        } finally {
+            setUploadingTranscript(false);
+        }
+    };
+
     const getSpeakerName = (speakerId) => {
         if (speakerMapping && speakerMapping[speakerId]) {
             return speakerMapping[speakerId];
@@ -588,9 +608,9 @@ export default function MeetingDetailPage() {
                 </div>
             )}
 
-            {/* Section 1: Audio Player / Upload */}
+            {/* Section 1: Audio / Transcript Upload */}
             <div className="detail-section audio-section">
-                <h2 className="section-title">{hasAudio ? '音频播放' : '音频（可选）'}</h2>
+                <h2 className="section-title">{hasAudio ? '音频播放' : '导入材料'}</h2>
                 <div className="audio-player-wrapper">
                     {hasAudio ? (
                         audioLoading ? (
@@ -603,7 +623,7 @@ export default function MeetingDetailPage() {
                             <div className="audio-unavailable">音频加载失败</div>
                         )
                     ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0' }}>
+                        <div className="meeting-import-actions">
                             <input
                                 type="file"
                                 id="audio-upload-input"
@@ -632,7 +652,25 @@ export default function MeetingDetailPage() {
                             >
                                 {uploadingAudio ? <><Loader2 size={16} className="spin" /> 上传中...</> : <><Upload size={16} /> 上传音频</>}
                             </button>
-                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>无音频也可直接使用自定义提示词生成会议纪要</span>
+                            <input
+                                type="file"
+                                id="transcript-upload-input"
+                                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                                style={{ display: 'none' }}
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = '';
+                                    await handleUploadTranscript(file);
+                                }}
+                            />
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => document.getElementById('transcript-upload-input').click()}
+                                disabled={uploadingTranscript || isProcessing}
+                            >
+                                {uploadingTranscript ? <><Loader2 size={16} className="spin" /> 导入中...</> : <><FileText size={16} /> 上传文稿</>}
+                            </button>
+                            <span className="meeting-import-hint">支持 Word/PDF 文稿，按说话人格式导入转录文本</span>
                         </div>
                     )}
                 </div>
@@ -645,6 +683,25 @@ export default function MeetingDetailPage() {
                         >
                             {retranscribing ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
                             重新转写
+                        </button>
+                        <input
+                            type="file"
+                            id="transcript-replace-input"
+                            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                await handleUploadTranscript(file);
+                            }}
+                        />
+                        <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => document.getElementById('transcript-replace-input').click()}
+                            disabled={uploadingTranscript}
+                        >
+                            {uploadingTranscript ? <Loader2 size={16} className="spin" /> : <FileText size={16} />}
+                            上传文稿
                         </button>
                     </div>
                 )}
@@ -800,19 +857,23 @@ export default function MeetingDetailPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <button
-                                                className={`segment-time ${playingSegmentIndex === index ? 'segment-time-playing' : ''}`}
-                                                onClick={() => handleSeek(segmentStart, segmentEnd, index)}
-                                                title={playingSegmentIndex === index ? '点击停止' : '点击播放此片段'}
-                                            >
-                                                {playingSegmentIndex === index
-                                                    ? <Square size={10} fill="currentColor" />
-                                                    : <Play size={12} />
-                                                }
-                                                {formatTime(segmentStart)}
-                                                {' - '}
-                                                {formatTime(segmentEnd)}
-                                            </button>
+                                            {hasAudio ? (
+                                                <button
+                                                    className={`segment-time ${playingSegmentIndex === index ? 'segment-time-playing' : ''}`}
+                                                    onClick={() => handleSeek(segmentStart, segmentEnd, index)}
+                                                    title={playingSegmentIndex === index ? '点击停止' : '点击播放此片段'}
+                                                >
+                                                    {playingSegmentIndex === index
+                                                        ? <Square size={10} fill="currentColor" />
+                                                        : <Play size={12} />
+                                                    }
+                                                    {formatTime(segmentStart)}
+                                                    {' - '}
+                                                    {formatTime(segmentEnd)}
+                                                </button>
+                                            ) : (
+                                                <span className="segment-time segment-time-static">文稿</span>
+                                            )}
                                         </div>
                                         <textarea
                                             className="segment-text"

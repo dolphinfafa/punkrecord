@@ -468,6 +468,32 @@ async def retranscribe_meeting(ctx: Context, meeting_id: str) -> dict:
     return await _call(ctx, "POST", f"/meeting/records/{meeting_id}/retranscribe")
 
 
+@mcp.tool()
+async def upload_meeting_transcript(
+    ctx: Context,
+    meeting_id: str,
+    file_name: str,
+    content_base64: str,
+    content_type: str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+) -> dict:
+    """上传已识别会议文稿（Word .docx 或 PDF），替换会议转写分段（需 meeting.write 权限）。"""
+    if not file_name:
+        raise RuntimeError("file_name 不能为空。")
+    try:
+        file_bytes = base64.b64decode(content_base64, validate=True)
+    except Exception as exc:
+        raise RuntimeError("content_base64 不是有效的 Base64 文件内容。") from exc
+    if not file_bytes:
+        raise RuntimeError("文稿内容不能为空。")
+
+    return await _call(
+        ctx,
+        "POST",
+        f"/meeting/records/{meeting_id}/upload-transcript",
+        files={"file": (file_name, file_bytes, content_type)},
+    )
+
+
 # ─── Finance write tools ──────────────────────────────────────────────────────
 
 # 允许批量写入时直接透传给 REST 层的字段（白名单，避免误传无关键值）。
