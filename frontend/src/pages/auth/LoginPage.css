@@ -187,7 +187,7 @@
     color: #585b70;
 }
 
-.profile-image-paste .image-paste-zone {
+.profile-image-paste .image-paste-strip.empty .image-paste-add-button {
     width: 100%;
     min-height: 42px;
     flex-direction: row;
@@ -202,13 +202,33 @@
     width: 100%;
 }
 
-.profile-image-paste.compact .image-paste-zone {
+.profile-image-paste.compact .image-paste-strip.empty .image-paste-add-button,
+.profile-image-paste.compact .image-paste-add-button {
     width: 100%;
+    min-height: 42px;
+    flex-direction: row;
 }
 
-.profile-image-paste .image-paste-zone:hover:not(.disabled),
-.profile-image-paste .image-paste-zone:focus-visible {
+.profile-image-paste .image-paste-add-button:hover:not(:disabled),
+.profile-image-paste .image-paste-add-button:focus-visible,
+.profile-image-paste .image-paste-add-button.active {
     border-color: #89b4fa;
     background: #1e1e2e;
     color: #cdd6f4;
+}
+
+.profile-image-paste .image-paste-panel {
+    border-color: #45475a;
+    background: #181825;
+}
+
+.profile-image-paste .image-paste-dropzone {
+    border-color: #45475a;
+    background: #1e1e2e;
+    color: #a6adc8;
+}
+
+.profile-image-paste .image-paste-local-button {
+    background: #181825;
+    color: #a6adc8;
 }

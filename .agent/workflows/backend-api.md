@@ -218,7 +218,7 @@
 | POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
 | POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；音频会统一归一化为 16k 单声道 mp3。大文件/长音频按大小或 45 分钟时长切片，切片间保留 12 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
 | POST | `/api/v1/meeting/records/{id}/retranscribe` | meeting.write | 对已有音频重新转写；新 ASR 成功后才替换旧分段，失败时保留旧转写 |
-| POST | `/api/v1/meeting/records/{id}/upload-transcript` | meeting.write | 上传已识别好的 Word `.docx` 或 PDF 文稿（最大 20MB）并导入转写分段；支持 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容` 和可选时间码格式；导入成功会替换旧分段、更新说话人映射、清空旧纪要并置为 transcribed |
+| POST | `/api/v1/meeting/records/{id}/upload-transcript` | meeting.write | 上传已识别好的 Word `.docx` 或 PDF 文稿（最大 20MB）并导入转写分段；支持 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容`、带时间码格式，以及 `讲话人1  00:20` 后下一行跟正文的录音文稿格式；导入成功会替换旧分段、更新说话人映射、清空旧纪要并置为 transcribed |
 | PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表 |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
@@ -270,4 +270,4 @@
 
 ---
 
-*最后更新：2026-07-13*
+*最后更新：2026-07-15*

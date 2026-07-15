@@ -32,6 +32,15 @@ import WeChatNotifyPage from '@/pages/wechat-notify/WeChatNotifyPage';
 import McpPage from '@/pages/mcp/McpPage';
 import McpToolDetailPage from '@/pages/mcp/McpToolDetailPage';
 
+const getRouterBasename = () => {
+  const base = import.meta.env.BASE_URL || '/';
+  const path = window.location.pathname;
+  if (path === '/punkrecord' || path.startsWith('/punkrecord/')) {
+    return '/punkrecord';
+  }
+  return base === '/' ? '/' : base.replace(/\/$/, '');
+};
+
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -70,7 +79,7 @@ const PermissionRoute = ({ permission, children }) => {
 
 function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <BrowserRouter basename={getRouterBasename()}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

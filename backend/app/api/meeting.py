@@ -63,7 +63,15 @@ SPEAKER_LINE_RE = re.compile(
     r"(?:(?P<time>\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?"
     r"(?:\s*(?:-|~|～|至|到)\s*\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)?)\s+)?"
     r"(?P<speaker>(?:讲话人|说话人|发言人|speaker|SPEAKER)[\s_-]*\d+|[^:：\s]{1,24})"
-    r"\s*[:：]\s*(?P<content>.*)$",
+    r"\s*(?:(?P<separator>[:：])|(?P<post_time>\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?"
+    r"(?:\s*(?:-|~|～|至|到)\s*\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)?))"
+    r"\s*(?P<content>.*)$",
+    re.IGNORECASE,
+)
+SPEAKER_HEADER_RE = re.compile(
+    r"^\s*(?:[-*•\d]+[.、)]\s*)?"
+    r"(?P<speaker>(?:讲话人|说话人|发言人|speaker|SPEAKER)[\s_-]*\d+)"
+    r"\s*$",
     re.IGNORECASE,
 )
 TIME_TOKEN_RE = re.compile(r"\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?")
@@ -149,6 +157,8 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
     speaker_aliases: dict[str, str] = {}
     speaker_mapping: dict[str, str] = {}
     current: Optional[dict] = None
+    pending_unlabelled_lines: list[str] = []
+    saw_speaker_label = False
 
     def close_current() -> None:
         nonlocal current
@@ -162,6 +172,24 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
             segments.append(current)
         current = None
 
+    def open_segment(speaker_label: str, content: str, time_text: str | None = None) -> None:
+        nonlocal current, saw_speaker_label
+        close_current()
+        if not saw_speaker_label:
+            pending_unlabelled_lines.clear()
+        saw_speaker_label = True
+        speaker_id = _speaker_id_for_label(speaker_label, speaker_aliases, speaker_mapping)
+        start, end = _parse_time_range(time_text)
+        fallback_start = segments[-1]["end_time"] if segments else 0.0
+        current = {
+            "segment_index": len(segments),
+            "speaker_id": speaker_id,
+            "start_time": float(start if start is not None else fallback_start),
+            "end_time": float(end if end is not None else (start if start is not None else fallback_start)),
+            "content": (content or "").strip(),
+            "has_time": start is not None,
+        }
+
     for raw_line in normalized_text.split("\n"):
         line = raw_line.strip()
         if not line:
@@ -172,24 +200,23 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
         if match and match.group("speaker").strip() in METADATA_LABELS:
             continue
         if match:
-            close_current()
             speaker_label = match.group("speaker").strip()
-            speaker_id = _speaker_id_for_label(speaker_label, speaker_aliases, speaker_mapping)
-            start, end = _parse_time_range(match.group("time") or match.group("bracket_time"))
-            fallback_start = segments[-1]["end_time"] if segments else 0.0
-            content = (match.group("content") or "").strip()
-            current = {
-                "segment_index": len(segments),
-                "speaker_id": speaker_id,
-                "start_time": float(start if start is not None else fallback_start),
-                "end_time": float(end if end is not None else (start if start is not None else fallback_start)),
-                "content": content,
-                "has_time": start is not None,
-            }
+            open_segment(
+                speaker_label,
+                match.group("content") or "",
+                match.group("time") or match.group("bracket_time") or match.group("post_time"),
+            )
+            continue
+
+        header_match = SPEAKER_HEADER_RE.match(line)
+        if header_match:
+            open_segment(header_match.group("speaker").strip(), "")
             continue
 
         if current:
             current["content"] = f"{current['content']}\n{line}".strip()
+        elif not saw_speaker_label and not segments:
+            pending_unlabelled_lines.append(line)
         else:
             current = {
                 "segment_index": len(segments),
@@ -202,6 +229,19 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
             speaker_mapping.setdefault("speaker_1", "讲话人1")
 
     close_current()
+
+    if not segments and pending_unlabelled_lines:
+        content = "\n".join(pending_unlabelled_lines).strip()
+        if content:
+            speaker_mapping.setdefault("speaker_1", "讲话人1")
+            segments.append({
+                "segment_index": 0,
+                "speaker_id": "speaker_1",
+                "start_time": 0.0,
+                "end_time": _segment_duration(content),
+                "content": content,
+                "has_time": False,
+            })
 
     for index, segment in enumerate(segments):
         segment["segment_index"] = index

@@ -37,7 +37,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 **团队任务显示规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`），支持按审核人过滤（`reviewed_by_user_id` 参数），默认过滤为当前用户。审核人匹配逻辑：显式设置的 `reviewed_by_user_id` 优先匹配；未设置时以 `creator_user_id` 作为隐含审核人。前端提供审核人下拉过滤器，可选"全部审核人"查看更广范围。
 
-**任务图片**：创建/编辑待办和任务详情均支持点击选择、拖拽、截图后 Ctrl+V 粘贴图片。创建表单会先展示缩略图预览；提交后后端在 `link.todo_images` 中返回规范化图片元数据，详情页可立即看到已上传图片并继续追加。
+**任务图片**：创建/编辑待办和任务详情均支持截图后 Ctrl+V 粘贴图片、拖拽上传和本地选择。图片上传区采用缩略图横向展示 + `+` 号入口；点击 `+` 后弹出“粘贴或拖拽至这里上传”和“添加本地文件”两个操作。提交后后端在 `link.todo_images` 中返回规范化图片元数据，详情页可立即看到已上传图片并继续追加。
 
 ### 1.3 请假审批
 
@@ -110,7 +110,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 - 上传音频文件 → 后台异步调用豆包 ASR 转写（含说话人分离）
 - **无音频创建**：可仅通过标题/类型/日期创建会议记录，进入详情页后手动填写参会人员，在自定义提示词中填写会议记录，AI 直接生成纪要；也可后续补传音频触发 ASR 转录
-- **文稿导入**：创建会议时可选择上传已识别好的 Word `.docx` 或 PDF 文稿；会议详情页也可上传/替换文稿。后端解析 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容` 和可选时间码格式为转写分段，自动更新说话人映射，清空旧纪要并进入 `transcribed` 状态。已归档会议不能替换文稿。
+- **文稿导入**：创建会议时可选择上传已识别好的 Word `.docx` 或 PDF 文稿；会议详情页也可上传/替换文稿。后端解析 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容`、可选时间码格式，以及 `讲话人1  00:20` 后下一行跟正文的录音文稿格式为转写分段，自动更新说话人映射，清空旧纪要并进入 `transcribed` 状态。已归档会议不能替换文稿。
 - **大文件/长音频自动切片**：音频会统一归一化为 16k 单声道 mp3；音频 > 300MB 或时长 > 45 分钟时自动用 ffmpeg 精确切片，切片间保留 12 秒重叠并在合并时按时间+文本相似度去重，减少边界漏识别和转录时间轴错位
   - 切片说话人 ID 带 chunk 前缀：`chunk1_speaker_0`、`chunk2_speaker_0`
   - 时间戳自动加回原音频偏移，segment_index 按开始时间全局递增
@@ -153,7 +153,7 @@ pytest -q tests/test_project_workflow.py
 ### 前端（在 `frontend/` 目录下）
 
 ```bash
-npm run dev        # 开发服务器
+VITE_BASE=/punkrecord/ npm run dev  # 开发服务器（开发访问 /punkrecord/）
 VITE_BASE=/ npm run build  # 生产根域名构建；子路径部署可覆盖 VITE_BASE
 npm run build              # 本地/默认构建
 npm run lint       # 代码检查
@@ -251,7 +251,7 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 - **后端**：端口 15085（uvicorn, Python 3.11, conda env: punkrecord）
 - **前端**：端口 15173（Vite dev server）
 - **数据库**：`punkrecord_local`（本地 MySQL 3306）
-- **启停**：`./dev.sh start|stop|restart|status`
+- **启停**：`./dev.sh start|stop|restart|status`；`dev.sh` 前端显式设置 `VITE_BASE=/punkrecord/`，且 `App.jsx` 会在访问 `/punkrecord/` 时自动使用 `/punkrecord` basename，避免子路径白屏
 
 ### Deploy 环境（生产服务器）
 - **后端**：端口 9086（uvicorn, Python 3.10+, venv/conda, pm2 守护）
@@ -268,4 +268,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-07-13*
+*最后更新：2026-07-15*

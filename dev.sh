@@ -27,7 +27,7 @@ case "${1:-start}" in
       echo "[Frontend] Already running on port $FRONTEND_PORT"
     else
       cd "$PROJECT_DIR/frontend"
-      nohup npx vite > "$FRONTEND_LOG" 2>&1 &
+      nohup env VITE_BASE=/punkrecord/ npx vite --host 0.0.0.0 --port $FRONTEND_PORT > "$FRONTEND_LOG" 2>&1 &
       echo "[Frontend] Started on port $FRONTEND_PORT (PID: $!)"
     fi
 

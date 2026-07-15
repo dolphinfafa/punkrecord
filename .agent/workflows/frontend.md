@@ -52,7 +52,7 @@
 |------|------|------|
 | Bug 图片预览 | `components/common/BugImagePreview.jsx` | 缩略图 + 放大查看 |
 | Bug 详情弹窗 | `components/common/BugDetailModal.jsx` | 全字段详情 + 图片画廊 |
-| 图片粘贴上传 | `components/common/ImagePasteUpload.jsx` | 图片选择/拖拽/Ctrl+V 粘贴 + 缩略图预览，复用于待办、Bug、身份证图片等表单 |
+| 图片粘贴上传 | `components/common/ImagePasteUpload.jsx` | 缩略图横向展示 + `+` 号入口；点击 `+` 弹出“粘贴或拖拽至这里上传”和“添加本地文件”，复用于待办、Bug、身份证图片等表单 |
 | 任务图片预览 | `components/common/TodoImagePreview.jsx` | 任务附件预览 + 放大 |
 
 ### 企业大脑页面（`pages/kb/`）
@@ -226,7 +226,7 @@
 
 | 页面/组件 | 变更说明 |
 |-----------|----------|
-| `components/common/ImagePasteUpload.jsx` + `.css` | 新增通用图片上传控件，支持点击选择、拖拽、Ctrl+V 粘贴截图，并生成缩略图预览 |
+| `components/common/ImagePasteUpload.jsx` + `.css` | 新增通用图片上传控件，支持点击选择、拖拽、Ctrl+V 粘贴截图，并生成缩略图预览；07-15 追加优化为缩略图横条 + `+` 号入口，点击后弹出粘贴/拖拽区和“添加本地文件”按钮 |
 | `utils/clipboardImages.js` | 新增剪贴板图片提取、无文件名粘贴图片命名、图片文件合并工具 |
 | `components/todo/TodoModal.jsx` | 创建/编辑待办的图片上传改为可粘贴图片并显示缩略图，创建前不再只显示文件名 |
 | `components/todo/TodoDetailModal.jsx` | 任务详情新增粘贴上传图片入口，并读取规范化后的 `link.todo_images` 展示已上传图片 |
@@ -236,7 +236,8 @@
 | `pages/meeting/components/UploadAudioModal.jsx` + `.css` | 创建会议弹窗新增导入方式切换：空白、音频、文稿；文稿模式支持 Word `.docx` / PDF |
 | `pages/meeting/MeetingDetailPage.jsx` + `.css` | 会议详情支持上传/替换文稿；无音频文稿分段显示静态“文稿”标识，不再显示不可播放时间按钮 |
 | `api/meeting.js` | 新增 `uploadTranscript(id, file)` |
+| `App.jsx` | 07-15 追加兼容开发子路径：访问 `/punkrecord/` 时自动使用 `/punkrecord` 作为 Router basename，避免开发环境白屏 |
 
 ---
 
-*最后更新：2026-07-13*
+*最后更新：2026-07-15*

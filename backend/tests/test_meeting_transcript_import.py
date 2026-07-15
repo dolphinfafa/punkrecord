@@ -42,6 +42,33 @@ def test_parse_transcript_text_named_speakers_and_timecodes():
     assert segments[2]["has_time"] is False
 
 
+def test_parse_transcript_text_speaker_header_time_next_line_content():
+    text = """
+07-15早会
+讲话人1  00:20
+你是磊哥吗？
+讲话人2  00:23
+首先，我已经完成剪映的检测并且正在测试效果。
+讲话人3  00:45
+一是需要测试外勤管理后台导出并且优化的功能。
+讲话人3  00:51
+二是处理程序，我们需要导出查询并且修改功能。
+讲话人1  01:07
+是的。
+"""
+
+    segments, mapping = _parse_transcript_text(text)
+
+    assert mapping == {"speaker_1": "讲话人1", "speaker_2": "讲话人2", "speaker_3": "讲话人3"}
+    assert [item["speaker_id"] for item in segments] == [
+        "speaker_1", "speaker_2", "speaker_3", "speaker_3", "speaker_1"
+    ]
+    assert segments[0]["start_time"] == 20.0
+    assert segments[1]["start_time"] == 23.0
+    assert segments[0]["content"] == "你是磊哥吗？"
+    assert "07-15早会" not in segments[0]["content"]
+
+
 def test_parse_transcript_text_without_speaker_labels_keeps_content():
     segments, mapping = _parse_transcript_text("这是已经整理好的会议记录，没有说话人标签。")
 
