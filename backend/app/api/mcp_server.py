@@ -12,6 +12,7 @@ duplication.
 import logging
 import base64
 from typing import Optional
+from urllib.parse import unquote
 
 import httpx
 from mcp.server.fastmcp import FastMCP, Context
@@ -95,6 +96,191 @@ async def _call(
     return body
 
 
+async def _download_file(ctx: Context, path: str) -> dict:
+    """Download a protected REST file using the caller's token and return base64."""
+    token = _extract_token(ctx)
+    url = settings.INTERNAL_API_BASE_URL.rstrip("/") + path
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        resp = await client.get(url, headers=headers)
+
+    if resp.status_code >= 400:
+        msg = None
+        try:
+            body = resp.json()
+            if isinstance(body, dict):
+                msg = body.get("message") or body.get("detail")
+        except Exception:
+            msg = None
+        raise RuntimeError(str(msg) if msg else f"下载失败（HTTP {resp.status_code}）")
+
+    return {
+        "file_name": _filename_from_disposition(resp.headers.get("content-disposition")),
+        "content_type": resp.headers.get("content-type") or "application/octet-stream",
+        "size": len(resp.content),
+        "content_base64": base64.b64encode(resp.content).decode("ascii"),
+    }
+
+
+def _filename_from_disposition(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    params = {}
+    for part in value.split(";")[1:]:
+        key, sep, raw_val = part.strip().partition("=")
+        if not sep:
+            continue
+        params[key.lower()] = raw_val.strip().strip('"')
+    filename_ext = params.get("filename*")
+    if filename_ext:
+        if filename_ext.lower().startswith("utf-8''"):
+            return unquote(filename_ext[7:])
+        return unquote(filename_ext)
+    return params.get("filename")
+
+
+def _first_header_value(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    return value.split(",", 1)[0].strip() or None
+
+
+def _api_base_from_public_mcp_url() -> Optional[str]:
+    raw = (settings.MCP_PUBLIC_URL or "").strip().rstrip("/")
+    if not raw:
+        return None
+    if raw.endswith("/api/v1/mcp"):
+        return raw[: -len("/mcp")]
+    if raw.endswith("/mcp"):
+        base = raw[: -len("/mcp")].rstrip("/")
+        return base if base.endswith("/api/v1") else f"{base}/api/v1"
+    return raw if raw.endswith("/api/v1") else f"{raw}/api/v1"
+
+
+def _api_base_from_request(ctx: Context) -> str:
+    request = None
+    try:
+        request = ctx.request_context.request
+    except Exception:  # pragma: no cover - defensive
+        request = None
+
+    if request is None:
+        return "/api/v1"
+
+    proto = _first_header_value(request.headers.get("x-forwarded-proto")) or request.url.scheme
+    host = (
+        _first_header_value(request.headers.get("x-forwarded-host"))
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    origin = f"{proto}://{host}"
+
+    path = getattr(request.url, "path", "") or ""
+    prefix = ""
+    marker = "/api/v1/mcp"
+    if marker in path:
+        prefix = path.split(marker, 1)[0].rstrip("/")
+    if not prefix:
+        prefix = (_first_header_value(request.headers.get("x-forwarded-prefix")) or "").rstrip("/")
+
+    if prefix.endswith("/api/v1"):
+        return f"{origin}{prefix}"
+    if prefix.endswith("/api"):
+        return f"{origin}{prefix}/v1"
+    if prefix and prefix != "/":
+        return f"{origin}{prefix}/api/v1"
+    return f"{origin}/api/v1"
+
+
+def _api_base(ctx: Context) -> str:
+    return _api_base_from_public_mcp_url() or _api_base_from_request(ctx)
+
+
+def _absolute_api_url(ctx: Context, path: str) -> str:
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    normalized = "/" + path.lstrip("/")
+    if normalized.startswith("/api/v1/"):
+        normalized = normalized[len("/api/v1") :]
+    return f"{_api_base(ctx).rstrip('/')}{normalized}"
+
+
+def _with_authenticated_download_url(ctx: Context, item: dict, path: str) -> dict:
+    url = _absolute_api_url(ctx, path)
+    return {
+        **item,
+        "download_path": path,
+        "api_download_url": url,
+        "download_url": url,
+        "requires_auth": True,
+        "auth_note": "下载时使用调用 MCP 时相同的 Authorization Bearer Token。",
+    }
+
+
+def _enrich_todo_image_urls(ctx: Context, image: dict) -> dict:
+    if not isinstance(image, dict):
+        return image
+    path = image.get("download_path")
+    if not path:
+        return image
+    return _with_authenticated_download_url(ctx, image, path)
+
+
+def _project_id_for_bug_images(todo: dict) -> Optional[str]:
+    link = todo.get("link") if isinstance(todo, dict) else None
+    if not isinstance(link, dict):
+        link = {}
+    project_id = link.get("project_id")
+    if project_id:
+        return str(project_id)
+    if todo.get("source_type") == "project_task" and todo.get("source_id"):
+        return str(todo["source_id"])
+    return None
+
+
+def _enrich_bug_image_urls(ctx: Context, image: dict, project_id: Optional[str]) -> dict:
+    if not isinstance(image, dict) or not project_id:
+        return image
+    attachment_id = image.get("attachment_id") or image.get("id")
+    if not attachment_id:
+        return image
+    path = f"/project/projects/{project_id}/attachments/{attachment_id}/download"
+    return _with_authenticated_download_url(ctx, image, path)
+
+
+def _enrich_todo_media_urls(ctx: Context, data: dict) -> dict:
+    if not isinstance(data, dict):
+        return data
+    link = data.get("link")
+    if not isinstance(link, dict):
+        return data
+
+    enriched_link = dict(link)
+    todo_images = enriched_link.get("todo_images")
+    if isinstance(todo_images, list):
+        enriched_link["todo_images"] = [_enrich_todo_image_urls(ctx, item) for item in todo_images]
+
+    project_id = _project_id_for_bug_images(data)
+    bug_images = enriched_link.get("bug_images")
+    if isinstance(bug_images, list):
+        enriched_link["bug_images"] = [_enrich_bug_image_urls(ctx, item, project_id) for item in bug_images]
+    if isinstance(enriched_link.get("bug_image"), dict):
+        enriched_link["bug_image"] = _enrich_bug_image_urls(ctx, enriched_link["bug_image"], project_id)
+
+    return {**data, "link": enriched_link}
+
+
+def _enrich_todo_list_media_urls(ctx: Context, data):
+    if isinstance(data, list):
+        return [_enrich_todo_media_urls(ctx, item) for item in data]
+    if isinstance(data, dict):
+        for key in ("items", "todos", "results"):
+            if isinstance(data.get(key), list):
+                return {**data, key: [_enrich_todo_media_urls(ctx, item) for item in data[key]]}
+    return data
+
+
 def _attachment_urls(contract_id: str, attachment_id: str) -> dict:
     base = f"/api/v1/contract/contracts/{contract_id}/attachments/{attachment_id}"
     return {
@@ -123,19 +309,40 @@ async def get_me(ctx: Context) -> dict:
 @mcp.tool()
 async def list_my_todos(ctx: Context, status: Optional[str] = None, page_size: int = 20) -> dict:
     """查看我的待办任务列表。status 可选：open/in_progress/pending_review/done/blocked/dismissed。"""
-    return await _call(ctx, "GET", "/todo/my", params={"status": status, "page_size": page_size})
+    data = await _call(ctx, "GET", "/todo/my", params={"status": status, "page_size": page_size})
+    return _enrich_todo_list_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def get_todo(ctx: Context, todo_id: str) -> dict:
-    """查看某个任务的详情（含 link.todo_images 图片元数据）。"""
-    return await _call(ctx, "GET", f"/todo/{todo_id}")
+    """查看某个任务的详情（含 link.todo_images/link.bug_images 图片元数据与下载 URL）。"""
+    data = await _call(ctx, "GET", f"/todo/{todo_id}")
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def list_todo_images(ctx: Context, todo_id: str) -> dict:
-    """列出某个任务的全部图片（含 download_path 下载路径）。"""
-    return await _call(ctx, "GET", f"/todo/{todo_id}/images")
+    """列出某个任务的全部图片（含 api_download_url；下载需携带同一 Authorization 头）。"""
+    data = await _call(ctx, "GET", f"/todo/{todo_id}/images")
+    if isinstance(data, dict) and isinstance(data.get("images"), list):
+        return {**data, "images": [_enrich_todo_image_urls(ctx, item) for item in data["images"]]}
+    return data
+
+
+@mcp.tool()
+async def get_todo_image(ctx: Context, todo_id: str, image_id: str) -> dict:
+    """读取某个待办图片的文件内容，返回 content_base64、content_type、size，适合 MCP 客户端直接接收图片。"""
+    file_data = await _download_file(ctx, f"/todo/{todo_id}/images/{image_id}/download")
+    file_data["file_name"] = file_data.get("file_name") or f"todo-image-{image_id}"
+    return {"todo_id": todo_id, "image_id": image_id, **file_data}
+
+
+@mcp.tool()
+async def get_bug_image(ctx: Context, project_id: str, attachment_id: str) -> dict:
+    """读取某个 Bug 配图的文件内容（Bug 配图是项目附件），返回 content_base64、content_type、size。"""
+    file_data = await _download_file(ctx, f"/project/projects/{project_id}/attachments/{attachment_id}/download")
+    file_data["file_name"] = file_data.get("file_name") or f"bug-image-{attachment_id}"
+    return {"project_id": project_id, "attachment_id": attachment_id, **file_data}
 
 
 @mcp.tool()
@@ -159,7 +366,8 @@ async def get_project(ctx: Context, project_id: str) -> dict:
 @mcp.tool()
 async def list_project_todos(ctx: Context, project_id: str) -> dict:
     """查看某个项目下的全部任务。"""
-    return await _call(ctx, "GET", f"/project/projects/{project_id}/todos")
+    data = await _call(ctx, "GET", f"/project/projects/{project_id}/todos")
+    return _enrich_todo_list_media_urls(ctx, data)
 
 
 @mcp.tool()
@@ -295,7 +503,8 @@ async def create_todo(
         body["tags"] = tags
     if link:
         body["link"] = link
-    return await _call(ctx, "POST", "/todo", json=body)
+    data = await _call(ctx, "POST", "/todo", json=body)
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
@@ -346,31 +555,36 @@ async def create_bug(
     }
     if description:
         body["description"] = description
-    return await _call(ctx, "POST", "/todo", json=body)
+    data = await _call(ctx, "POST", "/todo", json=body)
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def start_todo(ctx: Context, todo_id: str) -> dict:
     """开始任务（open → in_progress）。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/start")
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/start")
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def submit_todo(ctx: Context, todo_id: str) -> dict:
     """提交任务完成（有审核人则进入待审核，否则直接完成）。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/submit")
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/submit")
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def block_todo(ctx: Context, todo_id: str, blocked_reason: str) -> dict:
     """阻塞任务，需说明原因。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/block", json={"blocked_reason": blocked_reason})
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/block", json={"blocked_reason": blocked_reason})
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def dismiss_todo(ctx: Context, todo_id: str, dismiss_reason: Optional[str] = None) -> dict:
     """忽略任务，可附原因。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/dismiss", json={"dismiss_reason": dismiss_reason})
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/dismiss", json={"dismiss_reason": dismiss_reason})
+    return _enrich_todo_media_urls(ctx, data)
 
 
 # ─── Review tools (team tasks awaiting my review) ─────────────────────────────
@@ -380,22 +594,25 @@ async def list_tasks_to_review(ctx: Context) -> dict:
     """查看团队任务中【需要我审核】的任务（下属上报完成、待我审批的 pending_review 任务）。"""
     me = await _call(ctx, "GET", "/auth/me")
     my_id = me.get("id") if isinstance(me, dict) else None
-    return await _call(
+    data = await _call(
         ctx, "GET", "/todo/team",
         params={"status": "pending_review", "reviewed_by_user_id": my_id, "page_size": 50},
     )
+    return _enrich_todo_list_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def approve_todo(ctx: Context, todo_id: str, comment: Optional[str] = None) -> dict:
     """审核通过某个待我审核的任务（pending_review → done）。comment 为可选审批意见。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/approve", json={"comment": comment})
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/approve", json={"comment": comment})
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()
 async def reject_todo(ctx: Context, todo_id: str, comment: str) -> dict:
     """审核驳回某个待我审核的任务（打回为未开始 open）。comment 为驳回理由（必填）。"""
-    return await _call(ctx, "POST", f"/todo/{todo_id}/reject", json={"comment": comment})
+    data = await _call(ctx, "POST", f"/todo/{todo_id}/reject", json={"comment": comment})
+    return _enrich_todo_media_urls(ctx, data)
 
 
 @mcp.tool()

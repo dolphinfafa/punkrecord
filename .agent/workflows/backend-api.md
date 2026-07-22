@@ -95,7 +95,7 @@
 
 **AI Agent 工作流**：AI 修复状态存储在 `TodoItem.link.agent_status` 字段（值为 `ai_fixing` / `ai_fixed`），与 `todo.status` 完全解耦。AI 只需关注 `agent_status`，不改变任务本身的状态。
 
-**任务图片返回规范（v2.0.5，2026-07-13）**：创建/详情/列表返回前统一规范化 `link.todo_images`，剥离内部 `stored_name`，补齐 `download_path`。前端创建待办后可直接在详情中看到已上传图片，不再只显示文件名或缺少图片元数据。
+**任务图片返回规范（v2.0.5，2026-07-13）**：创建/详情/列表返回前统一规范化 `link.todo_images`，剥离内部 `stored_name`，补齐 `download_path`。前端创建待办后可直接在详情中看到已上传图片，不再只显示文件名或缺少图片元数据。v2.0.6 起 MCP 返回会在图片元数据中补 `api_download_url`/`download_url`，并标记 `requires_auth=true`；客户端下载 URL 时需携带调用 MCP 时同一个 `Authorization: Bearer pat_xxx`。
 
 **PATCH `/api/v1/todo/{todo_id}` 扩展字段**：
 - `link`（dict）：合并更新任务的 link JSON 字段（如 `{"agent_status": "ai_fixed"}`），不会覆盖已有键
@@ -260,14 +260,15 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（36）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（38）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`get_todo_image`/`get_bug_image`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
 - **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
 - **财务交易作废工具（v2.0.3，2026-07-01）**：`list_transactions` 支持 `account_id`/`txn_direction`/`status`/日期/分页筛选，`status=voided` 可查看作废交易；`void_transaction`/`unvoid_transaction`/`delete_voided_transaction` 分别转发财务交易作废、恢复和删除已作废交易。写操作需 `finance.write` 权限。
 - **合同附件与会议工具（v2.0.4，2026-07-08）**：新增 `get_contract`/`list_contract_attachments`/`upload_contract_attachment`/`delete_contract_attachment`，附件工具会返回 `view_path`/`download_path`；新增 `get_meeting`/`get_meeting_transcript`/`retranscribe_meeting`，用于查看会议详情、转写分段和触发重新转写。
 - **会议文稿导入工具（v2.0.5，2026-07-13）**：新增 `upload_meeting_transcript`，通过 base64 文件内容代理调用 `/meeting/records/{id}/upload-transcript`，支持 Word `.docx` 与 PDF 文稿替换会议转写分段。工具总数更新为 36。
+- **待办/Bug 图片读取（v2.0.6，2026-07-22）**：`get_todo`、`list_my_todos`、`list_project_todos`、`list_tasks_to_review` 及任务状态变更工具会补全 `link.todo_images` 与 `link.bug_images` 的 `api_download_url`/`download_url`；URL 不暴露 token，下载时需使用同一 `Authorization` 头。新增 `get_todo_image(todo_id, image_id)` 与 `get_bug_image(project_id, attachment_id)`，直接返回 `{file_name, content_type, size, content_base64}`，适合无法额外发 HTTP 下载请求的 MCP 客户端。工具总数更新为 38。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端使用 conda env `punkrecord`；`dev.sh` 已指向 `/opt/miniconda3/envs/punkrecord/bin/python`，避免误用旧 `punk` 环境。
 
 ---
 
-*最后更新：2026-07-15*
+*最后更新：2026-07-22*

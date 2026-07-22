@@ -37,7 +37,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 **团队任务显示规则**：显示所有负责人不是当前用户的任务（`assignee_user_id != current_user`），支持按审核人过滤（`reviewed_by_user_id` 参数），默认过滤为当前用户。审核人匹配逻辑：显式设置的 `reviewed_by_user_id` 优先匹配；未设置时以 `creator_user_id` 作为隐含审核人。前端提供审核人下拉过滤器，可选"全部审核人"查看更广范围。
 
-**任务图片**：创建/编辑待办和任务详情均支持截图后 Ctrl+V 粘贴图片、拖拽上传和本地选择。图片上传区采用缩略图横向展示 + `+` 号入口；点击 `+` 后弹出“粘贴或拖拽至这里上传”和“添加本地文件”两个操作。提交后后端在 `link.todo_images` 中返回规范化图片元数据，详情页可立即看到已上传图片并继续追加。
+**任务图片**：创建/编辑待办和任务详情均支持截图后 Ctrl+V 粘贴图片、拖拽上传和本地选择。图片上传区采用缩略图横向展示 + `+` 号入口；点击 `+` 后弹出“粘贴或拖拽至这里上传”和“添加本地文件”两个操作。提交后后端在 `link.todo_images` 中返回规范化图片元数据，详情页可立即看到已上传图片并继续追加。MCP 客户端通过 `get_todo`/`list_todo_images` 可拿到图片下载 URL，也可用 `get_todo_image` 直接获取 base64 图片内容。
 
 ### 1.3 请假审批
 
@@ -62,6 +62,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - Bug 创建只写入一条 Bug 任务记录（不创建额外镜像）
 - Bug 列表视图不显示附件缩略图，图片仅在详情弹窗中展示
 - Bug 管理包含"Agent 文档"面板，可一键复制自动生成的 AI Agent 操作手册
+- MCP 客户端读取 Bug 时，`link.bug_images` 会附带项目附件下载 URL；无法直接 HTTP 下载时可调用 `get_bug_image(project_id, attachment_id)` 获取 base64 图片内容
 - AI Agent Bug 修复流程：Agent 通过 PATCH `/api/v1/todo/{todo_id}` 更新 `link.agent_status`（`ai_fixing` → `ai_fixed`），不改变 `todo.status`。`status` 和 `agent_status` 完全独立
 - Bug 列表支持编辑（预填所有字段）、配图增删改查（单张删除/撤销、继续添加）
 - Bug 编辑时自动同步更新关联 TodoItem 的描述（重新组合实际结果/期望结果/复现步骤/备注）
@@ -268,4 +269,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-07-15*
+*最后更新：2026-07-22*

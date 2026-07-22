@@ -45,7 +45,7 @@
 
 | 模型 | 说明 |
 |------|------|
-| `TodoItem` | 任务项（含状态机、图片附件）。`link` JSON 字段包含 `todo_images` 图片元数据和 `agent_status`（`ai_fixing`/`ai_fixed`）；`agent_status` 独立于 `status` 字段，用于 AI Agent Bug 修复状态追踪。v2.0.5 起 API 返回前会规范化 `link.todo_images` 并补齐下载路径 |
+| `TodoItem` | 任务项（含状态机、图片附件）。`link` JSON 字段包含 `todo_images` 任务图片元数据、`bug_images` Bug 配图引用（项目附件 `attachment_id`）和 `agent_status`（`ai_fixing`/`ai_fixed`）；`agent_status` 独立于 `status` 字段，用于 AI Agent Bug 修复状态追踪。v2.0.5 起 API 返回前会规范化 `link.todo_images` 并补齐下载路径；v2.0.6 起 MCP 返回会额外补图片下载 URL 或提供 base64 图片读取工具 |
 | `LeaveRequest` | 请假申请 |
 
 ### 项目管理
@@ -97,4 +97,4 @@
 
 ---
 
-*最后更新：2026-07-13*
+*最后更新：2026-07-22*
