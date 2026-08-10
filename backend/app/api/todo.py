@@ -248,6 +248,17 @@ def _calc_leave_days(start_at: datetime, end_at: datetime) -> float:
     return max(0.5, total)
 
 
+def _apply_todo_list_order(query, status: Optional[str]):
+    """Sort completed todos by finish time; active lists keep deadline order."""
+    if status == TodoStatus.DONE.value:
+        return query.order_by(
+            TodoItem.done_at.desc(),
+            TodoItem.updated_at.desc(),
+            TodoItem.due_at.desc(),
+        )
+    return query.order_by(TodoItem.due_at)
+
+
 def _apply_beli_rules_on_done(todo: TodoItem, session: Session):
     """Apply active Beli rules once when a todo is completed."""
     link = dict(todo.link or {})
@@ -458,7 +469,7 @@ async def get_my_todos(
     if source_type:
         query = query.where(TodoItem.source_type == source_type)
 
-    query = query.order_by(TodoItem.due_at)
+    query = _apply_todo_list_order(query, status)
 
     count_query = query
     total = len(session.exec(count_query).all())
@@ -511,7 +522,7 @@ async def get_team_todos(
     if status:
         query = query.where(TodoItem.status == status)
 
-    query = query.order_by(TodoItem.due_at)
+    query = _apply_todo_list_order(query, status)
 
     total = len(session.exec(query).all())
     offset = (page - 1) * page_size

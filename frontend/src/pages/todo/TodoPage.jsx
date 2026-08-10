@@ -30,6 +30,7 @@ const TASK_TYPE_LABELS = {
     custom: '自定义任务',
     other: '其他',
 };
+const DONE_PAGE_SIZE = 10;
 
 const getProjectLabel = (todo) => {
     const projectName = todo?.link?.project_name;
@@ -92,6 +93,8 @@ export default function TodoPage() {
     const pageSize = 20;
     const [doneExpanded, setDoneExpanded] = useState(false);
     const [doneTodos, setDoneTodos] = useState([]);
+    const [donePage, setDonePage] = useState(1);
+    const [doneTotalCount, setDoneTotalCount] = useState(0);
     const [doneLoading, setDoneLoading] = useState(false);
     const actioningTodoIdsRef = useRef(new Set());
 
@@ -130,14 +133,27 @@ export default function TodoPage() {
         }
     };
 
-    const fetchDoneTodos = async () => {
+    const resetDoneTodos = () => {
+        setDoneTodos([]);
+        setDonePage(1);
+        setDoneTotalCount(0);
+    };
+
+    const fetchDoneTodos = async ({ pageToLoad = 1, append = false } = {}) => {
         try {
             setDoneLoading(true);
             const api = viewMode === 'team' ? todoApi.listTeam : todoApi.list;
             const teamExtra = viewMode === 'team' && reviewerFilter !== 'all'
                 ? { reviewed_by_user_id: reviewerFilter } : {};
-            const response = await api({ status: 'done', page_size: 100, ...teamExtra });
-            setDoneTodos(response.data?.items || []);
+            const response = await api({ status: 'done', page: pageToLoad, page_size: DONE_PAGE_SIZE, ...teamExtra });
+            const nextItems = response.data?.items || [];
+            setDoneTodos((prev) => {
+                if (!append) return nextItems;
+                const seen = new Set(prev.map((item) => item.id));
+                return [...prev, ...nextItems.filter((item) => !seen.has(item.id))];
+            });
+            setDonePage(pageToLoad);
+            setDoneTotalCount(response.data?.total ?? nextItems.length);
         } catch {
             // silent
         } finally {
@@ -172,7 +188,7 @@ export default function TodoPage() {
                 setTotalCount(0);
                 // Refresh done todos if expanded, don't collapse
                 if (doneExpanded) {
-                    fetchDoneTodos();
+                    fetchDoneTodos({ pageToLoad: 1, append: false });
                 }
                 setLoading(false);
                 return;
@@ -195,6 +211,10 @@ export default function TodoPage() {
     };
 
     useEffect(() => { fetchTodos(); }, [filter, viewMode, page, reviewerFilter]);
+    useEffect(() => {
+        setDoneExpanded(false);
+        resetDoneTodos();
+    }, [viewMode, reviewerFilter]);
 
     const assigneeOptions = useMemo(() => {
         const map = new Map();
@@ -601,6 +621,8 @@ export default function TodoPage() {
                                 const columnTodos = isDoneCol
                                     ? doneTodos
                                     : filteredTodos.filter(t => t.status === status);
+                                const hasMoreDoneTodos = isDoneCol && doneTodos.length < doneTotalCount;
+                                const isInitialDoneLoading = isDoneCol && doneLoading && doneTodos.length === 0;
                                 return (
                                     <div
                                         key={status}
@@ -614,27 +636,29 @@ export default function TodoPage() {
                                             onClick={isDoneCol ? () => {
                                                 const next = !doneExpanded;
                                                 setDoneExpanded(next);
-                                                if (next && doneTodos.length === 0) fetchDoneTodos();
+                                                if (next) fetchDoneTodos({ pageToLoad: 1, append: false });
                                             } : undefined}
                                         >
                                             <span className={clsx('status-dot', `status-${status}`)}></span>
                                             <h3>{STATUS_LABELS[status]}</h3>
                                             {isDoneCol && !doneExpanded
                                                 ? <span className="count-badge" style={{ fontSize: '11px' }}>点击展开</span>
-                                                : <span className="count-badge">{columnTodos.length}</span>
+                                                : <span className="count-badge">{isDoneCol && doneTotalCount > 0 ? `${columnTodos.length}/${doneTotalCount}` : columnTodos.length}</span>
                                             }
                                         </div>
                                         {isDoneCol && !doneExpanded ? (
                                             <div className="column-body" style={{ opacity: 0.5, textAlign: 'center', padding: '2rem 0', fontSize: '13px', color: '#94a3b8' }}>
                                                 已折叠
                                             </div>
-                                        ) : isDoneCol && doneLoading ? (
+                                        ) : isInitialDoneLoading ? (
                                             <div className="column-body" style={{ textAlign: 'center', padding: '2rem 0', fontSize: '13px', color: '#94a3b8' }}>
                                                 加载中...
                                             </div>
                                         ) : (
                                         <div className="column-body">
-                                            {columnTodos.map(todo => (
+                                            {columnTodos.length === 0 && isDoneCol ? (
+                                                <div className="done-empty-state">暂无已完成任务</div>
+                                            ) : columnTodos.map(todo => (
                                                 <div
                                                     key={todo.id}
                                                     className={clsx('todo-card', {
@@ -671,6 +695,16 @@ export default function TodoPage() {
                                                     </div>
                                                 </div>
                                             ))}
+                                            {hasMoreDoneTodos && (
+                                                <button
+                                                    type="button"
+                                                    className="done-load-more-btn"
+                                                    disabled={doneLoading}
+                                                    onClick={() => fetchDoneTodos({ pageToLoad: donePage + 1, append: true })}
+                                                >
+                                                    {doneLoading ? '加载中...' : `加载更多（剩余 ${doneTotalCount - doneTodos.length} 项）`}
+                                                </button>
+                                            )}
                                         </div>
                                         )}
                                     </div>

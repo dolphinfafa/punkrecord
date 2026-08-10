@@ -346,6 +346,37 @@
     gap: 12px;
 }
 
+.done-empty-state {
+    padding: 24px 8px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.done-load-more-btn {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.done-load-more-btn:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: var(--bg-color);
+}
+
+.done-load-more-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
 /* Board Card */
 .todo-card {
     background: var(--card-bg);
