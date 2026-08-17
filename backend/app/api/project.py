@@ -1263,6 +1263,7 @@ async def sync_dev_tasks_from_feature_list(
         raise ValidationException("未找到可用的我方主体，无法同步任务")
 
     created = 0
+    notify_pairs = []  # (todo_id, assignee_user_id) for genuinely-new tasks only
     for row in expected_rows:
         feature_key = row["feature_key"]
         keep = preserved.get(feature_key, {})
@@ -1291,9 +1292,26 @@ async def sync_dev_tasks_from_feature_list(
             },
         )
         session.add(todo)
+        session.flush()
+        if not keep:  # re-sync of a preserved task must not re-notify its assignee
+            notify_pairs.append((todo.id, todo.assignee_user_id))
         created += 1
 
     session.commit()
+
+    # Notify assignees of newly-generated tasks (non-critical).
+    # Function-local import avoids the project.py <-> todo.py module cycle.
+    from app.api.todo import _notify_user
+    for todo_id, assignee_id in notify_pairs:
+        if not assignee_id or assignee_id == current_user.id:
+            continue  # skip self-assignment spam
+        try:
+            t = session.get(TodoItem, todo_id)  # re-fetch: attributes expire on commit
+            if t:
+                _notify_user(assignee_id, t, session, "todo_assigned")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     return success_response({
         "created": created,
@@ -1932,6 +1950,7 @@ async def generate_dev_tasks(
         raise ValidationException("未找到可用的我方主体，无法生成任务")
 
     created_ids = []
+    created_pairs = []  # (todo_id, assignee_user_id) for post-commit notify
     for item in payload.tasks:
         # Parse due_at
         due_at = None
@@ -1973,8 +1992,23 @@ async def generate_dev_tasks(
         session.add(todo)
         session.flush()
         created_ids.append(str(todo.id))
+        created_pairs.append((todo.id, item.assignee_user_id))
 
     session.commit()
+
+    # Notify each assignee that a new task was assigned (non-critical).
+    # Function-local import avoids the project.py <-> todo.py module cycle.
+    from app.api.todo import _notify_user
+    for todo_id, assignee_id in created_pairs:
+        if not assignee_id or assignee_id == current_user.id:
+            continue  # skip self-assignment spam
+        try:
+            t = session.get(TodoItem, todo_id)  # re-fetch: attributes expire on commit
+            if t:
+                _notify_user(assignee_id, t, session, "todo_assigned")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     return success_response({
         "created": len(created_ids),

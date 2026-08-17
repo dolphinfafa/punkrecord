@@ -10,6 +10,8 @@ const PREF_OPTIONS = [
     { key: 'todo_assigned', label: '新任务分配给我', desc: '有人给你分配了新的待办事项' },
     { key: 'todo_created_notify_manager', label: '下属收到新任务', desc: '你的下属被分配了新任务' },
     { key: 'todo_submitted', label: '任务提交审核', desc: '下属提交任务等待你审核' },
+    { key: 'todo_pending_review', label: '待我审核的任务', desc: '有任务提交，等待你审核（通过/拒绝）' },
+    { key: 'leave_approval_pending', label: '请假审批待处理', desc: '有下属提交请假申请，等待你审批' },
     { key: 'todo_approved', label: '任务审核通过', desc: '你提交的任务被审核通过' },
     { key: 'todo_rejected', label: '任务被退回', desc: '你提交的任务被退回修改' },
     { key: 'todo_reassigned', label: '任务转派给我', desc: '有任务被转派给你' },

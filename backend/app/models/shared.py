@@ -6,7 +6,8 @@ from typing import Optional
 from uuid import UUID
 from enum import Enum
 from sqlmodel import Field, Column, JSON, SQLModel
-from app.models.base import BaseDBModel
+from sqlalchemy import Text
+from app.models.base import BaseDBModel, now_cn
 
 
 class AuditLog(BaseDBModel, table=True):
@@ -98,3 +99,35 @@ class WeChatNotifyBinding(BaseDBModel, table=True):
     nickname: Optional[str] = None
     is_active: bool = Field(default=True, nullable=False)
     preferences: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+
+
+class WeChatPendingStatus(str, Enum):
+    """WeChat pending-notification delivery status"""
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"    # gave up after max attempts, or permanent error
+    DROPPED = "dropped"  # no active binding at flush time
+
+
+class WeChatPendingNotification(BaseDBModel, table=True):
+    """Buffered WeChat notification awaiting delivery (offline queue).
+
+    Stores the fully-rendered push text so a flush is a pure FIFO replay
+    without re-rendering against a possibly-changed/deleted todo. The
+    msg_service_key is deliberately NOT snapshotted: at flush time we
+    re-resolve the recipient's current active binding.
+    """
+    __tablename__ = "wechat_pending_notification"
+    # MySQL FK columns are collation-sensitive: the referenced users.id /
+    # todo_item.id use utf8mb4_0900_ai_ci, so this table must match or the
+    # FK constraint fails (pymysql 3780 "columns are incompatible").
+    __table_args__ = {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_0900_ai_ci"}
+
+    recipient_user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
+    todo_id: Optional[UUID] = Field(default=None, foreign_key="todo_item.id", index=True)
+    event_type: str = Field(default="", nullable=False)
+    payload: str = Field(sa_column=Column(Text, nullable=False))
+    status: WeChatPendingStatus = Field(default=WeChatPendingStatus.PENDING, nullable=False, index=True)
+    retry_count: int = Field(default=0, nullable=False)
+    next_retry_at: datetime = Field(default_factory=now_cn, nullable=False, index=True)
+    last_error: Optional[str] = None

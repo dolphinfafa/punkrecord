@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # WeChat Message Service (weixin-agent-sdk)
     WECHAT_MSG_SERVICE_URL: Optional[str] = None
     WECHAT_MSG_SERVICE_API_KEY: Optional[str] = None
+    # WeChat notification offline-queue retry worker
+    WECHAT_NOTIFY_RETRY_INTERVAL_SECONDS: int = 300      # worker sleep between cycles
+    WECHAT_NOTIFY_MAX_ATTEMPTS: int = 20                 # per-row give-up threshold
+    WECHAT_NOTIFY_RETRY_BACKOFF_MAX_SECONDS: int = 3600  # cap for exponential backoff
 
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20

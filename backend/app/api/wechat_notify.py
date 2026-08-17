@@ -3,6 +3,8 @@ WeChat Notification API endpoints
 Proxies requests to weixin-msg-service for QR binding and message sending.
 """
 import httpx
+from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
@@ -19,6 +21,8 @@ VALID_PREF_KEYS = {
     "todo_assigned",
     "todo_created_notify_manager",
     "todo_submitted",
+    "todo_pending_review",
+    "leave_approval_pending",
     "todo_approved",
     "todo_rejected",
     "todo_reassigned",
@@ -287,3 +291,47 @@ def send_wechat_notification(key: str, text: str) -> bool:
             return resp.status_code == 200 and resp.json().get("ok", False)
     except Exception:
         return False
+
+
+class FlushRequest(BaseModel):
+    user_id: Optional[str] = None       # default: caller's own queue
+    account_id: Optional[str] = None    # alternative: resolve via binding
+
+
+@router.post("/flush", response_model=dict)
+async def flush_pending(
+    data: FlushRequest = FlushRequest(),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Flush queued (offline-buffered) WeChat notifications.
+
+    Called by the WeChat bot whenever it receives any inbound message — that
+    inbound is the signal that the user's push channel (context_token) has been
+    reactivated, so buffered messages can be delivered immediately instead of
+    waiting for the retry worker's interval. Accepts a pat_ agent token.
+
+    Not sensitive: it can only cause already-queued messages to be delivered to
+    their rightful recipients, so any authenticated caller may trigger a flush
+    (worst case is premature delivery of one's own pending messages).
+    """
+    from app.services.wechat_notify_queue import flush_pending_for_user
+
+    target_id = current_user.id
+    if data.account_id:
+        binding = session.exec(
+            select(WeChatNotifyBinding).where(
+                WeChatNotifyBinding.account_id == data.account_id,
+                WeChatNotifyBinding.is_active == True,  # noqa: E712
+            )
+        ).first()
+        if binding:
+            target_id = binding.user_id
+    elif data.user_id:
+        try:
+            target_id = UUID(data.user_id)
+        except (ValueError, TypeError):
+            raise ValidationException("无效的 user_id")
+
+    result = flush_pending_for_user(session, target_id, force=True)
+    return success_response(result)

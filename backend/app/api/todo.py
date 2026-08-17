@@ -1,6 +1,7 @@
 """
 Todo API endpoints
 """
+import logging
 from typing import Optional, Any
 from app.models.base import now_cn
 from uuid import UUID, uuid4
@@ -28,8 +29,12 @@ from app.schemas.todo import (
 from app.api.project import sync_project_progress, VALID_DEV_TYPES
 from app.models.project import Project
 from app.core.storage import save_file, get_file, delete_file, get_download_url
+from app.services.wechat_notify_queue import (
+    send_wechat_text, enqueue_wechat_notification, SendOutcome,
+)
 
 router = APIRouter(prefix="/todo", tags=["Todo"])
+logger = logging.getLogger(__name__)
 TODO_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "todo-images"
 MAX_TODO_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB per image
 
@@ -87,6 +92,8 @@ EVENT_LABELS = {
     "todo_assigned": "新任务分配",
     "todo_created_notify_manager": "下属收到新任务",
     "todo_submitted": "任务提交审核",
+    "todo_pending_review": "任务待审核",
+    "leave_approval_pending": "请假审批待处理",
     "todo_approved": "任务审核通过",
     "todo_rejected": "任务被退回",
     "todo_reassigned": "任务转派",
@@ -123,21 +130,16 @@ def _send_wechat_for_todo(recipient_user_id: UUID, todo: TodoItem, session: Sess
     text = f"📋 {label}\n标题: {todo.title}\n优先级: {todo.priority.value.upper()}\n状态: {todo.status.value}"
     if assignee:
         text += f"\n负责人: {assignee.display_name}"
+    # 单号供"引用回复"定位:外部 bot 从 [引用:...] 块中提取该 UUID 再调 approve/reject。
+    text += f"\n单号: {todo.id}"
 
-    import httpx
-    try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.post(
-                f"{settings.WECHAT_MSG_SERVICE_URL}/api/send",
-                json={"key": binding.msg_service_key, "text": text},
-                headers={"Authorization": f"Bearer {settings.WECHAT_MSG_SERVICE_API_KEY}"}
-                if settings.WECHAT_MSG_SERVICE_API_KEY else {},
-            )
-            status = NotificationStatus.SENT if resp.status_code == 200 else NotificationStatus.FAILED
-            error_msg = None if resp.status_code == 200 else resp.text
-    except Exception as e:
-        status = NotificationStatus.FAILED
-        error_msg = str(e)
+    outcome, error_msg = send_wechat_text(binding.msg_service_key, text)
+    status = NotificationStatus.SENT if outcome is SendOutcome.SENT else NotificationStatus.FAILED
+    if outcome is SendOutcome.CHANNEL_INACTIVE:
+        # 通道未激活(24h 未交互/服务不可达):入离线队列,激活后由 retry worker FIFO 补发。
+        enqueue_wechat_notification(session, recipient_user_id, todo.id, event_type, text, error_msg)
+    elif outcome is SendOutcome.PERMANENT:
+        logger.warning("WeChat push permanent failure (todo=%s, user=%s): %s", todo.id, recipient_user_id, error_msg)
 
     wechat_log = NotificationLog(
         todo_id=todo.id,
@@ -177,6 +179,18 @@ def _notify_user(user_id: UUID, todo: TodoItem, session: Session, event_type: st
     )
     session.add(log)
     _send_wechat_for_todo(user_id, todo, session, event_type)
+
+
+def _notify_reviewer_on_submit(todo: TodoItem, session: Session):
+    """Notify the reviewer that a todo awaits their approval.
+
+    Reviewer = explicit reviewed_by_user_id, else the creator (self-review).
+    Skipped when reviewer == creator to avoid duplicating the creator's own
+    `todo_submitted` notification.
+    """
+    reviewer_id = todo.reviewed_by_user_id or todo.creator_user_id
+    if reviewer_id and reviewer_id != todo.creator_user_id:
+        _notify_user(reviewer_id, todo, session, "todo_pending_review")
 
 
 def _is_direct_manager(manager: User, subordinate: User) -> bool:
@@ -666,6 +680,13 @@ async def create_leave_request(
         )
         session.add(approval_todo)
         session.commit()
+
+        # Notify the manager (reviewer) that a leave approval awaits them (non-critical)
+        try:
+            _notify_user(manager.id, approval_todo, session, "leave_approval_pending")
+            session.commit()
+        except Exception:
+            session.rollback()
 
     return success_response(_enrich_leave(leave, session))
 
@@ -1236,6 +1257,13 @@ async def submit_todo(
         except Exception:
             session.rollback()
 
+        # Notify reviewer that approval is pending (non-critical)
+        try:
+            _notify_reviewer_on_submit(todo, session)
+            session.commit()
+        except Exception:
+            session.rollback()
+
     if todo.source_type == TodoSourceType.PROJECT_TASK and todo.source_id:
         try:
             sync_project_progress(session, UUID(todo.source_id))
@@ -1432,6 +1460,13 @@ async def mark_todo_done(
 
         try:
             _notify_user(todo.creator_user_id, todo, session, "todo_submitted")
+            session.commit()
+        except Exception:
+            session.rollback()
+
+        # Notify reviewer that approval is pending (non-critical)
+        try:
+            _notify_reviewer_on_submit(todo, session)
             session.commit()
         except Exception:
             session.rollback()

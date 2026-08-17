@@ -1,8 +1,9 @@
 """
 Main FastAPI application
 """
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,7 @@ from app.core.exceptions import AtlasException
 from app.core.response import error_response
 from app.api import auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog, wechat_notify
 from app.api.mcp_server import mcp as mcp_server
+from app.services.wechat_notify_queue import wechat_notification_retry_worker
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,15 @@ async def lifespan(app: FastAPI):
             run_alembic_migrations=settings.AUTO_RUN_MIGRATIONS_ON_STARTUP,
         )
     async with mcp_server.session_manager.run():
-        yield
+        # Background worker: replay queued WeChat notifications once the
+        # push channel reactivates (see services/wechat_notify_queue.py).
+        retry_task = asyncio.create_task(wechat_notification_retry_worker())
+        try:
+            yield
+        finally:
+            retry_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await retry_task
 
 
 # Create FastAPI app
