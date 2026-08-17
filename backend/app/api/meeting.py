@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from sqlalchemy import delete
 from sqlmodel import Session, select
 
 from app.core.database import get_session, engine
@@ -702,12 +703,12 @@ async def delete_meeting(
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
-    # Delete transcript segments
-    segments = session.exec(
-        select(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting_id)
-    ).all()
-    for seg in segments:
-        session.delete(seg)
+    # Delete child rows at the database level so MySQL applies the FK-safe order
+    # before deleting the parent meeting record.
+    session.exec(
+        delete(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting_id)
+    )
+    session.flush()
 
     # Delete audio file
     if meeting.audio_stored_name:

@@ -1,21 +1,47 @@
+import asyncio
 from pathlib import Path
 import sys
 from uuid import uuid4
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import models  # noqa: F401
-from app.api.meeting import _attendee_names_from_speakers, _parse_transcript_text, _replace_transcript_segments
+from app.api.meeting import (
+    _attendee_names_from_speakers,
+    _parse_transcript_text,
+    _replace_transcript_segments,
+    delete_meeting,
+)
+from app.models.iam import User, UserStatus
 from app.models.meeting import MeetingRecord, MeetingStatus, MeetingTranscriptSegment, MeetingType
 from app.schemas.meeting import TranscriptBatchUpdate, TranscriptSegmentUpdate
 
 
 def _make_session() -> Session:
     engine = create_engine("sqlite://")
+
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     SQLModel.metadata.create_all(engine)
     return Session(engine)
+
+
+def _add_test_user(session: Session) -> User:
+    user = User(
+        id=uuid4(),
+        display_name="会议测试用户",
+        username=f"meeting_test_{uuid4().hex[:8]}",
+        status=UserStatus.ACTIVE,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 def test_parse_transcript_text_speaker_number_labels():
@@ -92,11 +118,12 @@ def test_parse_transcript_text_without_speaker_labels_keeps_content():
 
 def test_replace_transcript_segments_inserts_deletes_and_reorders():
     with _make_session() as session:
+        user = _add_test_user(session)
         meeting = MeetingRecord(
             title="编辑测试会议",
             meeting_type=MeetingType.MORNING,
             status=MeetingStatus.TRANSCRIBED,
-            created_by=uuid4(),
+            created_by=user.id,
         )
         session.add(meeting)
         session.commit()
@@ -174,3 +201,38 @@ def test_attendees_follow_transcript_speaker_mapping_order():
     })
 
     assert names == ["李四", "张三"]
+
+
+def test_delete_meeting_removes_transcript_segments_before_parent():
+    with _make_session() as session:
+        user = _add_test_user(session)
+        meeting = MeetingRecord(
+            title="删除测试会议",
+            meeting_type=MeetingType.MORNING,
+            status=MeetingStatus.TRANSCRIBED,
+            created_by=user.id,
+        )
+        session.add(meeting)
+        session.commit()
+        session.refresh(meeting)
+
+        session.add(
+            MeetingTranscriptSegment(
+                meeting_id=meeting.id,
+                segment_index=0,
+                speaker_id="speaker_1",
+                start_time=0,
+                end_time=3,
+                content="需要先删除的转录段",
+            )
+        )
+        session.commit()
+
+        response = asyncio.run(delete_meeting(meeting.id, session, current_user=None))
+
+        assert response["data"]["message"] == "会议记录已删除"
+        assert session.get(MeetingRecord, meeting.id) is None
+        rows = session.exec(
+            select(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting.id)
+        ).all()
+        assert rows == []
