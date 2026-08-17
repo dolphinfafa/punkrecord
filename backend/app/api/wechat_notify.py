@@ -338,7 +338,7 @@ async def wechat_inbound(
     if not user:
         return success_response({"reply": ""})
 
-    reply = handle_wechat_inbound(session, user, binding, data.text)
+    reply = await handle_wechat_inbound(session, user, binding, data.text)
     return success_response({"reply": reply})
 
 

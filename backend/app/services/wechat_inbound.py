@@ -10,7 +10,12 @@ weixin-msg-service 收到用户在微信里发来的消息后,转发到
   3. 其余自由消息 → LiteLLM 对话兜底。
 
 入站本身即"通道激活"信号,顺带触发该用户离线队列补发。
+
+注意:本模块运行在后端自己的事件循环里,且会调用本系统自身 REST
+(自调用)。所有 HTTP 必须用 AsyncClient —— 在 async 端点里用同步
+httpx 调自己会死锁事件循环(等不到响应直至超时)。
 """
+import asyncio
 import logging
 import re
 from typing import Optional
@@ -23,11 +28,7 @@ from app.core.config import settings
 from app.core.security import create_access_token
 from app.models.iam import User
 from app.models.shared import WeChatNotifyBinding
-from app.services.wechat_notify_queue import (
-    SendOutcome,
-    flush_pending_for_user,
-    send_wechat_text,
-)
+from app.services.wechat_notify_queue import SendOutcome, send_wechat_text
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +86,13 @@ def parse_quote_command(text: str) -> Optional[dict]:
 
 
 # ─── 以绑定用户身份调用本系统 REST(铸造短时 JWT,完整复用权限逻辑) ─────────
+# 必须异步:这是进程对自身的 HTTP 调用。
 
-def _internal_call(user: User, method: str, path: str, json_body: Optional[dict] = None) -> dict:
+async def _internal_call(user: User, method: str, path: str, json_body: Optional[dict] = None) -> dict:
     token = create_access_token({"sub": str(user.id)})
     url = f"{settings.INTERNAL_API_BASE_URL.rstrip('/')}{path}"
-    with httpx.Client(timeout=30.0, verify=False) as client:
-        resp = client.request(
+    async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+        resp = await client.request(
             method, url,
             json=json_body,
             headers={"Authorization": f"Bearer {token}"},
@@ -106,13 +108,13 @@ def _internal_call(user: User, method: str, path: str, json_body: Optional[dict]
 
 # ─── 各类处理 ────────────────────────────────────────────────────────────────
 
-def _exec_approval(user: User, cmd: dict) -> str:
+async def _exec_approval(user: User, cmd: dict) -> str:
     todo_id = cmd["todo_id"]
     try:
         if cmd["action"] == "approve":
-            data = _internal_call(user, "POST", f"/todo/{todo_id}/approve", {"comment": None})
+            data = await _internal_call(user, "POST", f"/todo/{todo_id}/approve", {"comment": None})
         else:
-            data = _internal_call(user, "POST", f"/todo/{todo_id}/reject", {"comment": cmd["comment"]})
+            data = await _internal_call(user, "POST", f"/todo/{todo_id}/reject", {"comment": cmd["comment"]})
     except Exception as e:  # noqa: BLE001
         return f"❌ {('通过' if cmd['action'] == 'approve' else '拒绝')}失败:{e}"
     title = (data or {}).get("title") or todo_id[:8]
@@ -131,12 +133,13 @@ def _wants_todo_list(text: str) -> bool:
         return False
     return any(h in lowered for h in _TODO_LIST_HINTS)
 
+
 _ACTIVE_STATUSES = ("open", "in_progress", "pending_review", "blocked")
 
 
-def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
+async def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
     try:
-        data = _internal_call(user, "GET", "/todo/my?page_size=50")
+        data = await _internal_call(user, "GET", "/todo/my?page_size=50")
         items = (data or {}).get("items") or []
     except Exception as e:  # noqa: BLE001
         return f"❌ 查询待办失败:{e}"
@@ -152,7 +155,8 @@ def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
             f"📋 待办\n标题: {t['title']}\n优先级: {(t.get('priority') or '').upper()}"
             f"\n状态: {t.get('status')}{due}\n单号: {t['id']}"
         )
-        outcome, err = send_wechat_text(binding.msg_service_key, msg)
+        # send_wechat_text 是同步的(发往 msg-service,非自调用),放线程池避免阻塞事件循环
+        outcome, err = await asyncio.to_thread(send_wechat_text, binding.msg_service_key, msg)
         if outcome is SendOutcome.SENT:
             sent += 1
         else:
@@ -170,10 +174,10 @@ _LLM_SYSTEM = (
 )
 
 
-def _llm_reply(user: User, text: str) -> str:
+async def _llm_reply(user: User, text: str) -> str:
     try:
-        with httpx.Client(timeout=60.0, verify=False) as client:
-            resp = client.post(
+        async with httpx.AsyncClient(timeout=60.0, verify=False) as client:
+            resp = await client.post(
                 f"{settings.LITELLM_BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {settings.LITELLM_API_KEY}"},
                 json={
@@ -193,11 +197,12 @@ def _llm_reply(user: User, text: str) -> str:
 
 # ─── 入口 ────────────────────────────────────────────────────────────────────
 
-def handle_wechat_inbound(session: Session, user: User, binding: WeChatNotifyBinding, text: str) -> str:
+async def handle_wechat_inbound(session: Session, user: User, binding: WeChatNotifyBinding, text: str) -> str:
     """处理一条入站消息,返回回复文本(空串=不回复)。"""
-    # 来信即激活信号:顺手补发离线队列(尽力而为)
+    # 来信即激活信号:顺手补发离线队列(同步 DB+HTTP,放线程池;尽力而为)
+    from app.services.wechat_notify_queue import flush_pending_for_user
     try:
-        flush_pending_for_user(session, UUID(str(user.id)), force=True)
+        await asyncio.to_thread(flush_pending_for_user, session, UUID(str(user.id)), True)
     except Exception:  # noqa: BLE001
         logger.exception("inbound flush failed (user=%s)", user.id)
 
@@ -207,9 +212,9 @@ def handle_wechat_inbound(session: Session, user: User, binding: WeChatNotifyBin
 
     cmd = parse_quote_command(text)
     if cmd:
-        return _exec_approval(user, cmd)
+        return await _exec_approval(user, cmd)
 
     if _wants_todo_list(text):
-        return _send_todo_list(user, binding)
+        return await _send_todo_list(user, binding)
 
-    return _llm_reply(user, text)
+    return await _llm_reply(user, text)
