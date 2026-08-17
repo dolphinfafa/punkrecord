@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     WECHAT_NOTIFY_RETRY_INTERVAL_SECONDS: int = 300      # worker sleep between cycles
     WECHAT_NOTIFY_MAX_ATTEMPTS: int = 20                 # per-row give-up threshold
     WECHAT_NOTIFY_RETRY_BACKOFF_MAX_SECONDS: int = 3600  # cap for exponential backoff
+    # Shared secret between weixin-msg-service and POST /wechat-notify/inbound
+    WECHAT_INBOUND_SECRET: Optional[str] = None
 
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20

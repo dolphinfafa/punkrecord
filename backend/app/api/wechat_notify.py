@@ -6,7 +6,7 @@ import httpx
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlmodel import Session, select
 from app.core.database import get_session
 from app.core.auth import get_current_user
@@ -296,6 +296,50 @@ def send_wechat_notification(key: str, text: str) -> bool:
 class FlushRequest(BaseModel):
     user_id: Optional[str] = None       # default: caller's own queue
     account_id: Optional[str] = None    # alternative: resolve via binding
+
+
+class InboundMessage(BaseModel):
+    """weixin-msg-service 转发来的入站微信消息。"""
+    account_id: str                     # msg-service 侧的机器人账号 ID → 定位绑定
+    text: str
+    conversation_id: Optional[str] = None
+
+
+@router.post("/inbound", response_model=dict)
+async def wechat_inbound(
+    data: InboundMessage,
+    x_inbound_secret: Optional[str] = Header(default=None),
+    session: Session = Depends(get_session),
+):
+    """接收 msg-service 转发的入站消息,理解并执行,返回回复文本。
+
+    服务器间接口:用 WECHAT_INBOUND_SECRET 共享密钥鉴权(配置后必填)。
+    处理逻辑见 app/services/wechat_inbound.py:
+    引用+通过/拒绝 → 审批;"待办" → 逐条推送待办;其余 → LiteLLM 对话。
+    """
+    if settings.WECHAT_INBOUND_SECRET and x_inbound_secret != settings.WECHAT_INBOUND_SECRET:
+        from app.core.exceptions import UnauthorizedException
+        raise UnauthorizedException("Invalid inbound secret")
+
+    from app.services.wechat_inbound import handle_wechat_inbound
+    from app.models.iam import User
+
+    binding = session.exec(
+        select(WeChatNotifyBinding).where(
+            WeChatNotifyBinding.account_id == data.account_id,
+            WeChatNotifyBinding.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if not binding:
+        # 该微信账号没绑定任何 punkrecord 用户:静默
+        return success_response({"reply": ""})
+
+    user = session.get(User, binding.user_id)
+    if not user:
+        return success_response({"reply": ""})
+
+    reply = handle_wechat_inbound(session, user, binding, data.text)
+    return success_response({"reply": reply})
 
 
 @router.post("/flush", response_model=dict)
