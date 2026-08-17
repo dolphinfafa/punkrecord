@@ -86,8 +86,8 @@
 
 | 模型 | 说明 |
 |------|------|
-| `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID、会议日期、参会人员） |
-| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；无时间码文稿导入时 `start_time`/`end_time` 可为空 |
+| `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID、会议日期、参会人员）。v2.0.7 起 `attendees` 由当前转写分段实际使用的 `speaker_id` 结合 `speaker_mapping` 自动派生，Web 前端不再手动维护 |
+| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；无时间码文稿导入时 `start_time`/`end_time` 可为空。v2.0.7 起支持通过完整分段列表保存来新增、插入、删除和重排分段，不新增数据库字段 |
 
 ### 共享模块（Shared）- 版本日志
 
@@ -97,4 +97,4 @@
 
 ---
 
-*最后更新：2026-07-22*
+*最后更新：2026-08-17*

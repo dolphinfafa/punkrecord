@@ -69,7 +69,7 @@
 | 页面/组件 | 说明 |
 |-----------|------|
 | `MeetingListPage.jsx` | 会议表格 + 搜索框（标题/参会人）+ 会议日期列 + 参会人副文本 + 创建会议按钮 |
-| `MeetingDetailPage.jsx` | 音频播放 + 文稿编辑 + 说话人映射 + 单条 speaker 下拉切换 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 重新转写 + 上传/替换 Word/PDF 文稿 + 归档 |
+| `MeetingDetailPage.jsx` | 音频播放 + 转写稿编辑 + 新增讲话人 + 插入/删除转写行 + 说话人映射 + 单条 speaker 下拉切换 + 参会人员自动跟随转写稿说话人 + 预设/自定义提示词（选预设追加到自定义框，不覆盖）+ 引用上次会议 + AI 总结 + 参会人/日期显示 + 重新转写 + 上传/替换 Word/PDF 文稿 + 归档 |
 | `components/UploadAudioModal.jsx` | 创建会议弹窗，支持空白创建、上传音频、上传 Word/PDF 文稿三种导入方式 |
 
 ### API 模块（`api/`）
@@ -238,6 +238,14 @@
 | `api/meeting.js` | 新增 `uploadTranscript(id, file)` |
 | `App.jsx` | 07-15 追加兼容开发子路径：访问 `/punkrecord/` 时自动使用 `/punkrecord` 作为 Router basename，避免开发环境白屏 |
 
+### v2.0.7 版本变更的页面/组件
+
+| 页面/组件 | 变更说明 |
+|-----------|----------|
+| `pages/meeting/MeetingDetailPage.jsx` | 转写稿编辑增强：文本修改直接写入本地分段草稿；支持新增讲话人、每行上方/下方插入、删除行、切换 speaker；保存时用 `replace=true` 提交完整分段列表，后端返回最新分段 ID 和会议详情 |
+| `pages/meeting/MeetingDetailPage.jsx` | 移除无音频会议的手动参会人员编辑区；参会人员展示改为后端根据转写稿实际 speaker 自动同步 |
+| `pages/meeting/MeetingDetailPage.css` | 新增 speaker 添加按钮、转写行插入/删除图标按钮和移动端换行布局 |
+
 ---
 
-*最后更新：2026-07-15*
+*最后更新：2026-08-17*

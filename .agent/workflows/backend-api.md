@@ -218,18 +218,24 @@
 | POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
 | POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；音频会统一归一化为 16k 单声道 mp3。大文件/长音频按大小或 45 分钟时长切片，切片间保留 12 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
 | POST | `/api/v1/meeting/records/{id}/retranscribe` | meeting.write | 对已有音频重新转写；新 ASR 成功后才替换旧分段，失败时保留旧转写 |
-| POST | `/api/v1/meeting/records/{id}/upload-transcript` | meeting.write | 上传已识别好的 Word `.docx` 或 PDF 文稿（最大 20MB）并导入转写分段；支持 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容`、带时间码格式，以及 `讲话人1  00:20` 后下一行跟正文的录音文稿格式；导入成功会替换旧分段、更新说话人映射、清空旧纪要并置为 transcribed |
-| PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表 |
+| POST | `/api/v1/meeting/records/{id}/upload-transcript` | meeting.write | 上传已识别好的 Word `.docx` 或 PDF 文稿（最大 20MB）并导入转写分段；支持 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容`、带时间码格式，以及 `讲话人1  00:20` 后下一行跟正文的录音文稿格式；导入成功会替换旧分段、更新说话人映射、自动同步参会人员、清空旧纪要并置为 transcribed |
+| PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表（兼容旧客户端；Web 前端 v2.0.7 起不再手动编辑参会人员，改由转写分段实际使用的说话人自动同步） |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
 | DELETE | `/api/v1/meeting/records/{id}` | meeting.write | 删除会议 |
 | GET | `/api/v1/meeting/records/{id}/status` | meeting.read | 轮询 ASR 状态 |
 | GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
-| PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人（支持 `speaker_id`） |
-| PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射 |
+| PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人。默认兼容旧模式（仅更新已有分段）；传 `replace=true` 时按提交的完整 `segments` 列表整体替换，支持新增分段、插入行、删除行和重排 `segment_index`，保存后返回最新分段列表和会议详情，并自动同步参会人员 |
+| PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射；保存后按当前转写分段实际使用的 `speaker_id` 自动同步参会人员 |
 | POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要）。**仅当 LLM 实际产出内容才落库并置 SUMMARIZED；为空/失败时不改状态、不存空总结，SSE 返回 error**（避免"已总结但空"） |
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
+
+**会议转写编辑规则（v2.0.7，2026-08-17）**：
+- 前端编辑转写文本、新增讲话人、切换说话人、插入/删除行后，统一通过 `PATCH /transcript` 的 `replace=true` 模式保存完整分段列表。
+- `TranscriptSegmentUpdate.id` 允许为空或临时字符串；后端仅当其为有效 UUID 且属于当前会议时更新原分段，否则创建新分段，避免前端插入行触发 422。
+- `MeetingRecord.attendees` 不再作为 Web 前端的手动输入来源；后端会根据保存后的分段顺序收集实际使用的 `speaker_id`，再用 `speaker_mapping` 转成显示名并去重，写回参会人员。
+- 本版本不新增数据库字段，不需要 Alembic 迁移。
 
 ### 版本更新日志（Changelog）
 
@@ -271,4 +277,4 @@
 
 ---
 
-*最后更新：2026-07-22*
+*最后更新：2026-08-17*

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
-    APP_VERSION: str = "2.0.6"
+    APP_VERSION: str = "2.0.7"
     APP_ENV: str = "development"
     DEBUG: bool = False
     

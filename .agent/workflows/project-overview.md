@@ -40,7 +40,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | Finance | 账户、交易、发票、报销、实时余额 |
 | Beli | 积分激励体系、规则引擎、自动结算 |
 | KB (企业大脑) | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
-| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、重新转写、Word/PDF 文稿导入、说话人标注/切换、会议日期、参会人自动提取、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
+| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、重新转写、Word/PDF 文稿导入、转写稿编辑、插入/删除分段、新增讲话人、说话人标注/切换、会议日期、参会人自动同步、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
 
 平台提供三个客户端：Web 管理后台、微信小程序（移动端）、RESTful API。
 
@@ -309,8 +309,8 @@ KB 模块（企业大脑）
   +-- KBMessage            对话消息（用户/助手、引用信息）
 
 Meeting 模块（会议记录）
-  +-- MeetingRecord        会议主表（音频、ASR/导入状态、说话人映射、AI纪要、会议日期、参会人员）
-  +-- MeetingTranscriptSegment  转写分段（说话人、时间、文本；可来自 ASR 或 Word/PDF 文稿导入）
+  +-- MeetingRecord        会议主表（音频、ASR/导入状态、说话人映射、AI纪要、会议日期、参会人员；attendees 由转写分段 speaker 自动同步）
+  +-- MeetingTranscriptSegment  转写分段（说话人、时间、文本；可来自 ASR 或 Word/PDF 文稿导入，可通过完整列表保存进行新增/插入/删除/重排）
 ```
 
 ### 5.3 核心模型字段详情
@@ -726,6 +726,7 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要 |
 | 会议重新转写 | `POST /api/v1/meeting/records/{id}/retranscribe` | 对已有音频重新触发豆包 ASR，成功后替换旧分段 |
 | 会议文稿导入 | `POST /api/v1/meeting/records/{id}/upload-transcript` | 解析 Word `.docx` / PDF 中的说话人文稿，生成会议转写分段 |
+| 会议转写编辑 | `PATCH /api/v1/meeting/records/{id}/transcript` | `replace=true` 时按完整分段列表保存，支持新增讲话人、插入/删除分段和自动同步参会人员 |
 | 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
 **AI 技术栈**：LiteLLM 代理（统一调用 Gemini 等模型） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
@@ -760,4 +761,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-07-15*
+*最后更新：2026-08-17*

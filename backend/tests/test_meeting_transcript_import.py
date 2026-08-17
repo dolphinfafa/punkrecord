@@ -1,9 +1,21 @@
 from pathlib import Path
 import sys
+from uuid import uuid4
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app.api.meeting import _parse_transcript_text
+from sqlmodel import Session, SQLModel, create_engine, select
+
+from app import models  # noqa: F401
+from app.api.meeting import _attendee_names_from_speakers, _parse_transcript_text, _replace_transcript_segments
+from app.models.meeting import MeetingRecord, MeetingStatus, MeetingTranscriptSegment, MeetingType
+from app.schemas.meeting import TranscriptBatchUpdate, TranscriptSegmentUpdate
+
+
+def _make_session() -> Session:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+    return Session(engine)
 
 
 def test_parse_transcript_text_speaker_number_labels():
@@ -76,3 +88,89 @@ def test_parse_transcript_text_without_speaker_labels_keeps_content():
     assert len(segments) == 1
     assert segments[0]["speaker_id"] == "speaker_1"
     assert segments[0]["content"] == "这是已经整理好的会议记录，没有说话人标签。"
+
+
+def test_replace_transcript_segments_inserts_deletes_and_reorders():
+    with _make_session() as session:
+        meeting = MeetingRecord(
+            title="编辑测试会议",
+            meeting_type=MeetingType.MORNING,
+            status=MeetingStatus.TRANSCRIBED,
+            created_by=uuid4(),
+        )
+        session.add(meeting)
+        session.commit()
+        session.refresh(meeting)
+
+        first = MeetingTranscriptSegment(
+            meeting_id=meeting.id,
+            segment_index=0,
+            speaker_id="speaker_1",
+            start_time=0,
+            end_time=3,
+            content="第一段",
+        )
+        second = MeetingTranscriptSegment(
+            meeting_id=meeting.id,
+            segment_index=1,
+            speaker_id="speaker_2",
+            start_time=3,
+            end_time=6,
+            content="第二段",
+        )
+        session.add(first)
+        session.add(second)
+        session.commit()
+        session.refresh(first)
+
+        payload = TranscriptBatchUpdate(
+            replace=True,
+            segments=[
+                TranscriptSegmentUpdate(id=first.id, speaker_id="speaker_2", start_time=0, end_time=3, content="第一段改后"),
+                TranscriptSegmentUpdate(id="draft-row-1", speaker_id="speaker_3", start_time=3, end_time=5, content="插入的新段"),
+            ],
+        )
+
+        _replace_transcript_segments(meeting.id, payload, session)
+        session.commit()
+
+        rows = session.exec(
+            select(MeetingTranscriptSegment)
+            .where(MeetingTranscriptSegment.meeting_id == meeting.id)
+            .order_by(MeetingTranscriptSegment.segment_index)
+        ).all()
+
+    assert [row.segment_index for row in rows] == [0, 1]
+    assert [row.content for row in rows] == ["第一段改后", "插入的新段"]
+    assert [row.speaker_id for row in rows] == ["speaker_2", "speaker_3"]
+
+
+def test_attendees_follow_transcript_speaker_mapping_order():
+    meeting_id = uuid4()
+    segments = [
+        MeetingTranscriptSegment(
+            meeting_id=meeting_id,
+            segment_index=0,
+            speaker_id="speaker_2",
+            content="先说话",
+        ),
+        MeetingTranscriptSegment(
+            meeting_id=meeting_id,
+            segment_index=1,
+            speaker_id="speaker_1",
+            content="后说话",
+        ),
+        MeetingTranscriptSegment(
+            meeting_id=meeting_id,
+            segment_index=2,
+            speaker_id="speaker_2",
+            content="重复讲话人不重复记录",
+        ),
+    ]
+
+    names = _attendee_names_from_speakers(segments, {
+        "speaker_1": "张三",
+        "speaker_2": "李四",
+    })
+
+    assert names == ["李四", "张三"]

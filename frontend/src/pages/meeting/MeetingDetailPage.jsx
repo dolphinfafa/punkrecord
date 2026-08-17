@@ -6,7 +6,8 @@ import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Loader2, Save, Users, Brain, Archive,
-    Play, Square, Check, AlertCircle, ExternalLink, X, Upload, RefreshCw, FileText
+    Play, Square, Check, AlertCircle, ExternalLink, X, Upload, RefreshCw, FileText,
+    Plus, Trash2, UserPlus, CornerDownRight, CornerUpRight
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 
@@ -52,6 +53,17 @@ const PRESET_PROMPTS = [
     { value: '请用简洁的要点列表格式生成纪要，不需要长段落描述。', label: '简洁要点' },
 ];
 
+const DEFAULT_SPEAKER_ID = 'speaker_1';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getApiErrorMessage(err, fallback = '操作失败') {
+    const detail = err?.response?.data?.detail;
+    if (Array.isArray(detail) && detail.length > 0) {
+        return detail.map((item) => item.msg || JSON.stringify(item)).join('；');
+    }
+    return err?.response?.data?.message || err?.message || fallback;
+}
+
 function getSpeakerColor(speakerId, speakerIds) {
     const idx = speakerIds.indexOf(speakerId);
     return SPEAKER_COLORS[idx >= 0 ? idx % SPEAKER_COLORS.length : 0];
@@ -81,13 +93,13 @@ export default function MeetingDetailPage() {
 
     // Transcript
     const [segments, setSegments] = useState([]);
-    const [editedSegments, setEditedSegments] = useState({});
     const [speakerMapping, setSpeakerMapping] = useState({});
+    const [transcriptChanged, setTranscriptChanged] = useState(false);
+    const [speakerMappingDirty, setSpeakerMappingDirty] = useState(false);
     const [savingTranscript, setSavingTranscript] = useState(false);
     const [savingSpeakers, setSavingSpeakers] = useState(false);
 
     // Speaker edit
-    const [editedSpeakers, setEditedSpeakers] = useState({});
     const [speakerDropdownIndex, setSpeakerDropdownIndex] = useState(null);
 
     // Previous meeting search
@@ -111,37 +123,42 @@ export default function MeetingDetailPage() {
     const [uploadingTranscript, setUploadingTranscript] = useState(false);
     const [retranscribing, setRetranscribing] = useState(false);
 
-    // Attendees (for meetings without audio)
-    const [attendeesInput, setAttendeesInput] = useState('');
-
     // Polling
     const pollingRef = useRef(null);
 
-    // Extract unique speaker IDs from segments (stable order)
+    // Extract unique speaker IDs from segments and mappings (stable order)
     const speakerIds = useMemo(() => {
         const seen = new Set();
         const ids = [];
         for (const seg of segments) {
-            const sid = seg.speaker_id || seg.speaker || '';
+            const sid = seg.speaker_id || seg.speaker || DEFAULT_SPEAKER_ID;
             if (sid && !seen.has(sid)) {
                 seen.add(sid);
                 ids.push(sid);
             }
         }
-        return ids;
-    }, [segments]);
+        for (const sid of Object.keys(speakerMapping || {})) {
+            if (sid && !seen.has(sid)) {
+                seen.add(sid);
+                ids.push(sid);
+            }
+        }
+        return ids.length ? ids : [DEFAULT_SPEAKER_ID];
+    }, [segments, speakerMapping]);
 
     // Initialize speaker mapping for new speaker IDs
     useEffect(() => {
         if (speakerIds.length > 0) {
             setSpeakerMapping(prev => {
                 const updated = { ...prev };
+                let changed = false;
                 for (const sid of speakerIds) {
                     if (!(sid in updated)) {
                         updated[sid] = '';
+                        changed = true;
                     }
                 }
-                return updated;
+                return changed ? updated : prev;
             });
         }
     }, [speakerIds]);
@@ -161,14 +178,12 @@ export default function MeetingDetailPage() {
             const data = response.data;
             setMeeting(data);
 
-            if (data.attendees && data.attendees.length > 0) {
-                setAttendeesInput(data.attendees.join('，'));
-            }
             if (data.summary) {
                 setSummary(data.summary);
             }
             if (data.speaker_mapping && Object.keys(data.speaker_mapping).length > 0) {
                 setSpeakerMapping(prev => ({ ...prev, ...data.speaker_mapping }));
+                setSpeakerMappingDirty(false);
             }
             if (data.archived_document_id) {
                 setArchiveResult({ doc_id: data.archived_document_id });
@@ -186,6 +201,7 @@ export default function MeetingDetailPage() {
             const response = await meetingApi.getTranscript(id);
             const data = response.data;
             setSegments(Array.isArray(data) ? data : (data?.segments || []));
+            setTranscriptChanged(false);
         } catch (err) {
             console.error('Error loading transcript:', err);
         }
@@ -323,39 +339,118 @@ export default function MeetingDetailPage() {
         }
     };
 
+    const normalizeSegmentOrder = (items) => items.map((item, idx) => ({
+        ...item,
+        segment_index: idx,
+    }));
+
+    const createDraftSegment = (speakerId = DEFAULT_SPEAKER_ID, startTime = 0, endTime = startTime) => ({
+        _client_id: `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        meeting_id: id,
+        segment_index: 0,
+        speaker_id: speakerId,
+        start_time: startTime,
+        end_time: endTime,
+        content: '',
+    });
+
+    const getNextSpeakerId = () => {
+        const used = new Set(speakerIds);
+        const maxNum = speakerIds.reduce((max, sid) => {
+            const match = /^speaker_(\d+)$/.exec(sid);
+            return match ? Math.max(max, Number(match[1])) : max;
+        }, 0);
+        let next = Math.max(maxNum + 1, speakerIds.length + 1);
+        while (used.has(`speaker_${next}`)) next += 1;
+        return `speaker_${next}`;
+    };
+
     const handleSegmentEdit = (index, newText) => {
-        setEditedSegments(prev => ({ ...prev, [index]: newText }));
+        setSegments(prev => prev.map((seg, idx) => (
+            idx === index ? { ...seg, content: newText } : seg
+        )));
+        setTranscriptChanged(true);
+    };
+
+    const handleSegmentSpeakerChange = (index, speakerId) => {
+        setSegments(prev => prev.map((seg, idx) => (
+            idx === index ? { ...seg, speaker_id: speakerId } : seg
+        )));
+        setSpeakerDropdownIndex(null);
+        setTranscriptChanged(true);
+    };
+
+    const handleAddSpeaker = () => {
+        const nextSpeakerId = getNextSpeakerId();
+        const nextLabel = `讲话人${nextSpeakerId.replace('speaker_', '')}`;
+        setSpeakerMapping(prev => ({ ...prev, [nextSpeakerId]: nextLabel }));
+        setSpeakerMappingDirty(true);
+    };
+
+    const handleInsertSegment = (index, position = 'after') => {
+        stopSegmentPlayback();
+        const anchor = segments[index];
+        const insertAt = position === 'before' ? index : index + 1;
+        const speakerId = anchor?.speaker_id || speakerIds[0] || DEFAULT_SPEAKER_ID;
+        const baseTime = position === 'before'
+            ? (anchor?.start_time ?? anchor?.start ?? 0)
+            : (anchor?.end_time ?? anchor?.end ?? anchor?.start_time ?? anchor?.start ?? 0);
+        const draft = createDraftSegment(speakerId, baseTime, baseTime);
+        setSegments(prev => normalizeSegmentOrder([
+            ...prev.slice(0, insertAt),
+            draft,
+            ...prev.slice(insertAt),
+        ]));
+        setSpeakerDropdownIndex(null);
+        setTranscriptChanged(true);
+    };
+
+    const handleAppendSegment = () => {
+        stopSegmentPlayback();
+        const last = segments[segments.length - 1];
+        const baseTime = last?.end_time ?? last?.end ?? last?.start_time ?? last?.start ?? 0;
+        const speakerId = last?.speaker_id || speakerIds[0] || DEFAULT_SPEAKER_ID;
+        setSegments(prev => normalizeSegmentOrder([
+            ...prev,
+            createDraftSegment(speakerId, baseTime, baseTime),
+        ]));
+        setTranscriptChanged(true);
+    };
+
+    const handleDeleteSegment = (index) => {
+        stopSegmentPlayback();
+        setSegments(prev => normalizeSegmentOrder(prev.filter((_, idx) => idx !== index)));
+        setSpeakerDropdownIndex(null);
+        setTranscriptChanged(true);
     };
 
     const handleSaveTranscript = async () => {
         try {
             setSavingTranscript(true);
-            const updatePayload = [];
-            const updatedSegments = segments.map((seg, idx) => {
-                const hasContentEdit = editedSegments[idx] !== undefined;
-                const hasSpeakerEdit = editedSpeakers[idx] !== undefined;
-                if (hasContentEdit || hasSpeakerEdit) {
-                    const entry = {
-                        id: seg.id,
-                        content: hasContentEdit ? editedSegments[idx] : seg.content,
-                    };
-                    if (hasSpeakerEdit) entry.speaker_id = editedSpeakers[idx];
-                    updatePayload.push(entry);
-                    return {
-                        ...seg,
-                        content: hasContentEdit ? editedSegments[idx] : seg.content,
-                        speaker_id: hasSpeakerEdit ? editedSpeakers[idx] : seg.speaker_id,
-                    };
-                }
-                return seg;
+            const payload = segments.map((seg, idx) => {
+                const startTime = Number(seg.start_time ?? seg.start ?? 0) || 0;
+                const endTime = Number(seg.end_time ?? seg.end ?? startTime) || startTime;
+                return {
+                    ...(seg.id && UUID_RE.test(String(seg.id)) ? { id: seg.id } : {}),
+                    content: seg.content || '',
+                    speaker_id: seg.speaker_id || DEFAULT_SPEAKER_ID,
+                    start_time: startTime,
+                    end_time: endTime,
+                    segment_index: idx,
+                };
             });
-            await meetingApi.updateTranscript(id, { segments: updatePayload });
-            setSegments(updatedSegments);
-            setEditedSegments({});
-            setEditedSpeakers({});
+            const response = await meetingApi.updateTranscript(id, { replace: true, segments: payload });
+            if (response.data?.meeting && !speakerMappingDirty) setMeeting(response.data.meeting);
+            if (speakerMappingDirty) {
+                const speakerResponse = await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
+                if (speakerResponse.data) setMeeting(speakerResponse.data);
+                setSpeakerMappingDirty(false);
+            }
+            setSegments(response.data?.segments || normalizeSegmentOrder(segments));
+            setTranscriptChanged(false);
             alert('转录文本已保存');
         } catch (err) {
-            alert(err.message || '保存失败');
+            alert(getApiErrorMessage(err, '保存失败'));
         } finally {
             setSavingTranscript(false);
         }
@@ -364,10 +459,12 @@ export default function MeetingDetailPage() {
     const handleSaveSpeakers = async () => {
         try {
             setSavingSpeakers(true);
-            await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
+            const response = await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
+            if (response.data) setMeeting(response.data);
+            setSpeakerMappingDirty(false);
             setSavingSpeakers(false);
         } catch (err) {
-            alert(err.message || '保存失败');
+            alert(getApiErrorMessage(err, '保存失败'));
             setSavingSpeakers(false);
         }
     };
@@ -469,8 +566,9 @@ export default function MeetingDetailPage() {
             setRetranscribing(true);
             const response = await meetingApi.retranscribe(id);
             setMeeting(response.data);
-            setEditedSegments({});
-            setEditedSpeakers({});
+            setSegments([]);
+            setTranscriptChanged(false);
+            setSpeakerDropdownIndex(null);
             alert('已开始重新转写，请稍后查看结果');
         } catch (err) {
             alert(err.response?.data?.message || err.message || '重新转写失败');
@@ -488,8 +586,9 @@ export default function MeetingDetailPage() {
             if (nextMeeting) setMeeting(nextMeeting);
             await loadTranscript();
             await loadMeeting();
-            setEditedSegments({});
-            setEditedSpeakers({});
+            setTranscriptChanged(false);
+            setSpeakerMappingDirty(false);
+            setSpeakerDropdownIndex(null);
             alert(`文稿已导入，共 ${response.data?.segments || 0} 段`);
         } catch (err) {
             alert(err.response?.data?.message || err.message || '上传文稿失败');
@@ -536,7 +635,7 @@ export default function MeetingDetailPage() {
         return () => document.removeEventListener('mousedown', handleClick);
     }, [showPrevMeetingDropdown]);
 
-    const hasEdits = Object.keys(editedSegments).length > 0 || Object.keys(editedSpeakers).length > 0;
+    const hasEdits = transcriptChanged || speakerMappingDirty;
 
     if (loading) {
         return (
@@ -707,52 +806,20 @@ export default function MeetingDetailPage() {
                 )}
             </div>
 
-            {/* Section 1b: Attendees (for meetings without transcript from audio) */}
-            {!hasAudio && !isProcessing && (
-                <div className="detail-section" style={{ padding: '16px 24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <Users size={16} />
-                        <h2 className="section-title" style={{ margin: 0 }}>参会人员</h2>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input
-                            type="text"
-                            value={attendeesInput}
-                            onChange={(e) => setAttendeesInput(e.target.value)}
-                            placeholder="输入参会人员姓名，用逗号分隔（如：张三,李四,王五）"
-                            style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem' }}
-                        />
-                        <button
-                            className="btn btn-primary btn-sm"
-                            onClick={async () => {
-                                const names = attendeesInput.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-                                if (!names.length) return;
-                                try {
-                                    await meetingApi.updateAttendees(id, names);
-                                    const res = await meetingApi.getMeeting(id);
-                                    setMeeting(res.data);
-                                } catch (err) {
-                                    alert(err?.response?.data?.message || '保存失败');
-                                }
-                            }}
-                        >
-                            <Save size={14} /> 保存
-                        </button>
-                    </div>
-                    {meeting.attendees && meeting.attendees.length > 0 && (
-                        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '0.85rem' }}>
-                            已保存: {meeting.attendees.join('、')}
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Section 2: Transcript Editor */}
             {hasTranscript && (
                 <div className="detail-section transcript-section">
                     <div className="section-header">
                         <h2 className="section-title">转录文本</h2>
                         <div className="section-actions">
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={handleAppendSegment}
+                                disabled={savingTranscript}
+                            >
+                                <Plus size={16} />
+                                添加行
+                            </button>
                             {hasEdits && (
                                 <button
                                     className="btn btn-primary btn-sm"
@@ -774,6 +841,15 @@ export default function MeetingDetailPage() {
                                 <span>说话人识别</span>
                                 {savingSpeakers && <Loader2 size={14} className="spin" />}
                                 {!savingSpeakers && <span className="speaker-hint">输入姓名后失焦或回车保存</span>}
+                                <button
+                                    type="button"
+                                    className="speaker-add-btn"
+                                    onClick={handleAddSpeaker}
+                                    disabled={savingSpeakers}
+                                >
+                                    <UserPlus size={14} />
+                                    新增讲话人
+                                </button>
                             </div>
                             <div className="speaker-mapping-grid">
                                 {speakerIds.map((sid) => {
@@ -787,12 +863,13 @@ export default function MeetingDetailPage() {
                                             <input
                                                 type="text"
                                                 value={speakerMapping[sid] || ''}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
                                                     setSpeakerMapping(prev => ({
                                                         ...prev,
                                                         [sid]: e.target.value
-                                                    }))
-                                                }
+                                                    }));
+                                                    setSpeakerMappingDirty(true);
+                                                }}
                                                 onKeyDown={handleSpeakerKeyDown}
                                                 onBlur={handleSaveSpeakers}
                                                 className="speaker-name-input"
@@ -818,7 +895,7 @@ export default function MeetingDetailPage() {
                                 const segmentEnd = segment.end_time ?? segment.end ?? segmentStart;
                                 return (
                                     <div
-                                        key={index}
+                                        key={segment.id || segment._client_id || index}
                                         className="segment-item"
                                         style={{ borderLeft: `3px solid ${sc.border}` }}
                                     >
@@ -833,7 +910,7 @@ export default function MeetingDetailPage() {
                                                     }}
                                                     title="点击切换说话人"
                                                 >
-                                                    {getSpeakerName(editedSpeakers[index] !== undefined ? editedSpeakers[index] : sid)}
+                                                    {getSpeakerName(sid)}
                                                 </span>
                                                 {speakerDropdownIndex === index && (
                                                     <div className="speaker-dropdown">
@@ -845,8 +922,7 @@ export default function MeetingDetailPage() {
                                                                     className="speaker-dropdown-item"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setEditedSpeakers(prev => ({ ...prev, [index]: optSid }));
-                                                                        setSpeakerDropdownIndex(null);
+                                                                        handleSegmentSpeakerChange(index, optSid);
                                                                     }}
                                                                 >
                                                                     <span className="speaker-color-dot" style={{ background: optSc.dot }} />
@@ -874,10 +950,36 @@ export default function MeetingDetailPage() {
                                             ) : (
                                                 <span className="segment-time segment-time-static">文稿</span>
                                             )}
+                                            <div className="segment-row-actions">
+                                                <button
+                                                    type="button"
+                                                    className="segment-icon-btn"
+                                                    onClick={() => handleInsertSegment(index, 'before')}
+                                                    title="上方插入"
+                                                >
+                                                    <CornerUpRight size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="segment-icon-btn"
+                                                    onClick={() => handleInsertSegment(index, 'after')}
+                                                    title="下方插入"
+                                                >
+                                                    <CornerDownRight size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="segment-icon-btn segment-icon-btn-danger"
+                                                    onClick={() => handleDeleteSegment(index)}
+                                                    title="删除此行"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <textarea
                                             className="segment-text"
-                                            value={editedSegments[index] !== undefined ? editedSegments[index] : (segment.content || '')}
+                                            value={segment.content || ''}
                                             onChange={(e) => handleSegmentEdit(index, e.target.value)}
                                             rows={Math.max(1, Math.ceil((segment.content || '').length / 80))}
                                         />

@@ -249,6 +249,88 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
     return segments, speaker_mapping
 
 
+def _load_transcript_segments(session: Session, meeting_id: UUID) -> list[MeetingTranscriptSegment]:
+    return session.exec(
+        select(MeetingTranscriptSegment)
+        .where(MeetingTranscriptSegment.meeting_id == meeting_id)
+        .order_by(MeetingTranscriptSegment.segment_index)
+    ).all()
+
+
+def _serialize_transcript_segments(segments: list[MeetingTranscriptSegment]) -> list[dict]:
+    return [TranscriptSegmentResponse.model_validate(segment).model_dump() for segment in segments]
+
+
+def _coerce_uuid(value) -> Optional[UUID]:
+    if isinstance(value, UUID):
+        return value
+    if value is None:
+        return None
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _attendee_names_from_speakers(segments: list[MeetingTranscriptSegment], speaker_mapping: dict | None) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    mapping = speaker_mapping or {}
+    for segment in segments:
+        speaker_id = (segment.speaker_id or "").strip()
+        if not speaker_id:
+            continue
+        label = str(mapping.get(speaker_id) or speaker_id).strip()
+        if label and label not in seen:
+            names.append(label)
+            seen.add(label)
+    return names
+
+
+def _replace_transcript_segments(
+    meeting_id: UUID,
+    data: TranscriptBatchUpdate,
+    session: Session,
+) -> list[MeetingTranscriptSegment]:
+    existing_segments = _load_transcript_segments(session, meeting_id)
+    existing_by_id = {segment.id: segment for segment in existing_segments}
+    payload_existing_ids: set[UUID] = set()
+
+    for index, item in enumerate(data.segments):
+        segment_id = _coerce_uuid(item.id)
+        segment = existing_by_id.get(segment_id) if segment_id else None
+        if segment is None:
+            start_time = item.start_time if item.start_time is not None else 0.0
+            end_time = item.end_time if item.end_time is not None else start_time
+            segment = MeetingTranscriptSegment(
+                meeting_id=meeting_id,
+                segment_index=index,
+                speaker_id=item.speaker_id or "speaker_1",
+                start_time=start_time,
+                end_time=end_time,
+                content=item.content,
+            )
+        else:
+            payload_existing_ids.add(segment.id)
+            segment.segment_index = index
+            segment.content = item.content
+            if item.speaker_id is not None:
+                segment.speaker_id = item.speaker_id
+            if item.start_time is not None:
+                segment.start_time = item.start_time
+            if item.end_time is not None:
+                segment.end_time = item.end_time
+            segment.updated_at = now_cn()
+        session.add(segment)
+
+    for segment in existing_segments:
+        if segment.id not in payload_existing_ids:
+            session.delete(segment)
+
+    session.flush()
+    return _load_transcript_segments(session, meeting_id)
+
+
 async def _run_asr(meeting_id: UUID):
     """Background task: run ASR on uploaded audio, save transcript segments."""
     try:
@@ -510,10 +592,10 @@ async def upload_transcript_document(
             end_time=segment_data["end_time"],
             content=segment_data["content"],
         ))
+    session.flush()
 
     meeting.speaker_mapping = speaker_mapping
-    if speaker_mapping and not meeting.attendees:
-        meeting.attendees = list(speaker_mapping.values())
+    meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), speaker_mapping)
     if any(segment.get("has_time") for segment in segments):
         meeting.duration_seconds = int(max((segment["end_time"] for segment in segments), default=0)) or None
     elif not meeting.audio_stored_name:
@@ -671,14 +753,7 @@ async def get_transcript(
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
-    segments = session.exec(
-        select(MeetingTranscriptSegment)
-        .where(MeetingTranscriptSegment.meeting_id == meeting_id)
-        .order_by(MeetingTranscriptSegment.segment_index)
-    ).all()
-
-    items = [TranscriptSegmentResponse.model_validate(s).model_dump() for s in segments]
-    return success_response(items)
+    return success_response(_serialize_transcript_segments(_load_transcript_segments(session, meeting_id)))
 
 
 # ─── 7. Batch update transcript segments ─────────────────────────────────────
@@ -695,16 +770,36 @@ async def update_transcript(
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
-    for update in data.segments:
-        segment = session.get(MeetingTranscriptSegment, update.id)
-        if segment and segment.meeting_id == meeting_id:
-            segment.content = update.content
-            if update.speaker_id is not None:
-                segment.speaker_id = update.speaker_id
-            session.add(segment)
+    if data.replace:
+        segments = _replace_transcript_segments(meeting_id, data, session)
+    else:
+        for update in data.segments:
+            segment_id = _coerce_uuid(update.id)
+            if not segment_id:
+                continue
+            segment = session.get(MeetingTranscriptSegment, segment_id)
+            if segment and segment.meeting_id == meeting_id:
+                segment.content = update.content
+                if update.speaker_id is not None:
+                    segment.speaker_id = update.speaker_id
+                if update.start_time is not None:
+                    segment.start_time = update.start_time
+                if update.end_time is not None:
+                    segment.end_time = update.end_time
+                segment.updated_at = now_cn()
+                session.add(segment)
+        segments = _load_transcript_segments(session, meeting_id)
 
+    meeting.attendees = _attendee_names_from_speakers(segments, meeting.speaker_mapping or {})
+    meeting.updated_at = now_cn()
+    session.add(meeting)
     session.commit()
-    return success_response({"message": "转写内容已更新"})
+    session.refresh(meeting)
+    return success_response({
+        "message": "转写内容已更新",
+        "segments": _serialize_transcript_segments(segments),
+        "meeting": _enrich_meeting(meeting, session).model_dump(),
+    })
 
 
 # ─── 8. Update speaker mapping ───────────────────────────────────────────────
@@ -722,6 +817,7 @@ async def update_speakers(
         raise NotFoundException("未找到会议记录")
 
     meeting.speaker_mapping = data.speaker_mapping
+    meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting_id), meeting.speaker_mapping)
     meeting.updated_at = now_cn()
     session.add(meeting)
     session.commit()

@@ -64,13 +64,17 @@ class TranscriptSegmentResponse(BaseModel):
 
 
 class TranscriptSegmentUpdate(BaseModel):
-    id: UUID
-    content: str
+    id: Optional[UUID | str] = None
+    content: str = ""
     speaker_id: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    segment_index: Optional[int] = None
 
 
 class TranscriptBatchUpdate(BaseModel):
     segments: List[TranscriptSegmentUpdate]
+    replace: bool = False
 
 
 class SpeakerMappingUpdate(BaseModel):
