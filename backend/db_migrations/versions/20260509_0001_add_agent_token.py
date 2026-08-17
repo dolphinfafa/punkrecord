@@ -14,6 +14,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'agent_token' in inspector.get_table_names():
+        return
     op.create_table(
         'agent_token',
         sa.Column('id', sa.String(32), primary_key=True),
@@ -29,4 +33,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table('agent_token')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'agent_token' in inspector.get_table_names():
+        op.drop_table('agent_token')

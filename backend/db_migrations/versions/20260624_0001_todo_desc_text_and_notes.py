@@ -14,22 +14,38 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 描述上限 1 万字符：varchar(255) -> TEXT
-    op.alter_column(
-        'todo_item', 'description',
-        existing_type=sa.String(length=255),
-        type_=sa.Text(),
-        existing_nullable=True,
-    )
-    # 新增「备注」字段
-    op.add_column('todo_item', sa.Column('notes', sa.Text(), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'todo_item' not in inspector.get_table_names():
+        return
+
+    columns = {c['name']: c for c in inspector.get_columns('todo_item')}
+
+    # 描述上限 1 万字符：varchar(255) -> TEXT(已是 TEXT 则跳过)
+    if 'description' in columns and not isinstance(columns['description']['type'], sa.Text):
+        op.alter_column(
+            'todo_item', 'description',
+            existing_type=sa.String(length=255),
+            type_=sa.Text(),
+            existing_nullable=True,
+        )
+    # 新增「备注」字段(已存在则跳过)
+    if 'notes' not in columns:
+        op.add_column('todo_item', sa.Column('notes', sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('todo_item', 'notes')
-    op.alter_column(
-        'todo_item', 'description',
-        existing_type=sa.Text(),
-        type_=sa.String(length=255),
-        existing_nullable=True,
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'todo_item' not in inspector.get_table_names():
+        return
+    columns = {c['name']: c for c in inspector.get_columns('todo_item')}
+    if 'notes' in columns:
+        op.drop_column('todo_item', 'notes')
+    if 'description' in columns and isinstance(columns['description']['type'], sa.Text):
+        op.alter_column(
+            'todo_item', 'description',
+            existing_type=sa.Text(),
+            type_=sa.String(length=255),
+            existing_nullable=True,
+        )
