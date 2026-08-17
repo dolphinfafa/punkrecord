@@ -7,6 +7,7 @@
  *
  * 登录态由 weixin-agent-sdk 持久化,重启无需重新扫码(token 过期除外)。
  */
+import "./load-env.js"; // 必须第一个 import:在 config 求值前加载 .env
 import { isLoggedIn, login, start } from "weixin-agent-sdk";
 
 import { PunkRecordAgent } from "./agent.js";
