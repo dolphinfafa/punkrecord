@@ -134,42 +134,63 @@ def _wants_todo_list(text: str) -> bool:
     return any(h in lowered for h in _TODO_LIST_HINTS)
 
 
-_ACTIVE_STATUSES = ("open", "in_progress", "pending_review", "blocked")
 
 
 async def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
+    """「待办」指令:逐条只发"待你审批"的事项(请假审批等,可引用回复通过/拒绝);
+    其余进行中的待办只给数量。"""
+    # 1) 待我审核的(pending_review 且我是审核人)——逐条发送
     try:
-        data = await _internal_call(user, "GET", "/todo/my?page_size=50")
-        items = (data or {}).get("items") or []
+        me = await _internal_call(user, "GET", "/auth/me")
+        review_data = await _internal_call(
+            user, "GET",
+            f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=50",
+        )
+        review_items = (review_data or {}).get("items") or []
     except Exception as e:  # noqa: BLE001
-        return f"❌ 查询待办失败:{e}"
-
-    todos = [t for t in items if (t.get("status") or "") in _ACTIVE_STATUSES]
-    if not todos:
-        return "🎉 当前没有待办事项"
+        return f"❌ 查询待审批失败:{e}"
 
     sent = 0
-    for t in todos:
-        due = f"\n截止: {t['due_at'][:16]}" if t.get("due_at") else ""
+    for t in review_items:
+        desc = (t.get("description") or "").strip().replace("\n", " | ")
+        if len(desc) > 60:
+            desc = desc[:60] + "…"
         msg = (
-            f"📋 待办\n标题: {t['title']}\n优先级: {(t.get('priority') or '').upper()}"
-            f"\n状态: {t.get('status')}{due}\n单号: {t['id']}"
+            f"🔔 待你审批\n标题: {t['title']}\n状态: {t.get('status')}"
+            + (f"\n内容: {desc}" if desc else "")
+            + f"\n单号: {t['id']}"
         )
-        # send_wechat_text 是同步的(发往 msg-service,非自调用),放线程池避免阻塞事件循环
         outcome, err = await asyncio.to_thread(send_wechat_text, binding.msg_service_key, msg)
         if outcome is SendOutcome.SENT:
             sent += 1
         else:
-            logger.warning("todo-list push failed (todo=%s): %s", t.get("id"), err)
+            logger.warning("review-queue push failed (todo=%s): %s", t.get("id"), err)
 
-    hint = '。引用任意一条回复"通过"或"拒绝 理由"即可审批' if sent else ""
-    return f"📋 你有 {len(todos)} 条待办,已逐条发送{hint}"
+    # 2) 我名下进行中的其余待办(open/in_progress/blocked)——只计数
+    try:
+        my_data = await _internal_call(user, "GET", "/todo/my?page_size=100")
+        my_items = (my_data or {}).get("items") or []
+        doing = [t for t in my_items if (t.get("status") or "") in ("open", "in_progress", "blocked")]
+        doing_count = len(doing)
+    except Exception:  # noqa: BLE001
+        logger.exception("query my todos failed")
+        doing_count = -1  # 查询失败时不展示该项
+
+    parts = []
+    if review_items:
+        parts.append(f"🔔 待你审批 {len(review_items)} 条,已逐条发送"
+                     + ('(引用回复"通过"/"拒绝 理由")' if sent else ""))
+    else:
+        parts.append("✅ 没有待你审批的事项")
+    if doing_count >= 0:
+        parts.append(f"📋 你名下进行中的待办 {doing_count} 条")
+    return "\n".join(parts)
 
 
 _LLM_SYSTEM = (
     "你是 PunkRecord 待办系统的微信助手。用户在微信里和你对话。"
-    "已知指令:发送\"待办\"可列出全部待办事项(逐条发送);引用某条待办消息并回复"
-    "\"通过\"或\"拒绝 理由\"可以直接审批该待办。"
+    "已知指令:发送\"待办\"会逐条发送待用户审批的事项(如请假审批),并汇总其名下"
+    "进行中待办的数量;引用某条待办消息并回复\"通过\"或\"拒绝 理由\"可以直接审批该待办。"
     "回答务必简短,适合微信阅读,不要用 markdown。与待办系统无关的问题礼貌带过。"
 )
 
