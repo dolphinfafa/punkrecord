@@ -1,5 +1,6 @@
 from app.services.wechat_inbound import (
     _wants_todo_list,
+    parse_action_reply,
     parse_quote_command,
 )
 
@@ -61,3 +62,31 @@ def test_todo_list_triggers():
 def test_todo_list_not_triggered():
     for t in ["你好", "", "帮我写一份待办系统的使用文档好吗,要详细一点的"]:
         assert not _wants_todo_list(t), t
+
+
+# ─── parse_action_reply(编号指令) ───────────────────────────────────────────
+
+def test_action_bare_words():
+    assert parse_action_reply("通过") == {"action": "approve", "index": None, "comment": None}
+    assert parse_action_reply("通过了")["action"] == "approve"
+    assert parse_action_reply("同意")["action"] == "approve"
+    assert parse_action_reply("拒绝") == {"action": "reject", "index": None, "comment": "审核不通过"}
+
+
+def test_action_with_index():
+    r = parse_action_reply("通过 1")
+    assert r == {"action": "approve", "index": 1, "comment": None}
+    assert parse_action_reply("同意第2条")["index"] == 2
+    r = parse_action_reply("拒绝 3 理由:预算超了")
+    assert r["action"] == "reject" and r["index"] == 3 and r["comment"] == "预算超了"
+    assert parse_action_reply("驳回2，需求不明确")["index"] == 2
+
+
+def test_action_with_uuid():
+    r = parse_action_reply(f"通过 {UUID_STR}")
+    assert r == {"action": "approve", "todo_id": UUID_STR, "comment": None}
+
+
+def test_action_non_command_returns_none():
+    for t in ["你好", "挺贵", "通过一下这个方案吧我觉得还行", "", "12345"]:
+        assert parse_action_reply(t) is None, t
