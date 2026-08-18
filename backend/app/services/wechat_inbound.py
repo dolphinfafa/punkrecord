@@ -123,7 +123,12 @@ async def _exec_approval(user: User, cmd: dict) -> str:
     return f"🚫 已拒绝:{title}\n理由:{cmd['comment']}"
 
 
-_TODO_LIST_HINTS = ("待办", "代办", "任务列表", "todo", "list", "有什么任务", "我的任务")
+_TODO_LIST_HINTS = (
+    "待办", "代办", "任务列表", "todo", "list",
+    "有什么任务", "我的任务",
+    # 审批类问法(如"有哪些需要我审批的")也路由到真实查询,避免落到 LLM 编造
+    "审批", "审核", "批准",
+)
 
 
 def _wants_todo_list(text: str) -> bool:
@@ -187,15 +192,48 @@ async def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
     return "\n".join(parts)
 
 
-_LLM_SYSTEM = (
-    "你是 PunkRecord 待办系统的微信助手。用户在微信里和你对话。"
-    "已知指令:发送\"待办\"会逐条发送待用户审批的事项(如请假审批),并汇总其名下"
-    "进行中待办的数量;引用某条待办消息并回复\"通过\"或\"拒绝 理由\"可以直接审批该待办。"
-    "回答务必简短,适合微信阅读,不要用 markdown。与待办系统无关的问题礼貌带过。"
+_LLM_SYSTEM_TEMPLATE = (
+    "你是 PunkRecord 待办系统的微信助手,用户在微信里和你对话。\n"
+    "【实时数据】(仅可引用下面给出的数据,严禁编造任何人名、数量或事项):\n"
+    "{facts}\n"
+    "【指令】用户发送\"待办\":逐条发送待审批事项并汇总数量;"
+    "引用某条待办消息回复\"通过\"或\"拒绝 理由\"可直接审批。\n"
+    "【规则】回答务必简短,适合微信阅读,不要 markdown;"
+    "凡问及具体待办/审批内容而【实时数据】里没有的,引导用户发送\"待办\"查看,不得虚构;"
+    "与系统无关的问题礼貌带过。"
 )
+
+_FACTS_OK = "- 待用户审批:{review} 条\n- 进行中待办:{doing} 条"
+_FACTS_UNAVAILABLE = "(实时数据暂时不可用,请引导用户发送\"待办\"查询,不要猜测)"
+
+
+async def _fetch_facts(user: User) -> Optional[str]:
+    """取用户真实待办数据,供 LLM 引用(失败返回 None,绝不给 LLM 编造的机会)。"""
+    try:
+        me = await _internal_call(user, "GET", "/auth/me")
+        review_data = await _internal_call(
+            user, "GET",
+            f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=1",
+        )
+        my_data = await _internal_call(user, "GET", "/todo/my?page_size=100")
+        doing = [
+            t for t in (my_data or {}).get("items") or []
+            if (t.get("status") or "") in ("open", "in_progress", "blocked")
+        ]
+        review_total = (review_data or {}).get("total")
+        if review_total is None:
+            review_total = len((review_data or {}).get("items") or [])
+        return _FACTS_OK.format(review=review_total, doing=len(doing))
+    except Exception:  # noqa: BLE001
+        logger.exception("fetch facts for LLM failed")
+        return None
 
 
 async def _llm_reply(user: User, text: str) -> str:
+    facts = await _fetch_facts(user)
+    system_prompt = _LLM_SYSTEM_TEMPLATE.format(
+        facts=facts if facts is not None else _FACTS_UNAVAILABLE
+    )
     try:
         async with httpx.AsyncClient(timeout=60.0, verify=False) as client:
             resp = await client.post(
@@ -204,7 +242,7 @@ async def _llm_reply(user: User, text: str) -> str:
                 json={
                     "model": settings.LITELLM_MODEL,
                     "messages": [
-                        {"role": "system", "content": _LLM_SYSTEM},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": text},
                     ],
                 },

@@ -53,7 +53,8 @@ def test_parse_non_command_reply_returns_none():
 # ─── _wants_todo_list ───────────────────────────────────────────────────────
 
 def test_todo_list_triggers():
-    for t in ["待办", "所有待办", "我的待办", "待办列表", "todo", "LIST", "查一下任务列表"]:
+    for t in ["待办", "所有待办", "我的待办", "待办列表", "todo", "LIST", "查一下任务列表",
+              "有哪些需要我审批的", "要审核的有哪些", "有什么要批准的"]:
         assert _wants_todo_list(t), t
 
 
