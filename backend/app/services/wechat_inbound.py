@@ -113,6 +113,12 @@ def parse_action_reply(text: str) -> Optional[dict]:
     return {"action": "reject", "index": None, "comment": _clean_comment(rest) or _DEFAULT_REJECT_COMMENT}
 
 
+# account_id → {"items": [(todo_id, title), ...], "ts": ...}
+# 最近一次「待办」发送的编号映射,用于解析"通过 1"这类编号指令
+_REPLY_CACHE: dict = {}
+_REPLY_CACHE_TTL_SECONDS = 3600
+
+
 def _reply_cache_get(account_id: str) -> Optional[list]:
     import time as _time
     entry = _REPLY_CACHE.get(account_id)
