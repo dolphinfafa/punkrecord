@@ -127,11 +127,10 @@ def _send_wechat_for_todo(recipient_user_id: UUID, todo: TodoItem, session: Sess
 
     label = EVENT_LABELS.get(event_type, "待办通知")
     assignee = session.get(User, todo.assignee_user_id)
-    text = f"📋 {label}\n标题: {todo.title}\n优先级: {todo.priority.value.upper()}\n状态: {todo.status.value}"
+    # 单号放第一行:微信"引用"通常只携带消息开头的预览,单号在末行会随截断丢失
+    text = f"📋 {label}(单号:{todo.id})\n标题: {todo.title}\n优先级: {todo.priority.value.upper()}\n状态: {todo.status.value}"
     if assignee:
         text += f"\n负责人: {assignee.display_name}"
-    # 单号供"引用回复"定位:外部 bot 从 [引用:...] 块中提取该 UUID 再调 approve/reject。
-    text += f"\n单号: {todo.id}"
 
     outcome, error_msg = send_wechat_text(binding.msg_service_key, text)
     status = NotificationStatus.SENT if outcome is SendOutcome.SENT else NotificationStatus.FAILED

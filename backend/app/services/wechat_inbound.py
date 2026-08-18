@@ -118,9 +118,25 @@ async def _exec_approval(user: User, cmd: dict) -> str:
     except Exception as e:  # noqa: BLE001
         return f"❌ {('通过' if cmd['action'] == 'approve' else '拒绝')}失败:{e}"
     title = (data or {}).get("title") or todo_id[:8]
+
+    # 请假审批级联:该待办关联请假单时,同步批准/驳回请假单本身
+    # (否则只改待办状态,请假单永远停在 pending)
+    leave_note = ""
+    link = (data or {}).get("link") or {}
+    leave_id = link.get("leave_id")
+    if leave_id:
+        try:
+            if cmd["action"] == "approve":
+                await _internal_call(user, "POST", f"/todo/leaves/{leave_id}/approve", {})
+            else:
+                await _internal_call(user, "POST", f"/todo/leaves/{leave_id}/reject", {"comment": cmd["comment"]})
+            leave_note = "(请假单已同步审批)"
+        except Exception as e:  # noqa: BLE001
+            leave_note = f"(⚠️ 请假单同步失败:{e})"
+
     if cmd["action"] == "approve":
-        return f"✅ 已通过:{title}"
-    return f"🚫 已拒绝:{title}\n理由:{cmd['comment']}"
+        return f"✅ 已通过:{title}{leave_note}"
+    return f"🚫 已拒绝:{title}\n理由:{cmd['comment']}{leave_note}"
 
 
 _TODO_LIST_HINTS = (
@@ -160,10 +176,10 @@ async def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
         desc = (t.get("description") or "").strip().replace("\n", " | ")
         if len(desc) > 60:
             desc = desc[:60] + "…"
+        # 单号放第一行:微信"引用"往往只携带消息开头预览,单号在末行会丢失
         msg = (
-            f"🔔 待你审批\n标题: {t['title']}\n状态: {t.get('status')}"
+            f"🔔 待你审批(单号:{t['id']})\n标题: {t['title']}\n状态: {t.get('status')}"
             + (f"\n内容: {desc}" if desc else "")
-            + f"\n单号: {t['id']}"
         )
         outcome, err = await asyncio.to_thread(send_wechat_text, binding.msg_service_key, msg)
         if outcome is SendOutcome.SENT:
