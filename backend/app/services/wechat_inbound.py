@@ -364,6 +364,57 @@ async def _llm_reply(user: User, text: str) -> str:
         return ""
 
 
+# ─── 批量指令:"全部通过/都同意/通过全部/全部拒绝 理由:xx" ─────────────────────
+
+_BULK_HEAD_RE = re.compile(r"^(全部|都|所有)\s*(通过|同意|批准|拒绝|驳回|不通过)(了)?", re.I)
+_BULK_TAIL_RE = re.compile(r"^(通过|同意|批准|拒绝|驳回|不通过)(了)?\s*(全部|都|所有)", re.I)
+
+
+def parse_bulk_command(text: str) -> Optional[dict]:
+    """识别批量审批指令(严格整句:"全部通过/都同意/通过全部/全部拒绝 理由:xx");
+    尾巴只允许空或"理由:xxx",防止"全部通过的申请…"这类问句误触发。"""
+    t = (text or "").strip()
+    if not t or len(t) > 60:
+        return None
+    m = _BULK_HEAD_RE.match(t) or _BULK_TAIL_RE.match(t)
+    if not m:
+        return None
+    tail = t[m.end():].strip()
+    comment = None
+    if tail:
+        cm = re.match(r"^理由?\s*[:：]\s*(.+)$", tail)
+        if not cm:
+            return None  # 尾巴不是"理由:xxx" → 不是批量指令
+        comment = cm.group(1).strip()
+    verb = (m.group(2) or m.group(1) or "").lower()
+    action = "reject" if verb in ("拒绝", "驳回", "不通过", "reject") else "approve"
+    return {"action": action, "comment": comment or (_DEFAULT_REJECT_COMMENT if action == "reject" else None)}
+
+
+async def _exec_bulk_action(user: User, action: str, comment: Optional[str]) -> str:
+    """对当前全部待我审批的事项批量通过/拒绝(实时查询,不依赖编号缓存)。"""
+    try:
+        me = await _internal_call(user, "GET", "/auth/me")
+        review_data = await _internal_call(
+            user, "GET",
+            f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=50",
+        )
+        items = (review_data or {}).get("items") or []
+    except Exception as e:  # noqa: BLE001
+        return f"❌ 查询待审批失败:{e}"
+    if not items:
+        return "✅ 没有待你审批的事项"
+
+    ok = 0
+    for t in items:
+        r = await _exec_approval(user, {"action": action, "todo_id": t["id"], "comment": comment})
+        if r.startswith(("✅", "🚫")):
+            ok += 1
+    verb = "通过" if action == "approve" else "拒绝"
+    note = f"(请假单已同步审批)" if any((t.get("link") or {}).get("leave_id") for t in items) else ""
+    return f"✅ 已批量{verb} {ok}/{len(items)} 条{note}"
+
+
 # ─── 入口 ────────────────────────────────────────────────────────────────────
 
 async def handle_wechat_inbound(session: Session, user: User, binding: WeChatNotifyBinding, text: str) -> str:
@@ -378,6 +429,11 @@ async def handle_wechat_inbound(session: Session, user: User, binding: WeChatNot
     text = (text or "").strip()
     if not text:
         return ""
+
+    # 0) 批量指令:"全部通过/都同意/通过全部/全部拒绝 理由:xx"
+    bulk = parse_bulk_command(text)
+    if bulk:
+        return await _exec_bulk_action(user, bulk["action"], bulk["comment"])
 
     # 1) 引用式指令(平台若回传 [引用:...单号:...]) —— 目前该通道不回传,留作兜底
     cmd = parse_quote_command(text)

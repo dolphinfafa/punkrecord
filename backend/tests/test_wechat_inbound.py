@@ -90,3 +90,21 @@ def test_action_with_uuid():
 def test_action_non_command_returns_none():
     for t in ["你好", "挺贵", "通过一下这个方案吧我觉得还行", "", "12345"]:
         assert parse_action_reply(t) is None, t
+
+
+# ─── parse_bulk_command(批量指令) ───────────────────────────────────────────
+
+def test_bulk_commands():
+    from app.services.wechat_inbound import parse_bulk_command
+    assert parse_bulk_command("全部通过") == {"action": "approve", "comment": None}
+    assert parse_bulk_command("都同意")["action"] == "approve"
+    assert parse_bulk_command("全部通过了")["action"] == "approve"
+    assert parse_bulk_command("通过全部")["action"] == "approve"
+    r = parse_bulk_command("全部拒绝 理由:时间太长")
+    assert r == {"action": "reject", "comment": "时间太长"}
+
+
+def test_bulk_not_triggered_by_questions():
+    from app.services.wechat_inbound import parse_bulk_command
+    for t in ["全部通过的申请都会发吗", "都通过的话要不要通知他们", "你好", ""]:
+        assert parse_bulk_command(t) is None, t
