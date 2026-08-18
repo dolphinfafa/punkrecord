@@ -324,6 +324,10 @@ async def wechat_inbound(
     from app.services.wechat_inbound import handle_wechat_inbound
     from app.models.iam import User
 
+    # 原始文本落日志:排查微信引用格式用(含单号即可解析)
+    import logging as _logging
+    _logging.getLogger(__name__).info("inbound raw text: %r (account=%s)", data.text, data.account_id)
+
     binding = session.exec(
         select(WeChatNotifyBinding).where(
             WeChatNotifyBinding.account_id == data.account_id,
