@@ -99,6 +99,9 @@ class WeChatNotifyBinding(BaseDBModel, table=True):
     nickname: Optional[str] = None
     is_active: bool = Field(default=True, nullable=False)
     preferences: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    # 通道保活跟踪:context_token 自最近一次来信起约 24h 有效
+    last_inbound_at: Optional[datetime] = Field(default=None)
+    keepalive_notified_at: Optional[datetime] = Field(default=None)
 
 
 class WeChatPendingStatus(str, Enum):

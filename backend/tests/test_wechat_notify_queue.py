@@ -166,3 +166,24 @@ def test_flush_gives_up_after_max_attempts(monkeypatch):
         session.expire_all()
         row = session.exec(select(WeChatPendingNotification)).one()
         assert row.status == WeChatPendingStatus.FAILED
+
+
+# ─── keepalive_due(保活提醒判定) ────────────────────────────────────────────
+
+def test_keepalive_due():
+    from datetime import datetime, timedelta as td
+    from app.services.wechat_notify_queue import keepalive_due
+
+    now = datetime(2026, 8, 18, 12, 0, 0)
+    # 无来信记录 → 不提醒
+    assert keepalive_due(None, None, now) is False
+    # 刚来信(距过期还早) → 不提醒
+    assert keepalive_due(now - td(hours=1), None, now) is False
+    # 来信 23.5h(距过期 30min,窗口内) → 提醒
+    assert keepalive_due(now - td(hours=23, minutes=30), None, now) is True
+    # 本周期已提醒过 → 不再提醒
+    assert keepalive_due(now - td(hours=23, minutes=30), now - td(minutes=5), now) is False
+    # 已过期(>24h) → 不提醒(送不到,等激活补发)
+    assert keepalive_due(now - td(hours=25), None, now) is False
+    # 上一周期的提醒不挡本周期:上次来信后重新来过信 → 应提醒
+    assert keepalive_due(now - td(hours=23, minutes=30), now - td(hours=30), now) is True

@@ -204,6 +204,62 @@ def retry_cycle() -> None:
             logger.exception("flush_pending_for_user failed for user %s", uid)
 
 
+# ─── 通道保活提醒 ────────────────────────────────────────────────────────────
+# context_token 自用户最近一次来信起约 24h 有效;过期前 KEEPALIVE_WINDOW 内
+# 推一条提醒,让用户回条消息保活,避免通道静默死亡。
+
+from app.models.shared import WeChatNotifyBinding  # noqa: E402
+
+CHANNEL_TTL = timedelta(hours=24)
+KEEPALIVE_WINDOW = timedelta(minutes=60)
+
+KEEPALIVE_TEXT = (
+    "⏰ 微信推送通道约 1 小时后过期(24 小时无互动)。\n"
+    "给我回条任意消息(如:hi)即可保持在线;过期后的通知会暂存,"
+    "你下次发消息时自动补发。"
+)
+
+
+def keepalive_due(
+    last_inbound_at: Optional[object],
+    keepalive_notified_at: Optional[object],
+    now: object,
+) -> bool:
+    """是否需要发保活提醒:距过期不足窗口期,且本激活周期未提醒过。"""
+    if last_inbound_at is None:
+        return False
+    expires_at = last_inbound_at + CHANNEL_TTL
+    if now >= expires_at:
+        return False  # 已过期,提醒送不到;等用户下次来信时补发队列即可
+    if now < expires_at - KEEPALIVE_WINDOW:
+        return False  # 还早
+    if keepalive_notified_at is not None and keepalive_notified_at > last_inbound_at:
+        return False  # 本周期已提醒过
+    return True
+
+
+def keepalive_cycle() -> None:
+    """对所有活跃绑定检查并推送保活提醒(尽力而为,失败不影响标记)。"""
+    if not settings.WECHAT_MSG_SERVICE_URL:
+        return
+    now = now_cn()
+    with Session(engine) as session:
+        bindings = session.exec(
+            select(WeChatNotifyBinding).where(WeChatNotifyBinding.is_active == True)  # noqa: E712
+        ).all()
+        for b in bindings:
+            if not keepalive_due(b.last_inbound_at, b.keepalive_notified_at, now):
+                continue
+            outcome, err = send_wechat_text(b.msg_service_key, KEEPALIVE_TEXT)
+            if outcome is not SendOutcome.SENT:
+                logger.warning("keepalive push failed (user=%s): %s", b.user_id, err)
+            # 无论成败都标记,避免每轮重发(失败时通道已死,提醒无意义)
+            b.keepalive_notified_at = now
+            b.updated_at = now
+            session.add(b)
+        session.commit()
+
+
 async def wechat_notification_retry_worker() -> None:
     """Background loop: periodically replay due queued notifications.
 
@@ -218,6 +274,7 @@ async def wechat_notification_retry_worker() -> None:
     while True:
         try:
             await asyncio.to_thread(retry_cycle)
+            await asyncio.to_thread(keepalive_cycle)
         except asyncio.CancelledError:
             raise
         except Exception:

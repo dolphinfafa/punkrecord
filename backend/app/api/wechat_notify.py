@@ -341,6 +341,11 @@ async def wechat_inbound(
     if not user:
         return success_response({"reply": ""})
 
+    # 记录最近来信时刻:保活提醒按"最近来信+24h"计算过期
+    binding.last_inbound_at = now_cn()
+    session.add(binding)
+    session.commit()
+
     reply = await handle_wechat_inbound(session, user, binding, data.text)
     return success_response({"reply": reply})
 
