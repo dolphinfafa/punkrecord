@@ -20,7 +20,7 @@
 | `contract.py` | 合同、对手方、付款计划 |
 | `finance.py` | 财务账户、交易记录、发票、报销 |
 | `approval.py` | 审批相关模型 |
-| `shared.py` | 共享/通用模型（含版本更新日志 ChangeLog） |
+| `shared.py` | 共享/通用模型（审计日志、文件元数据、版本更新日志、Agent Token、微信通知绑定与离线队列） |
 | `kb.py` | 企业大脑（知识库文档、文档切片、对话、消息） |
 | `meeting.py` | 会议记录（会议主表、转写分段） |
 
@@ -89,12 +89,19 @@
 | `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID、会议日期、参会人员）。v2.0.7 起 `attendees` 由当前转写分段实际使用的 `speaker_id` 结合 `speaker_mapping` 自动派生，Web 前端不再手动维护 |
 | `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；无时间码文稿导入时 `start_time`/`end_time` 可为空。v2.0.7 起支持通过完整分段列表保存来新增、插入、删除和重排分段，不新增数据库字段 |
 
-### 共享模块（Shared）- 版本日志
+### 共享模块（Shared）
 
 | 模型 | 说明 |
 |------|------|
+| `AuditLog` | 操作审计日志 |
+| `FileMetadata` | 文件元数据 |
 | `ChangeLog` | 版本更新日志（version, title, content(Markdown), published_by_user_id, published_at） |
+| `AgentToken` | Agent 个人访问令牌（`pat_` 前缀 token、有效期、启用状态、最后使用时间） |
+| `WeChatUserBinding` | 微信小程序用户绑定（openid/unionid、订阅状态等） |
+| `WeChatMessageTemplate` | 微信模板消息配置 |
+| `WeChatNotifyBinding` | weixin-msg-service 通知绑定（user_id、msg_service_key、account_id、偏好）。v2.0.8 起新增 `last_inbound_at` 与 `keepalive_notified_at`，用于记录最近微信来信和通道保活提醒状态 |
+| `WeChatPendingNotification` | 微信离线通知队列（recipient_user_id、todo_id、event_type、payload、status、retry_count、next_retry_at、last_error），用于通道失效后暂存并按 FIFO 补发 |
 
 ---
 
-*最后更新：2026-08-17*
+*最后更新：2026-08-31*

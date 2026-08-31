@@ -33,14 +33,14 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 | 业务域 | 能力概述 |
 |--------|---------|
 | IAM | 用户、部门（树形）、职位、组织架构、实体管理、RBAC 权限 |
-| Todo | 任务全生命周期、看板拖拽、团队协作、图片附件粘贴/预览 |
+| Todo | 任务全生命周期、看板拖拽、团队协作、图片附件粘贴/预览、微信通知与微信入站审批 |
 | Leave | 请假申请与审批、额度自动扣减、年度重置 |
 | Project | B2B/B2C 项目管理、阶段流转、开发进度、Bug 管理、验收报告 |
 | Contract | 三方合同管理、PDF/图片附件、AI 智能生成、Word 导出 |
 | Finance | 账户、交易、发票、报销、实时余额 |
 | Beli | 积分激励体系、规则引擎、自动结算 |
 | KB (企业大脑) | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
-| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、重新转写、Word/PDF 文稿导入、转写稿编辑、插入/删除分段、新增讲话人、说话人标注/切换、会议日期、参会人自动同步、预设/自定义提示词、引用历史会议、AI 会议纪要、搜索、归档到企业大脑 |
+| Meeting (会议记录) | 音频上传、ASR 转写（豆包）、重新转写、Word/PDF 文稿导入、转写稿编辑、插入/删除分段、新增讲话人、说话人标注/切换、会议日期、参会人自动同步、预设/自定义提示词、引用历史会议、AI 会议纪要（含会议日期上下文）、搜索、归档到企业大脑 |
 
 平台提供三个客户端：Web 管理后台、微信小程序（移动端）、RESTful API。
 
@@ -157,7 +157,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 2. 注册 CORS 中间件（允许前端开发服务器跨域）
 3. 注册请求日志中间件（记录每个请求的方法、路径、响应码）
 4. 注册异常处理器（`AtlasException` 与通用异常）
-5. 注册 10 个路由模块（统一前缀 `/api/v1`）
+5. 注册 11 个路由模块（统一前缀 `/api/v1`）并挂载 MCP Streamable HTTP 应用
 6. 启动事件中按需初始化数据库
 
 ### 4.2 路由模块一览
@@ -174,6 +174,8 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
   +-- kb/             企业大脑        (kb.py,        ~460 行)
   +-- meeting/        会议记录        (meeting.py,   ~490 行)
   +-- changelog/      版本更新日志    (changelog.py)
+  +-- wechat-notify/  微信通知与入站  (wechat_notify.py)
+  +-- mcp             MCP Streamable HTTP mount (mcp_server.py)
 ```
 
 ### 4.3 中间件栈
@@ -225,11 +227,17 @@ AtlasException (基类, code=400)
 | `KB_CHUNK_SIZE` | `1000` | 知识库文档切片大小（字符） |
 | `KB_CHUNK_OVERLAP` | `200` | 切片重叠长度 |
 | `KB_RAG_TOP_K` | `5` | RAG 检索返回的 top-k 数量 |
-| `LITELLM_BASE_URL` | （见 `.env`） | LiteLLM 代理地址（会议纪要/AI 对话） |
-| `LITELLM_API_KEY` | (已配置) | LiteLLM API 密钥 |
-| `LITELLM_MODEL` | `gemini/gemini-3.1-flash-lite-preview` | LiteLLM 使用的模型 |
+| `LITELLM_BASE_URL` | `https://api.moonshot.cn/v1` | OpenAI 兼容 LLM 地址；会议纪要、AI 对话、合同起草和微信兜底对话使用。真实值以 dev/prod `.env` 为准 |
+| `LITELLM_API_KEY` | (已配置) | LLM API 密钥；真实 key 只写入各环境 `.env`，不进入 Git |
+| `LITELLM_MODEL` | `kimi-k3` | LiteLLM/OpenAI 兼容调用使用的模型；v2.0.8 dev/prod `.env` 已切至 Moonshot Kimi K3 |
 | `VOLC_ASR_APP_KEY` | (已配置) | 豆包 ASR 应用 Key |
 | `VOLC_ASR_ACCESS_KEY` | (已配置) | 豆包 ASR 访问 Key |
+| `WECHAT_MSG_SERVICE_URL` | (可选) | weixin-msg-service 地址；未配置时微信通知与队列 worker 自动跳过 |
+| `WECHAT_MSG_SERVICE_API_KEY` | (可选) | 调用 weixin-msg-service 的服务间密钥 |
+| `WECHAT_INBOUND_SECRET` | (可选) | `/wechat-notify/inbound` 服务器间共享密钥，配置后请求必须带 `X-Inbound-Secret` |
+| `WECHAT_NOTIFY_RETRY_INTERVAL_SECONDS` | `300` | 微信离线通知队列 worker 周期，同时触发通道保活检查 |
+| `WECHAT_NOTIFY_MAX_ATTEMPTS` | `20` | 单条微信离线通知最大重试次数 |
+| `WECHAT_NOTIFY_RETRY_BACKOFF_MAX_SECONDS` | `3600` | 微信离线通知指数退避上限 |
 
 ### 4.7 服务层模式
 
@@ -301,6 +309,9 @@ Shared 模块
   +-- ChangeLog            版本更新日志（version, title, content, published_by, published_at）
   +-- WeChatUserBinding    微信用户绑定
   +-- WeChatMessageTemplate 微信消息模板
+  +-- AgentToken           Agent 个人访问令牌
+  +-- WeChatNotifyBinding  weixin-msg-service 通知绑定（含 last_inbound_at/keepalive_notified_at）
+  +-- WeChatPendingNotification 微信离线通知队列
 
 KB 模块（企业大脑）
   +-- KBDocument           知识库文档（标题、文件、标签、AI摘要、状态）
@@ -718,20 +729,21 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 | 能力 | 端点 | 实现 |
 |------|------|------|
-| 功能清单生成 | `POST /api/v1/ai/chat` | 调用 Gemini API，解析返回 JSON 为 10 列功能表 |
+| 功能清单生成 | `POST /api/v1/ai/chat` | 通过 OpenAI 兼容接口调用 `LITELLM_MODEL`，解析返回 JSON 为 10 列功能表 |
 | 合同智能起草 | `POST /api/v1/ai/chat-stream` | SSE 流式响应，注入项目上下文（甲乙方、金额、税号） |
 | 开发任务拆解 | 项目模块内 | 从功能清单自动生成任务，支持批量分配 |
 | RAG 企业知识对话 | `POST /api/v1/kb/chat` | Embedding检索→ChromaDB→上下文拼接→Gemini流式回答 |
 | 文档智能摘要/标签 | 上传文档后台自动触发 | Gemini 自动生成摘要和分类标签 |
-| 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要 |
+| 会议纪要生成 | `POST /api/v1/meeting/records/{id}/summarize` | SSE 流式生成结构化会议纪要；上下文包含会议标题、会议日期、参会人员和转写文稿 |
 | 会议重新转写 | `POST /api/v1/meeting/records/{id}/retranscribe` | 对已有音频重新触发豆包 ASR，成功后替换旧分段 |
 | 会议文稿导入 | `POST /api/v1/meeting/records/{id}/upload-transcript` | 解析 Word `.docx` / PDF 中的说话人文稿，生成会议转写分段 |
 | 会议转写编辑 | `PATCH /api/v1/meeting/records/{id}/transcript` | `replace=true` 时按完整分段列表保存，支持新增讲话人、插入/删除分段和自动同步参会人员 |
+| 微信入站审批 | `POST /api/v1/wechat-notify/inbound` | 解析微信消息中的待办查询、编号审批、批量审批；自由对话通过 `LITELLM_MODEL` 兜底 |
 | 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
-**AI 技术栈**：LiteLLM 代理（统一调用 Gemini 等模型） + Gemini Embedding text-embedding-004（向量化） + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
+**AI 技术栈**：OpenAI 兼容 LLM（dev/prod `.env` 当前为 Moonshot Kimi K3，用于 AI 对话、合同起草、会议纪要和微信兜底对话） + Gemini Embedding text-embedding-004（向量化） + Gemini Vision/文本处理 + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
 
-通过 LiteLLM 代理统一调用 AI 模型，支持 OpenAI 兼容接口。会议纪要、AI 对话等功能均通过 LiteLLM 路由。前端使用 `react-markdown` 渲染 Markdown。
+通过 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 统一配置 OpenAI 兼容模型。v2.0.8 起默认模型和开发/生产 `.env` 已切至 `kimi-k3`，真实 API key 不进入 Git。前端使用 `react-markdown` 渲染 Markdown。
 
 ---
 
@@ -761,4 +773,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-08-17*
+*最后更新：2026-08-31*

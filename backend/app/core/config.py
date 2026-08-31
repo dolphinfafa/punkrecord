@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
-    APP_VERSION: str = "2.0.7"
+    APP_VERSION: str = "2.0.8"
     APP_ENV: str = "development"
     DEBUG: bool = False
     
@@ -40,10 +40,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
-    # LiteLLM (meeting summary LLM)
-    LITELLM_BASE_URL: str = "https://litellm.yios.cn/v1"
-    LITELLM_API_KEY: str = "sk-pd8ihad3IQRHfn0TILW7Pg"
-    LITELLM_MODEL: str = "gemini/gemini-3.1-flash-lite-preview"
+    # OpenAI-compatible LLM (AI chat, contract drafting, meeting summary, WeChat fallback)
+    LITELLM_BASE_URL: str = "https://api.moonshot.cn/v1"
+    LITELLM_API_KEY: str = ""
+    LITELLM_MODEL: str = "kimi-k3"
 
     # Knowledge Base
     CHROMADB_PATH: str = "./data/chromadb"

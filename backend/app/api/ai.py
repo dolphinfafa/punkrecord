@@ -52,6 +52,15 @@ def _build_openai_messages(request: ChatRequest) -> list:
     return messages
 
 
+def _normalize_model_name(model: str) -> str:
+    """Keep direct OpenAI-compatible model names intact; prefix legacy Gemini names for LiteLLM."""
+    if "/" in model:
+        return model
+    if model.startswith("gemini-"):
+        return f"gemini/{model}"
+    return model
+
+
 @router.post("/chat", response_model=dict)
 async def ai_chat(
     request: ChatRequest,
@@ -59,10 +68,7 @@ async def ai_chat(
 ):
     """Chat with AI to generate feature lists in JSON format via LiteLLM."""
     try:
-        model = request.model_name or settings.LITELLM_MODEL
-        # Ensure model has provider prefix for LiteLLM
-        if "/" not in model:
-            model = f"gemini/{model}"
+        model = _normalize_model_name(request.model_name or settings.LITELLM_MODEL)
 
         url = f"{settings.LITELLM_BASE_URL}/chat/completions"
         headers = {
@@ -99,9 +105,7 @@ async def ai_chat_stream(
 
     async def generate_chunks():
         try:
-            model = request.model_name or settings.LITELLM_MODEL
-            if "/" not in model:
-                model = f"gemini/{model}"
+            model = _normalize_model_name(request.model_name or settings.LITELLM_MODEL)
 
             url = f"{settings.LITELLM_BASE_URL}/chat/completions"
             headers = {

@@ -28,6 +28,7 @@
 | `kb.py` | `/api/v1/kb` | 企业大脑（文档管理、RAG 对话、语义搜索） |
 | `meeting.py` | `/api/v1/meeting` | 会议记录（音频上传、ASR 转写、Word/PDF 文稿导入、AI 总结、归档） |
 | `changelog.py` | `/api/v1/changelog` | 版本更新日志（CRUD，L0 权限控制） |
+| `wechat_notify.py` | `/api/v1/wechat-notify` | 微信通知绑定、偏好、入站消息执行、离线队列补发 |
 | `mcp_server.py` | `/api/v1/mcp` | MCP 服务（Streamable HTTP，FastMCP），AI 客户端直连 |
 
 路由文件位于 `backend/app/api/` 目录。
@@ -190,6 +191,8 @@
 | POST | `/api/v1/ai/chat` | AI 对话（功能清单生成等） |
 | POST | `/api/v1/ai/chat-stream` | AI 流式对话（合同起草等） |
 
+> v2.0.8 起默认 LLM 配置为 OpenAI 兼容的 Moonshot Kimi K3。`/ai` 路由保留旧 Gemini 模型名兼容：显式传入 `gemini/...` 时原样发送；短模型名仅对 `gemini-*` 自动补 `gemini/` 前缀，`kimi-*` 等其他 OpenAI 兼容模型名保持原样。
+
 ### 企业大脑（Knowledge Base）
 
 | 方法 | 路径 | 权限 | 说明 |
@@ -222,12 +225,12 @@
 | PATCH | `/api/v1/meeting/records/{id}/attendees` | meeting.write | 更新参会人员列表（兼容旧客户端；Web 前端 v2.0.7 起不再手动编辑参会人员，改由转写分段实际使用的说话人自动同步） |
 | GET | `/api/v1/meeting/records` | meeting.read | 会议列表（支持 `search` 参数搜索标题和参会人） |
 | GET | `/api/v1/meeting/records/{id}` | meeting.read | 会议详情 |
-| DELETE | `/api/v1/meeting/records/{id}` | meeting.write | 删除会议 |
+| DELETE | `/api/v1/meeting/records/{id}` | meeting.write | 删除会议；先数据库批量删除转写分段并 flush，再删除会议主记录，避免 MySQL 外键顺序导致 500 |
 | GET | `/api/v1/meeting/records/{id}/status` | meeting.read | 轮询 ASR 状态 |
 | GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
 | PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人。默认兼容旧模式（仅更新已有分段）；传 `replace=true` 时按提交的完整 `segments` 列表整体替换，支持新增分段、插入行、删除行和重排 `segment_index`，保存后返回最新分段列表和会议详情，并自动同步参会人员 |
 | PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射；保存后按当前转写分段实际使用的 `speaker_id` 自动同步参会人员 |
-| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要）。**仅当 LLM 实际产出内容才落库并置 SUMMARIZED；为空/失败时不改状态、不存空总结，SSE 返回 error**（避免"已总结但空"） |
+| POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要）。请求会把会议标题、会议日期、参会人员和转写文稿一并放入 LLM 上下文；**仅当 LLM 实际产出内容才落库并置 SUMMARIZED；为空/失败时不改状态、不存空总结，SSE 返回 error**（避免"已总结但空"） |
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
 
@@ -236,6 +239,31 @@
 - `TranscriptSegmentUpdate.id` 允许为空或临时字符串；后端仅当其为有效 UUID 且属于当前会议时更新原分段，否则创建新分段，避免前端插入行触发 422。
 - `MeetingRecord.attendees` 不再作为 Web 前端的手动输入来源；后端会根据保存后的分段顺序收集实际使用的 `speaker_id`，再用 `speaker_mapping` 转成显示名并去重，写回参会人员。
 - 本版本不新增数据库字段，不需要 Alembic 迁移。
+
+**会议纪要上下文规则（v2.0.8，2026-08-31）**：
+- `summarize` 会先构造“会议基础信息”块，包含 `MeetingRecord.title`、`meeting_date` 和当前参会人员，再拼接上次会议纪要与当前转写文稿。
+- `meeting_date` 有值时以 ISO 日期格式（如 `2026-08-31`）传入模型；system prompt 明确要求模型把该字段作为会议时间/日期依据，避免输出“时间未注明”。
+- 开发和生产运行环境的会议纪要模型通过 `backend/.env` 的 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 配置；v2.0.8 起两端实际环境使用 Moonshot Kimi K3（`kimi-k3`），真实 API key 不进入 Git。
+
+### 微信通知（WeChat Notification）
+
+| 方法 | 路径 | 权限 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/wechat-notify/binding` | 登录用户 | 获取当前用户微信通知绑定状态 |
+| POST | `/api/v1/wechat-notify/bind/start` | 登录用户 | 向 weixin-msg-service 创建扫码绑定会话，返回二维码 URL |
+| GET | `/api/v1/wechat-notify/bind/status/{session_id}` | 登录用户 | 轮询绑定会话状态；确认后保存/更新 `WeChatNotifyBinding` |
+| DELETE | `/api/v1/wechat-notify/unbind` | 登录用户 | 解绑微信通知；远端删除失败时仍移除本地绑定 |
+| POST | `/api/v1/wechat-notify/test` | 登录用户 | 发送微信测试消息 |
+| PUT | `/api/v1/wechat-notify/preferences` | 登录用户 | 更新微信通知偏好，仅保留白名单事件 key |
+| POST | `/api/v1/wechat-notify/inbound` | 服务器间共享密钥 | 接收 weixin-msg-service 转发的用户微信消息；按绑定 account_id 定位用户，记录 `last_inbound_at`，执行待办/审批指令或 LiteLLM 兜底对话 |
+| POST | `/api/v1/wechat-notify/flush` | 登录用户 / Agent Token | 立即补发指定用户或 account_id 的离线微信通知队列；用户任意来信后可触发 force flush |
+
+**微信入站指令规则（v2.0.8，2026-08-31）**：
+- 用户发送“待办/审批/审核”等短指令时，系统查询真实待审批任务并逐条推送，消息带编号和单号；本人进行中的任务仅返回数量，避免长列表刷屏。
+- 支持“通过 1”“拒绝 2 理由:xxx”“通过 <todo_id>”等编号/单号审批指令；若任务关联请假单，会同步审批/驳回请假申请。
+- 支持“全部通过”“都同意”“通过全部”“全部拒绝 理由:xxx”等批量审批指令，实时查询当前待我审批任务后逐条执行。
+- 自由问答走 LiteLLM 兜底，但会先注入真实待办/审批数量；凡问及具体事项而实时数据不可用时，要求用户发送“待办”查询，避免编造。
+- 后台 `wechat_notification_retry_worker` 每轮执行离线队列补发和通道保活检查；`20260818_0001` 为 `wechat_notify_binding` 增加 `last_inbound_at`、`keepalive_notified_at` 字段，距 24 小时通道过期不足 1 小时时只提醒一次。
 
 ### 版本更新日志（Changelog）
 
@@ -277,4 +305,4 @@
 
 ---
 
-*最后更新：2026-08-17*
+*最后更新：2026-08-31*
