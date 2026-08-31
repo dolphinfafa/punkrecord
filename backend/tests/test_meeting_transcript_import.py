@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from pathlib import Path
 import sys
 from uuid import uuid4
@@ -11,6 +12,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app import models  # noqa: F401
 from app.api.meeting import (
     _attendee_names_from_speakers,
+    _build_meeting_summary_user_message,
     _parse_transcript_text,
     _replace_transcript_segments,
     delete_meeting,
@@ -201,6 +203,29 @@ def test_attendees_follow_transcript_speaker_mapping_order():
     })
 
     assert names == ["李四", "张三"]
+
+
+def test_meeting_summary_context_includes_meeting_date():
+    meeting = MeetingRecord(
+        title="早会",
+        meeting_type=MeetingType.MORNING,
+        meeting_date=date(2026, 8, 31),
+        status=MeetingStatus.TRANSCRIBED,
+        created_by=uuid4(),
+    )
+
+    message = _build_meeting_summary_user_message(
+        meeting,
+        "张三: 今天处理会议纪要日期。",
+        None,
+        ["张三", "李四"],
+    )
+
+    assert "会议基础信息" in message
+    assert "会议标题：早会" in message
+    assert "会议日期：2026-08-31" in message
+    assert "参会人员：张三、李四" in message
+    assert "会议转写文稿" in message
 
 
 def test_delete_meeting_removes_transcript_segments_before_parent():

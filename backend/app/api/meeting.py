@@ -88,6 +88,35 @@ def _enrich_meeting(meeting: MeetingRecord, session: Session) -> MeetingResponse
     return data
 
 
+def _build_meeting_summary_user_message(
+    meeting: MeetingRecord,
+    transcript_text: str,
+    custom_prompt: Optional[str],
+    attendees_list: list[str],
+    previous_summary: Optional[str] = None,
+) -> str:
+    """Build the user prompt context for meeting summary generation."""
+    meeting_date = meeting.meeting_date.isoformat() if meeting.meeting_date else "未填写"
+    metadata_lines = [
+        "会议基础信息：",
+        f"会议标题：{meeting.title}",
+        f"会议日期：{meeting_date}",
+    ]
+    attendees = [name.strip() for name in attendees_list if name and name.strip()]
+    if attendees:
+        metadata_lines.append(f"参会人员：{'、'.join(attendees)}")
+
+    user_message_parts = ["\n".join(metadata_lines)]
+    if previous_summary:
+        user_message_parts.append(f"上次会议纪要（供参考对比）：\n{previous_summary}\n\n---")
+    if transcript_text:
+        user_message_parts.append(f"会议转写文稿：\n{transcript_text}")
+    if custom_prompt and not transcript_text:
+        # For text-only meetings, the custom prompt IS the meeting content.
+        user_message_parts.append(f"会议记录：\n{custom_prompt}")
+    return "\n\n".join(user_message_parts)
+
+
 def _normalize_transcript_content_type(file: UploadFile) -> str:
     content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
     suffix = Path(file.filename or "").suffix.lower()
@@ -871,26 +900,27 @@ async def summarize_meeting(
     m_id = meeting.id
 
     if segments:
-        system_prompt = "你是专业的会议纪要生成助手。请根据以下会议转写文稿，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
+        system_prompt = "你是专业的会议纪要生成助手。请根据以下会议转写文稿，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。如果会议基础信息包含会议日期，请将其作为会议时间/日期依据，不要写“时间未注明”。"
         if custom_prompt:
             system_prompt += f"\n\n额外要求：{custom_prompt}"
     else:
         # No transcript — use custom prompt as the meeting content
-        system_prompt = "你是专业的会议纪要生成助手。请根据用户提供的会议记录，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。"
+        system_prompt = "你是专业的会议纪要生成助手。请根据用户提供的会议记录，生成结构化的会议纪要，包括：会议概要、讨论要点、决策事项、待办事项。如果会议基础信息包含会议日期，请将其作为会议时间/日期依据，不要写“时间未注明”。"
 
     # Build user message with optional previous meeting context
-    user_message_parts = []
+    previous_summary = None
     previous_meeting_id = body.previous_meeting_id if body else None
     if previous_meeting_id:
         prev_meeting = session.get(MeetingRecord, previous_meeting_id)
         if prev_meeting and prev_meeting.summary:
-            user_message_parts.append(f"上次会议纪要（供参考对比）：\n{prev_meeting.summary}\n\n---\n")
-    if transcript_text:
-        user_message_parts.append(f"会议转写文稿：\n{transcript_text}")
-    if custom_prompt and not segments:
-        # For text-only meetings, the custom prompt IS the meeting content
-        user_message_parts.append(f"会议记录：\n{custom_prompt}")
-    user_message = "\n".join(user_message_parts)
+            previous_summary = prev_meeting.summary
+    user_message = _build_meeting_summary_user_message(
+        meeting,
+        transcript_text,
+        custom_prompt,
+        attendees_list,
+        previous_summary,
+    )
 
     async def generate():
         full_text = ""
