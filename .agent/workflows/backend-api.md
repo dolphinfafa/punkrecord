@@ -300,7 +300,7 @@
 - **合同附件与会议工具（v2.0.4，2026-07-08）**：新增 `get_contract`/`list_contract_attachments`/`upload_contract_attachment`/`delete_contract_attachment`，附件工具会返回 `view_path`/`download_path`；新增 `get_meeting`/`get_meeting_transcript`/`retranscribe_meeting`，用于查看会议详情、转写分段和触发重新转写。
 - **会议文稿导入工具（v2.0.5，2026-07-13）**：新增 `upload_meeting_transcript`，通过 base64 文件内容代理调用 `/meeting/records/{id}/upload-transcript`，支持 Word `.docx` 与 PDF 文稿替换会议转写分段。工具总数更新为 36。
 - **待办/Bug 图片读取（v2.0.6，2026-07-22）**：`get_todo`、`list_my_todos`、`list_project_todos`、`list_tasks_to_review` 及任务状态变更工具会补全 `link.todo_images` 与 `link.bug_images` 的 `api_download_url`/`download_url`；URL 不暴露 token，下载时需使用同一 `Authorization` 头。新增 `get_todo_image(todo_id, image_id)` 与 `get_bug_image(project_id, attachment_id)`，直接返回 `{file_name, content_type, size, content_base64}`，适合无法额外发 HTTP 下载请求的 MCP 客户端。工具总数更新为 38。
-- **待办编辑**：`update_todo` 转发 `PATCH /todo/{todo_id}`，支持修改标题、描述、备注、优先级、起止时间、负责人、标签及项目关联信息；未传字段保持不变，权限规则与 Web 端一致。工具总数更新为 39。
+- **待办编辑（v2.0.9，2026-09-29）**：`update_todo` 转发 `PATCH /todo/{todo_id}`，支持修改标题、描述、备注、优先级、起止时间、负责人、标签及项目关联信息；未传字段保持不变，权限规则与 Web 端一致。工具总数更新为 39。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端使用 conda env `punkrecord`；`dev.sh` 已指向 `/opt/miniconda3/envs/punkrecord/bin/python`，避免误用旧 `punk` 环境。
 
