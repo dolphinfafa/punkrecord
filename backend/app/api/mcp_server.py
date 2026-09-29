@@ -508,6 +508,59 @@ async def create_todo(
 
 
 @mcp.tool()
+async def update_todo(
+    ctx: Context,
+    todo_id: str,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    notes: Optional[str] = None,
+    priority: Optional[str] = None,
+    due_at: Optional[str] = None,
+    start_at: Optional[str] = None,
+    assignee_user_id: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    project_name: Optional[str] = None,
+    project_id: Optional[str] = None,
+    dev_type: Optional[str] = None,
+) -> dict:
+    """编辑待办事项（需 todo.write 权限，且当前用户必须有权访问该任务）。
+
+    - todo_id：待办 UUID，可先用 list_my_todos 或 get_todo 获取。
+    - priority：p0-p3；due_at/start_at：ISO 时间。
+    - 可修改标题、描述、备注、负责人、标签及项目关联信息。
+    - 只传需要修改的字段；未传字段保持不变。
+    """
+    body: dict = {}
+    optional_fields = {
+        "title": title,
+        "description": description,
+        "notes": notes,
+        "priority": priority,
+        "due_at": due_at,
+        "start_at": start_at,
+        "assignee_user_id": assignee_user_id,
+        "tags": tags,
+    }
+    body.update({key: value for key, value in optional_fields.items() if value is not None})
+
+    link: dict = {}
+    if project_name is not None:
+        link["project_name"] = project_name
+    if project_id is not None:
+        link["project_id"] = project_id
+    if dev_type is not None:
+        link["dev_type"] = dev_type
+    if link:
+        body["link"] = link
+
+    if not body:
+        raise RuntimeError("至少需要提供一个要修改的字段。")
+
+    data = await _call(ctx, "PATCH", f"/todo/{todo_id}", json=body)
+    return _enrich_todo_media_urls(ctx, data)
+
+
+@mcp.tool()
 async def create_bug(
     ctx: Context,
     title: str,

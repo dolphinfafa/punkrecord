@@ -12,7 +12,7 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 | 合同管理 | 合同 CRUD、交易方管理（含编辑）、付款计划、AI 生成合同 |
 | 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、Bug 管理（编辑/配图CRUD/筛选/Agent状态）、验收报告 |
 | 财务管理 | 账户、交易记录（编辑、日期/状态筛选、作废/恢复、删除已作废交易、Excel导出）、发票、报销 |
-| AI 能力 | AI 对话、功能清单生成、合同起草、会议纪要生成（OpenAI 兼容 LLM；dev/prod 当前为 Kimi K3） |
+| AI 能力 | AI 对话、功能清单生成、合同起草、会议纪要生成（OpenAI 兼容 LLM；默认 GPT-5.6 Sol） |
 | 企业大脑（KB） | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
 | 版本日志 | 首页版本更新日志（L0 可编辑），版本选择查看，Markdown 渲染 |
 | 会议记录 | 音频上传、ASR 转写（豆包）、Word/PDF 文稿导入、转写稿编辑、说话人标注/切换、会议日期、参会人自动同步、预设/自定义提示词、引用历史会议、AI 会议纪要（含会议日期上下文）、搜索、归档到企业大脑 |
@@ -22,7 +22,7 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 - **后端**：Python / FastAPI / SQLModel / MySQL 8.0 / ChromaDB
 - **前端**：React 19 / Vite / React Router / Axios
 - **小程序**：原生微信小程序框架
-- **AI**：OpenAI 兼容 LLM（dev/prod 当前为 Kimi K3）/ Gemini Embedding & Vision / 豆包 ASR / ChromaDB 向量检索
+- **AI**：OpenAI 兼容 LLM（默认 GPT-5.6 Sol）/ Gemini Embedding & Vision / 豆包 ASR / ChromaDB 向量检索
 
 ## Project Structure
 

@@ -227,9 +227,9 @@ AtlasException (基类, code=400)
 | `KB_CHUNK_SIZE` | `1000` | 知识库文档切片大小（字符） |
 | `KB_CHUNK_OVERLAP` | `200` | 切片重叠长度 |
 | `KB_RAG_TOP_K` | `5` | RAG 检索返回的 top-k 数量 |
-| `LITELLM_BASE_URL` | `https://api.moonshot.cn/v1` | OpenAI 兼容 LLM 地址；会议纪要、AI 对话、合同起草和微信兜底对话使用。真实值以 dev/prod `.env` 为准 |
+| `LITELLM_BASE_URL` | `https://l-llm.yios.cn/v1` | OpenAI 兼容 LLM 地址；会议纪要、AI 对话、合同起草和微信兜底对话使用。真实值以各环境 `.env` 为准 |
 | `LITELLM_API_KEY` | (已配置) | LLM API 密钥；真实 key 只写入各环境 `.env`，不进入 Git |
-| `LITELLM_MODEL` | `kimi-k3` | LiteLLM/OpenAI 兼容调用使用的模型；v2.0.8 dev/prod `.env` 已切至 Moonshot Kimi K3 |
+| `LITELLM_MODEL` | `gpt-5.6-sol` | OpenAI 兼容调用使用的默认模型；各环境可通过 `.env` 覆盖 |
 | `VOLC_ASR_APP_KEY` | (已配置) | 豆包 ASR 应用 Key |
 | `VOLC_ASR_ACCESS_KEY` | (已配置) | 豆包 ASR 访问 Key |
 | `WECHAT_MSG_SERVICE_URL` | (可选) | weixin-msg-service 地址；未配置时微信通知与队列 worker 自动跳过 |
@@ -741,9 +741,9 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 | 微信入站审批 | `POST /api/v1/wechat-notify/inbound` | 解析微信消息中的待办查询、编号审批、批量审批；自由对话通过 `LITELLM_MODEL` 兜底 |
 | 图片文字提取 | 知识库上传图片时 | Gemini Vision 提取图片中的文字内容 |
 
-**AI 技术栈**：OpenAI 兼容 LLM（dev/prod `.env` 当前为 Moonshot Kimi K3，用于 AI 对话、合同起草、会议纪要和微信兜底对话） + Gemini Embedding text-embedding-004（向量化） + Gemini Vision/文本处理 + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
+**AI 技术栈**：OpenAI 兼容 LLM（默认 GPT-5.6 Sol，用于 AI 对话、合同起草、会议纪要和微信兜底对话） + Gemini Embedding text-embedding-004（向量化） + Gemini Vision/文本处理 + ChromaDB（向量存储检索） + 豆包 ASR（语音转文字）
 
-通过 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 统一配置 OpenAI 兼容模型。v2.0.8 起默认模型和开发/生产 `.env` 已切至 `kimi-k3`，真实 API key 不进入 Git。前端使用 `react-markdown` 渲染 Markdown。
+通过 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 统一配置 OpenAI 兼容模型。当前默认模型为 `gpt-5.6-sol`，真实 API key 只写入各环境 `.env`，不进入 Git。前端使用 `react-markdown` 渲染 Markdown。
 
 ---
 
@@ -773,4 +773,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-08-31*
+*最后更新：2026-09-29*

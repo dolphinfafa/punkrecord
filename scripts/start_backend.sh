@@ -1,11 +1,8 @@
-#!/bin/bash
-# Script to start the backend server
+#!/usr/bin/env bash
+# Start the development backend with the project's pinned Conda interpreter.
 
 cd "$(dirname "$0")/.."
-
-# Activate conda environment
-eval "$(conda shell.bash hook)"
-conda activate punk
-
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 15085
+
+PYTHON="/opt/miniconda3/envs/punkrecord/bin/python"
+exec "$PYTHON" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 15085

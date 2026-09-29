@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
     # OpenAI-compatible LLM (AI chat, contract drafting, meeting summary, WeChat fallback)
-    LITELLM_BASE_URL: str = "https://api.moonshot.cn/v1"
+    LITELLM_BASE_URL: str = "https://l-llm.yios.cn/v1"
     LITELLM_API_KEY: str = ""
-    LITELLM_MODEL: str = "kimi-k3"
+    LITELLM_MODEL: str = "gpt-5.6-sol"
 
     # Knowledge Base
     CHROMADB_PATH: str = "./data/chromadb"

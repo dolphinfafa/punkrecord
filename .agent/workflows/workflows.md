@@ -131,7 +131,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 - 每片 ASR 超时 20 分钟，ASR 返回 0 segments 时标记为 `failed`（而非 `transcribed`）
 - 会议状态流转：`uploading → transcribing → transcribed → summarized → archived`（或 `failed`）
 - 转写完成后可编辑文稿内容和说话人标注；v2.0.7 起支持新增讲话人、插入/删除转写行、切换 speaker，并通过完整分段列表保存。保存后后端按分段顺序收集实际使用的 `speaker_id`，结合 `speaker_mapping` 自动重算参会人员。
-- AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项；v2.0.8 起请求上下文会包含会议标题、会议日期、参会人员和转写文稿，模型应使用 `meeting_date` 作为会议时间/日期依据，避免输出“时间未注明”
+- AI 生成会议纪要（SSE 流式）：会议概要、讨论要点、决策事项、待办事项；请求上下文包含会议标题、会议日期、参会人员和转写文稿，模型应使用 `meeting_date` 作为会议时间/日期依据，避免输出“时间未注明”；当前默认模型为 `gpt-5.6-sol`
 - 提示词预设与自定义提示词：选择预设会**追加**预设文案到自定义框已有内容之后（两部分共存，提交时合并为 `prompt`），切换预设自动剥离上一次追加段以避免累积
 - 归档到企业大脑：将转写文稿 + 纪要存为知识库文档，自动进入处理管线
 
@@ -143,7 +143,7 @@ AI Agent 工作流（`link.agent_status` 字段，独立于 `todo.status`）：
 
 ```bash
 # 启动开发服务器
-uvicorn app.main:app --reload --host 0.0.0.0 --port 15085
+/opt/miniconda3/envs/punkrecord/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 15085
 
 # 数据库迁移
 alembic upgrade head
@@ -191,27 +191,24 @@ curl http://localhost:15085/health
 
 ### 环境要求
 
-| 系统 | 工具 | 环境名 |
-|------|------|--------|
-| macOS | pyenv | punkrecord |
-| Windows/Linux | conda | punkrecord |
+| 环境 | 工具 | 环境名 | Python |
+|------|------|--------|--------|
+| 开发服务器 | Conda | `punkrecord` | 3.10.0 |
 
 ### 使用规则
 
-1. 先检测操作系统
-2. 在执行任何 Python 命令前先激活环境
-3. 绝不在 `punkrecord` 环境外运行项目的 Python 命令
+1. 在执行任何 Python 命令前确认解释器属于 `punkrecord` 环境。
+2. 非交互命令优先使用绝对路径 `/opt/miniconda3/envs/punkrecord/bin/python`。
+3. PM2 后端进程必须直接使用该解释器，禁止使用 PATH 中不确定来源的 `uvicorn`。
+4. `scripts/start_backend.sh` 和 `dev.sh` 均固定使用该解释器。
 
 ### 激活命令
 
 ```bash
-# macOS
-pyenv activate punkrecord
-
-# Windows / Linux
 conda activate punkrecord
-# 如果 shell 未初始化 conda：
-eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
+
+# Agent/PM2/脚本推荐
+/opt/miniconda3/envs/punkrecord/bin/python --version
 ```
 
 ---
@@ -234,11 +231,11 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 | 环境 | 库名 | 主机 | 端口 | 用途 |
 |------|------|------|------|------|
 | 本地开发 | `punkrecord_local` | `127.0.0.1` | `3306` | 日常开发，`.env` 默认连接此库 |
-| 远程开发 | `punkrecord_dev` | `14.103.133.34` | `13306` | 共享开发数据（已停止直连） |
-| 生产 | `punkrecord_deploy` | `14.103.133.34` | `13306` | 生产环境 |
+| 远程开发 | `punkrecord_dev` | 见对应环境 `.env` | 见对应环境 `.env` | 共享开发数据（已停止直连） |
+| 生产 | `punkrecord_deploy` | 见生产 `.env` | 见生产 `.env` | 生产环境 |
 
 **注意事项**：
-- 开发时使用本地数据库 `punkrecord_local`（用户: `punkrecord`，密码: `punkrecord123`），不再直连远程 `punkrecord_dev`
+- 开发时使用本地数据库 `punkrecord_local`，连接账号和密码只保存在 `backend/.env`，不再直连远程 `punkrecord_dev`
 - User 模型表名为 `users`（`user` 是 MySQL 保留字），所有 `foreign_key` 引用已同步更新
 - 旧的 SQLite 专用启动迁移代码（`_ensure_user_profile_columns`）已删除
 - 测试仍使用 SQLite 内存数据库（`tests/test_project_workflow.py`），不影响生产
@@ -257,10 +254,10 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 ## 6. 部署环境
 
 ### Dev 环境（开发服务器）
-- **后端**：端口 15085（uvicorn, Python 3.11, conda env: punkrecord）
+- **后端**：端口 15085（Uvicorn，Conda `punkrecord`，Python 3.10.0）
 - **前端**：端口 15173（Vite dev server）
 - **数据库**：`punkrecord_local`（本地 MySQL 3306）
-- **启停**：`./dev.sh start|stop|restart|status`；`dev.sh` 前端显式设置 `VITE_BASE=/punkrecord/`，且 `App.jsx` 会在访问 `/punkrecord/` 时自动使用 `/punkrecord` basename，避免子路径白屏
+- **启停**：`./dev.sh start|stop|restart|status`；PM2 后端必须以 `/opt/miniconda3/envs/punkrecord/bin/python -m uvicorn ...` 启动。`dev.sh` 前端显式设置 `VITE_BASE=/punkrecord/`，且 `App.jsx` 会在访问 `/punkrecord/` 时自动使用 `/punkrecord` basename，避免子路径白屏
 
 ### Deploy 环境（生产服务器）
 - **后端**：端口 9086（uvicorn, Python 3.10+, venv/conda, pm2 守护）
@@ -277,4 +274,4 @@ eval "$(conda shell.bash hook 2>/dev/null)" && conda activate punkrecord
 
 ---
 
-*最后更新：2026-08-31*
+*最后更新：2026-09-29*

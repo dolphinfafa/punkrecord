@@ -191,7 +191,7 @@
 | POST | `/api/v1/ai/chat` | AI 对话（功能清单生成等） |
 | POST | `/api/v1/ai/chat-stream` | AI 流式对话（合同起草等） |
 
-> v2.0.8 起默认 LLM 配置为 OpenAI 兼容的 Moonshot Kimi K3。`/ai` 路由保留旧 Gemini 模型名兼容：显式传入 `gemini/...` 时原样发送；短模型名仅对 `gemini-*` 自动补 `gemini/` 前缀，`kimi-*` 等其他 OpenAI 兼容模型名保持原样。
+> 当前默认 LLM 配置为 OpenAI 兼容网关 `https://l-llm.yios.cn/v1` 上的 GPT-5.6 Sol（`gpt-5.6-sol`）。`/ai` 路由保留旧 Gemini 模型名兼容：显式传入 `gemini/...` 时原样发送；短模型名仅对 `gemini-*` 自动补 `gemini/` 前缀，其他 OpenAI 兼容模型名保持原样。
 
 ### 企业大脑（Knowledge Base）
 
@@ -243,7 +243,7 @@
 **会议纪要上下文规则（v2.0.8，2026-08-31）**：
 - `summarize` 会先构造“会议基础信息”块，包含 `MeetingRecord.title`、`meeting_date` 和当前参会人员，再拼接上次会议纪要与当前转写文稿。
 - `meeting_date` 有值时以 ISO 日期格式（如 `2026-08-31`）传入模型；system prompt 明确要求模型把该字段作为会议时间/日期依据，避免输出“时间未注明”。
-- 开发和生产运行环境的会议纪要模型通过 `backend/.env` 的 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 配置；v2.0.8 起两端实际环境使用 Moonshot Kimi K3（`kimi-k3`），真实 API key 不进入 Git。
+- 会议纪要模型通过 `backend/.env` 的 `LITELLM_BASE_URL` / `LITELLM_MODEL` / `LITELLM_API_KEY` 配置；当前默认使用 `https://l-llm.yios.cn/v1` 上的 GPT-5.6 Sol（`gpt-5.6-sol`），真实 API key 不进入 Git。
 
 ### 微信通知（WeChat Notification）
 
@@ -294,15 +294,16 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（38）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`get_todo_image`/`get_bug_image`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（39）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`get_todo_image`/`get_bug_image`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`update_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
 - **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
 - **财务交易作废工具（v2.0.3，2026-07-01）**：`list_transactions` 支持 `account_id`/`txn_direction`/`status`/日期/分页筛选，`status=voided` 可查看作废交易；`void_transaction`/`unvoid_transaction`/`delete_voided_transaction` 分别转发财务交易作废、恢复和删除已作废交易。写操作需 `finance.write` 权限。
 - **合同附件与会议工具（v2.0.4，2026-07-08）**：新增 `get_contract`/`list_contract_attachments`/`upload_contract_attachment`/`delete_contract_attachment`，附件工具会返回 `view_path`/`download_path`；新增 `get_meeting`/`get_meeting_transcript`/`retranscribe_meeting`，用于查看会议详情、转写分段和触发重新转写。
 - **会议文稿导入工具（v2.0.5，2026-07-13）**：新增 `upload_meeting_transcript`，通过 base64 文件内容代理调用 `/meeting/records/{id}/upload-transcript`，支持 Word `.docx` 与 PDF 文稿替换会议转写分段。工具总数更新为 36。
 - **待办/Bug 图片读取（v2.0.6，2026-07-22）**：`get_todo`、`list_my_todos`、`list_project_todos`、`list_tasks_to_review` 及任务状态变更工具会补全 `link.todo_images` 与 `link.bug_images` 的 `api_download_url`/`download_url`；URL 不暴露 token，下载时需使用同一 `Authorization` 头。新增 `get_todo_image(todo_id, image_id)` 与 `get_bug_image(project_id, attachment_id)`，直接返回 `{file_name, content_type, size, content_base64}`，适合无法额外发 HTTP 下载请求的 MCP 客户端。工具总数更新为 38。
+- **待办编辑**：`update_todo` 转发 `PATCH /todo/{todo_id}`，支持修改标题、描述、备注、优先级、起止时间、负责人、标签及项目关联信息；未传字段保持不变，权限规则与 Web 端一致。工具总数更新为 39。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端使用 conda env `punkrecord`；`dev.sh` 已指向 `/opt/miniconda3/envs/punkrecord/bin/python`，避免误用旧 `punk` 环境。
 
 ---
 
-*最后更新：2026-08-31*
+*最后更新：2026-09-29*

@@ -4,7 +4,23 @@ description: PunkRecord 项目索引大纲。执行任何任务前先阅读此�
 
 # 项目索引
 
-本文件是项目的导航入口，提供仓库结构总览和子文档索引。Agent 执行任务时先读此文件定位方向，再按需阅读对应的子文档获取详细信息。
+本文件是项目的行动纲领和导航入口。Agent 执行任何任务前必须先阅读本文件，再按需阅读对应子文档。
+
+### 强制行动规则
+
+1. 修改文件前，先用 3 个要点说明目标、改动范围和验证方式。
+2. Python 命令必须使用 Conda `punkrecord` 环境；开发服务器优先直接调用 `/opt/miniconda3/envs/punkrecord/bin/python`。
+3. 未经测试、构建、接口检查或日志验证，不得报告“完成”。
+4. 命令失败时先阅读错误和日志、分析根因，再做最小修复，禁止盲目重试。
+5. 优先复用现有模块和成熟方案，保持实现简单，不做无关重构，不引入未经用户确认的新依赖。
+6. IP、API key、Token、密码等敏感信息只能保存在被 `.gitignore` 排除的 `.env` 中，不得进入代码、文档、日志或 Git。
+7. `.agent/workflows/` 用于维护项目现状；`milestone/YYYY-MM-DD.md` 用于记录每日工作进展。
+
+### 身份与沟通
+
+- **Role**：首席工程师兼高级数据科学家
+- **Voice**：专业、简洁、结果导向
+- **Authority**：用户是总架构师，立即执行明确指令；仅在缺少必要信息、权限或存在不可逆风险时说明阻塞点
 
 ---
 
@@ -70,7 +86,7 @@ punkrecord/
 - **认证方式**：JWT Bearer Token（HS256，24 小时有效）
 - **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）
 - **数据库**：MySQL 8.0，驱动 `pymysql`（连接信息见 `backend/.env`）
-- **Python 环境**：虚拟环境名 `punkrecord`（macOS 用 pyenv，Linux/Windows 用 conda）
+- **Python 环境**：Conda 环境 `punkrecord`，开发服务器解释器 `/opt/miniconda3/envs/punkrecord/bin/python`（Python 3.10.0）
 - **RBAC 状态**：`ENFORCE_RBAC=True`，已正式启用前后端双层权限控制
 
 ---
@@ -97,9 +113,11 @@ punkrecord/
 | 业务流程/运行命令变更 | `workflows.md` |
 | 开发规范/安全规则变更 | `conventions.md` |
 | 架构/技术选型/设计变更 | `project-overview.md`（参见其第 10 章维护规则） |
+| 每日重要工作 | `milestone/YYYY-MM-DD.md`（同一天追加到同一文件） |
+| 用户指定版本发布 | `updates/<version>.md` |
 
 所有文档使用 UTF-8（无 BOM）编码，LF 换行符，中文书写（技术术语和代码标识符保持英文原文）。
 
 ---
 
-*最后更新：2026-04-09*
+*最后更新：2026-09-29*
