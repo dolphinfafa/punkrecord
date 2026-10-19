@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import client from '@/api/client';
 import {
     Plus, Check, Clock, AlertCircle, Calendar, Users, User, LayoutGrid, List,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, Coins
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -31,6 +31,7 @@ const TASK_TYPE_LABELS = {
     other: '其他',
 };
 const DONE_PAGE_SIZE = 10;
+const isBeliTask = (todo) => Number(todo.estimated_hours) > 0;
 
 const getProjectLabel = (todo) => {
     const projectName = todo?.link?.project_name;
@@ -663,6 +664,7 @@ export default function TodoPage() {
                                                     key={todo.id}
                                                     className={clsx('todo-card', {
                                                         done: todo.status === 'done',
+                                                        'beli-task': isBeliTask(todo),
                                                         dragging: draggedTodo?.id === todo.id
                                                     })}
                                                     draggable={todo.status !== 'blocked'} // Allow dragging except blocked
@@ -670,8 +672,11 @@ export default function TodoPage() {
                                                     onClick={() => handleTodoClick(todo)}
                                                 >
                                                     <div className="card-header">
-                                                        <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
-                                                            {PRIORITY_LABELS[todo.priority]}
+                                                        <span className="card-labels">
+                                                            <span className={clsx('priority-badge', `priority-${todo.priority}`)}>
+                                                                {PRIORITY_LABELS[todo.priority]}
+                                                            </span>
+                                                            {isBeliTask(todo) && <span className="beli-task-badge"><Coins size={12} aria-hidden="true" />贝利任务</span>}
                                                         </span>
                                                         {todo.due_at && (
                                                             <span className="due-date">
@@ -682,7 +687,7 @@ export default function TodoPage() {
                                                     <div className="card-title">{todo.title}</div>
                                                     <div className="card-footer">
                                                         {getProjectLabel(todo) && (
-                                                            <span className="meta-tag" style={{ marginRight: '6px' }}>
+                                                            <span className="meta-tag">
                                                                 项目: {getProjectLabel(todo)}
                                                             </span>
                                                         )}
@@ -722,6 +727,7 @@ export default function TodoPage() {
                                         key={todo.id}
                                         className={clsx('todo-item', {
                                             done: todo.status === 'done',
+                                            'beli-task': isBeliTask(todo),
                                             'pending-review': todo.status === 'pending_review'
                                         })}
                                         onClick={() => handleTodoClick(todo)}
@@ -733,6 +739,7 @@ export default function TodoPage() {
                                         <div className="todo-content">
                                             <div className="todo-title">{todo.title}</div>
                                             <div className="todo-meta">
+                                                {isBeliTask(todo) && <span className="beli-task-badge"><Coins size={12} aria-hidden="true" />贝利任务</span>}
                                                 {hasBugImage(todo) && (
                                                     <BugImagePreview
                                                         projectId={todo.link.project_id}

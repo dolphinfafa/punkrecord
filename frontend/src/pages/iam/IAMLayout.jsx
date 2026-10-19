@@ -17,7 +17,6 @@ export default function IAMLayout() {
                     <NavLink to="/iam/users" className={({ isActive }) => isActive ? 'active' : ''}>员工管理</NavLink>
                     <NavLink to="/iam/departments" className={({ isActive }) => isActive ? 'active' : ''}>部门管理</NavLink>
                     <NavLink to="/iam/job-titles" className={({ isActive }) => isActive ? 'active' : ''}>职位管理</NavLink>
-                    <NavLink to="/iam/beli-rules" className={({ isActive }) => isActive ? 'active' : ''}>贝利规则</NavLink>
                     <NavLink to="/iam/org-chart" className={({ isActive }) => isActive ? 'active' : ''}>组织架构</NavLink>
                 </nav>
             </div>

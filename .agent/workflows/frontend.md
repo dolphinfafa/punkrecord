@@ -1,5 +1,17 @@
 # 前端与小程序架构
 
+## 2026-10-16 开发环境页面
+
+- `/project/:id/bugs`：独立Bug页面，项目详情中的Bug入口直接导航；标题搜索、原筛选条件和分页保存在URL中，保留配图与详情交互。
+- `/beli`：独立贝利页面，包含贝利与假期、任务奖励、早会考勤、商城、兑换记录；L0额外维护工作日历、调整余额和审核兑换。
+- `/leave`：独立请假申请与审批。工作台及小程序保留请假快捷入口，但不再与待办状态联动。
+- 员工管理移除贝利、假期调整与重置入口；管理员专用基本工资编辑入口独立读取和保存，不加入用户列表返回体。
+- 普通任务、项目任务、Bug、批量生成及同步表单预计工时默认 0、可不填、不可为负数；截止日期仍必填。详情和小程序正确展示 0 小时，旧空工时按未设置展示为 0；奖励页将退出资格的历史记录标为“不参与奖励”，不显示审核按钮。
+- 待办看板、全部列表及小程序中，预计工时大于 0 的任务使用绿色卡片及“贝利任务”标识；0/空工时保持普通样式。我的/团队、未完成/已完成共用此规则，工时编辑后自动更新；配色表示任务配置，不代表奖励已审批或已到账。Web 支持明暗模式。
+- 手机视口自动收起侧栏、保留图标导航与退出按钮；内容区允许内部表格横向滚动，避免挤压页面文字。
+- 商品图片复用 `ImagePasteUpload`，支持粘贴、本地文件及预览；查看带认证图片使用blob URL并回收。
+- 贝利调整与兑换请求键兼容非HTTPS开发地址；不能依赖仅安全上下文提供的 `crypto.randomUUID`。
+
 > 本文档描述 Web 前端和微信小程序的架构设计。属于 `project-index.md` 的子文档。
 
 ---
@@ -20,17 +32,20 @@
 | `/profile-setup` | 首次登录档案完善页（`pages/auth/ProfileSetupPage`）- 新密码/确认密码输入限制中文 |
 | `/` | 仪表盘 |
 | `/todo` | 任务管理（看板/列表双视图，看板已完成列懒加载折叠，列表分页） |
+| `/leave` | 独立请假管理 |
+| `/beli` | 贝利、假期、独立奖励审核、考勤与商城 |
 | `/iam/users` | 用户管理 |
 | `/iam/entities` | 实体管理 |
 | `/iam/departments` | 部门管理 |
 | `/iam/job-titles` | 职位管理 |
-| `/iam/beli-rules` | 积分规则 |
+| `/iam/beli-rules` | 旧地址，重定向至 `/beli` |
 | `/iam/org-chart` | 组织架构图 |
 | `/contract/list` | 合同列表 |
 | `/contract/counterparties` | 对手方管理 |
 | `/project` | 项目列表 |
 | `/project/:id` | 项目详情 |
 | `/project/:id/dev-progress` | 开发进度 |
+| `/project/:id/bugs` | 独立Bug管理与标题查询 |
 | `/finance/accounts` | 账户管理 |
 | `/finance/transactions` | 交易记录 |
 | `/kb` | 企业大脑 - 文档列表 |
@@ -44,7 +59,7 @@
 
 - 共享布局组件：`components/layout/*`
 - 认证状态：`contexts/AuthContext`（React Context，非 Redux）
-- 业务页面：`src/pages/{auth,dashboard,iam,contract,project,finance,todo,kb,meeting}`
+- 业务页面：`src/pages/{auth,dashboard,iam,contract,project,finance,todo,leave,beli,kb,meeting}`
 
 ### 共享组件
 
@@ -248,4 +263,4 @@
 
 ---
 
-*最后更新：2026-08-17*
+*最后更新：2026-10-16*

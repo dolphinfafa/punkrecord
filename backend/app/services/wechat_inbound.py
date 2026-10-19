@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 # ─── 引用回复解析(与 wechat-bot/src/parse.ts 保持同源) ──────────────────────
 
 _UUID_RE = re.compile(
-    r"单号\s*[:：]\s*("
+    r"单号\s*[:：]\s*((?:leave:)?(?:"
     r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}"
-    r"|[0-9a-fA-F]{32})"
+    r"|[0-9a-fA-F]{32}))"
 )
 _APPROVE_RE = re.compile(
     r"^(通过|同意|批准|可以啊?|可以的?|行|好的?|OK|okay|approve|lgtm|yes|没问题)(了)?[\s!。.~！]*$",
@@ -58,7 +58,7 @@ _REJECT_WORDS = ("拒绝", "驳回", "不同意", "不通过", "打回", "退回
 _REPLY_CMD_RE = re.compile(  # 备用:见 parse_action_reply 的说明
     r"^(unused)$"
 )
-_REPLY_UUID_RE = re.compile(r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32})")
+_REPLY_UUID_RE = re.compile(r"((?:leave:)?(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32}))")
 _INDEX_RE = re.compile(r"^(?:第)?(\d+)(?:条|项|个)?\s*(.*)$")
 
 # 动词锚定:词表按需排序(长词在前避免前缀吞掉),匹配后解析剩余部分
@@ -92,6 +92,8 @@ def parse_action_reply(text: str) -> Optional[dict]:
     if um:
         uid = _normalize_uuid(um.group(1))
         if uid:
+            if "请假" in rest and not uid.startswith("leave:"):
+                uid = "leave:" + uid
             comment = _clean_comment(rest.replace(um.group(1), "").strip())
             return {"action": action, "todo_id": uid,
                     "comment": (comment or _DEFAULT_REJECT_COMMENT) if action == "reject" else (comment or None)}
@@ -136,12 +138,11 @@ def _reply_cache_set(account_id: str, items: list) -> None:
 
 
 def _normalize_uuid(raw: str) -> Optional[str]:
-    hex_str = raw.replace("-", "").lower()
-    if len(hex_str) != 32:
+    prefix = "leave:" if raw.startswith("leave:") else ""
+    try:
+        return prefix + str(UUID(raw[len(prefix):]))
+    except (ValueError, AttributeError):
         return None
-    return (
-        f"{hex_str[0:8]}-{hex_str[8:12]}-{hex_str[12:16]}-{hex_str[16:20]}-{hex_str[20:32]}"
-    )
 
 
 def parse_quote_command(text: str) -> Optional[dict]:
@@ -160,6 +161,8 @@ def parse_quote_command(text: str) -> Optional[dict]:
     todo_id = _normalize_uuid(m.group(1))
     if not todo_id:
         return None
+    if "请假" in quoted and not todo_id.startswith("leave:"):
+        todo_id = "leave:" + todo_id
 
     if _APPROVE_RE.match(reply):
         return {"action": "approve", "todo_id": todo_id, "comment": None}
@@ -196,33 +199,20 @@ async def _internal_call(user: User, method: str, path: str, json_body: Optional
 async def _exec_approval(user: User, cmd: dict) -> str:
     """cmd 需含 todo_id(编号指令已解析)"""
     todo_id = cmd["todo_id"]
+    is_leave = todo_id.startswith("leave:")
+    target = f"/todo/leaves/{todo_id[6:]}" if is_leave else f"/todo/{todo_id}"
     try:
         if cmd["action"] == "approve":
-            data = await _internal_call(user, "POST", f"/todo/{todo_id}/approve", {"comment": None})
+            data = await _internal_call(user, "POST", f"{target}/approve", {"comment": None})
         else:
-            data = await _internal_call(user, "POST", f"/todo/{todo_id}/reject", {"comment": cmd["comment"]})
+            data = await _internal_call(user, "POST", f"{target}/reject", {"comment": cmd["comment"]})
     except Exception as e:  # noqa: BLE001
         return f"❌ {('通过' if cmd['action'] == 'approve' else '拒绝')}失败:{e}"
-    title = (data or {}).get("title") or todo_id[:8]
-
-    # 请假审批级联:该待办关联请假单时,同步批准/驳回请假单本身
-    # (否则只改待办状态,请假单永远停在 pending)
-    leave_note = ""
-    link = (data or {}).get("link") or {}
-    leave_id = link.get("leave_id")
-    if leave_id:
-        try:
-            if cmd["action"] == "approve":
-                await _internal_call(user, "POST", f"/todo/leaves/{leave_id}/approve", {})
-            else:
-                await _internal_call(user, "POST", f"/todo/leaves/{leave_id}/reject", {"comment": cmd["comment"]})
-            leave_note = "(请假单已同步审批)"
-        except Exception as e:  # noqa: BLE001
-            leave_note = f"(⚠️ 请假单同步失败:{e})"
+    title = (data or {}).get("title") or ((data or {}).get("applicant_name", "") + " 请假申请" if is_leave else todo_id[:8])
 
     if cmd["action"] == "approve":
-        return f"✅ 已通过:{title}{leave_note}"
-    return f"🚫 已拒绝:{title}\n理由:{cmd['comment']}{leave_note}"
+        return f"✅ 已通过:{title}"
+    return f"🚫 已拒绝:{title}\n理由:{cmd['comment']}"
 
 
 _TODO_LIST_HINTS = (
@@ -243,17 +233,21 @@ def _wants_todo_list(text: str) -> bool:
 
 
 
+
+async def _pending_reviews(user):
+    me = await _internal_call(user, "GET", "/auth/me")
+    result = await _internal_call(user, "GET", f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=100")
+    items = (result or {}).get("items") or []
+    leaves = await _internal_call(user, "GET", "/todo/leaves/team/pending")
+    return [*items, *[{"id": f"leave:{leave['id']}", "title": f"{leave.get('applicant_name', '')} 请假申请",
+        "description": f"{leave['start_at']} 至 {leave['end_at']}", "status": "pending"} for leave in (leaves or [])]]
+
 async def _send_todo_list(user: User, binding: WeChatNotifyBinding) -> str:
     """「待办」指令:逐条只发"待你审批"的事项(请假审批等,可引用回复通过/拒绝);
     其余进行中的待办只给数量。"""
     # 1) 待我审核的(pending_review 且我是审核人)——逐条发送
     try:
-        me = await _internal_call(user, "GET", "/auth/me")
-        review_data = await _internal_call(
-            user, "GET",
-            f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=50",
-        )
-        review_items = (review_data or {}).get("items") or []
+        review_items = await _pending_reviews(user)
     except Exception as e:  # noqa: BLE001
         return f"❌ 查询待审批失败:{e}"
 
@@ -394,12 +388,7 @@ def parse_bulk_command(text: str) -> Optional[dict]:
 async def _exec_bulk_action(user: User, action: str, comment: Optional[str]) -> str:
     """对当前全部待我审批的事项批量通过/拒绝(实时查询,不依赖编号缓存)。"""
     try:
-        me = await _internal_call(user, "GET", "/auth/me")
-        review_data = await _internal_call(
-            user, "GET",
-            f"/todo/team?status=pending_review&reviewed_by_user_id={me.get('id')}&page_size=50",
-        )
-        items = (review_data or {}).get("items") or []
+        items = await _pending_reviews(user)
     except Exception as e:  # noqa: BLE001
         return f"❌ 查询待审批失败:{e}"
     if not items:
@@ -411,7 +400,7 @@ async def _exec_bulk_action(user: User, action: str, comment: Optional[str]) -> 
         if r.startswith(("✅", "🚫")):
             ok += 1
     verb = "通过" if action == "approve" else "拒绝"
-    note = f"(请假单已同步审批)" if any((t.get("link") or {}).get("leave_id") for t in items) else ""
+    note = ""
     return f"✅ 已批量{verb} {ok}/{len(items)} 条{note}"
 
 

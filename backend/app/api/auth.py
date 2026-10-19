@@ -149,6 +149,8 @@ async def get_me(
         "must_change_password": current_user.must_change_password,
         "permissions": permissions,
         "job_title_name": job_title_name,
+        "manager_user_id": str(current_user.manager_user_id) if current_user.manager_user_id else None,
+        "leave_balances": {name: getattr(current_user, f"leave_{name}_remaining") for name in ("annual", "maternity", "marriage", "personal", "sick")},
     })
 
 

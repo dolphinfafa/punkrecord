@@ -2,9 +2,11 @@
 Todo module Pydantic schemas
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.models.base import as_cn_naive
+from decimal import Decimal
 
 
 class TodoCreate(BaseModel):
@@ -17,11 +19,13 @@ class TodoCreate(BaseModel):
     source_type: str = "custom"
     source_id: str = ""
     action_type: str = "do"
-    priority: str = "p2"
-    due_at: Optional[datetime] = None
+    priority: Literal["p0", "p1", "p2", "p3"] = "p2"
+    due_at: datetime
+    estimated_hours: Decimal = Field(default=Decimal("0"), ge=0, max_digits=10, decimal_places=2)
     start_at: Optional[datetime] = None
     tags: List[str] = []
     link: Optional[dict] = None
+    _normalize_due = field_validator("due_at")(as_cn_naive)
 
 
 class TodoUpdate(BaseModel):
@@ -29,12 +33,14 @@ class TodoUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=10000)
     notes: Optional[str] = Field(default=None, max_length=2000)
-    priority: Optional[str] = None
+    priority: Optional[Literal["p0", "p1", "p2", "p3"]] = None
     due_at: Optional[datetime] = None
+    estimated_hours: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     start_at: Optional[datetime] = None
     tags: Optional[List[str]] = None
     link: Optional[dict] = None
     assignee_user_id: Optional[UUID] = None
+    _normalize_due = field_validator("due_at")(as_cn_naive)
 
 
 class TodoStatusUpdate(BaseModel):
@@ -76,6 +82,8 @@ class TodoResponse(BaseModel):
     priority: str
     status: str
     due_at: Optional[datetime] = None
+    estimated_hours: Optional[Decimal] = None
+    submitted_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     tags: list
     link: Optional[dict] = None
@@ -96,10 +104,11 @@ class TodoResponse(BaseModel):
 class LeaveRequestCreate(BaseModel):
     """Leave request creation schema"""
     our_entity_id: Optional[UUID] = None
-    leave_type: str
+    leave_type: Literal["annual", "maternity", "marriage", "personal", "sick"]
     start_at: datetime
     end_at: datetime
     reason: Optional[str] = None
+    _normalize_times = field_validator("start_at", "end_at")(as_cn_naive)
 
 
 class LeaveRequestResponse(BaseModel):

@@ -12,6 +12,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
         notes: '',
         priority: 'p2',
         due_at: '',
+        estimated_hours: 0,
         start_at: '',
         assignee_user_id: currentUserId || '',
         project_id: fixedProjectId || '',
@@ -67,6 +68,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 notes: initialData.notes || '',
                 priority: initialData.priority || 'p2',
                 due_at: initialData.due_at ? new Date(initialData.due_at).toISOString().slice(0, 10) : '',
+                estimated_hours: initialData.estimated_hours ?? 0,
                 start_at: initialData.start_at ? new Date(initialData.start_at).toISOString().slice(0, 10) : '',
                 assignee_user_id: initialData.assignee_user_id || currentUserId || '',
                 project_id: fixedProjectId || initialData?.link?.project_id || '',
@@ -79,6 +81,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 notes: '',
                 priority: 'p2',
                 due_at: '',
+                estimated_hours: 0,
                 start_at: '',
                 assignee_user_id: currentUserId || '',
                 project_id: fixedProjectId || '',
@@ -91,6 +94,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
     const validate = () => {
         const newErrors = {};
         if (!formData.title.trim()) newErrors.title = '标题不能为空';
+        if (!formData.due_at) newErrors.due_at = '请选择截止日期';
+        if (!Number.isFinite(Number(formData.estimated_hours)) || Number(formData.estimated_hours) < 0) newErrors.estimated_hours = '预计工时不能为负数';
         if (!formData.assignee_user_id) newErrors.assignee_user_id = '请选择被分配人';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -108,7 +113,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                 notes: formData.notes || null,
                 assignee_user_id: formData.assignee_user_id,
                 priority: formData.priority,
-                due_at: formData.due_at ? new Date(formData.due_at).toISOString() : null,
+                due_at: `${formData.due_at}T18:00:00`,
+                estimated_hours: Number(formData.estimated_hours),
                 start_at: formData.start_at ? new Date(formData.start_at).toISOString() : null,
                 source_type: formData.project_id ? 'project_task' : 'custom',
                 source_id: formData.project_id || '',
@@ -137,7 +143,7 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content todo-editor" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>{mode === 'create' ? '新建任务' : '编辑任务'}</h2>
                     <button className="modal-close-btn" onClick={onClose}><X size={20} /></button>
@@ -267,13 +273,19 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="due_at">截止日期</label>
+                            <label htmlFor="due_at">截止日期 *</label>
                             <input
                                 id="due_at"
                                 type="date"
+                                required
                                 value={formData.due_at}
                                 onChange={(e) => handleChange('due_at', e.target.value)}
                             />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="estimated_hours">预计工时（小时）</label>
+                            <input id="estimated_hours" type="number" min="0" step="0.01" value={formData.estimated_hours} onChange={e => handleChange('estimated_hours', e.target.value)} />
+                            {errors.estimated_hours && <span className="error-message">{errors.estimated_hours}</span>}
                         </div>
                     </div>
 

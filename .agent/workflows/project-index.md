@@ -15,6 +15,7 @@ description: PunkRecord 项目索引大纲。执行任何任务前先阅读此�
 5. 优先复用现有模块和成熟方案，保持实现简单，不做无关重构，不引入未经用户确认的新依赖。
 6. IP、API key、Token、密码等敏感信息只能保存在被 `.gitignore` 排除的 `.env` 中，不得进入代码、文档、日志或 Git。
 7. `.agent/workflows/` 用于维护项目现状；`milestone/YYYY-MM-DD.md` 用于记录每日工作进展。
+8. 每次更新必须同步 `.agent/test/` 中相关用例，并执行对应测试；测试入口和隔离要求见 `.agent/test/README.md`。
 
 ### 身份与沟通
 
@@ -30,7 +31,7 @@ description: PunkRecord 项目索引大纲。执行任何任务前先阅读此�
 punkrecord/
 |- backend/                 # FastAPI 后端服务
 |  |- app/
-|  |  |- api/               # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog）
+|  |  |- api/               # 路由模块（auth, iam, todo, beli, contract, project, finance, ai, kb, meeting, changelog）
 |  |  |- core/              # 配置、数据库、认证、响应、异常处理、文件存储
 |  |  |- models/            # SQLModel ORM 模型
 |  |  |- schemas/           # Pydantic 请求/响应 Schema
@@ -56,6 +57,7 @@ punkrecord/
 |  |- services/             # API 服务封装
 |  `- utils/                # 请求/会话工具
 |- milestone/               # 里程碑工作记录
+|- .agent/test/              # Agent 测试指引、回归用例
 |- prd/                     # 产品需求文档
 `- .agent/workflows/        # Agent 工作流文档（本目录）
 ```
@@ -87,7 +89,10 @@ punkrecord/
 - **权限模型**：双通道 RBAC（角色权限 + 职位权限，取并集）
 - **数据库**：MySQL 8.0，驱动 `pymysql`（连接信息见 `backend/.env`）
 - **Python 环境**：Conda 环境 `punkrecord`，开发服务器解释器 `/opt/miniconda3/envs/punkrecord/bin/python`（Python 3.10.0）
+- **开发服务守护**：`pm2-zheyang.service` 负责当前用户 PM2 的开机恢复；进程为 `punkrecord-backend` 和 `punkrecord-frontend`。调整进程后执行 `pm2 save`。
 - **RBAC 状态**：`ENFORCE_RBAC=True`，已正式启用前后端双层权限控制
+- **开发中业务升级（2026-10-16）**：任务截止日期必填，预计工时默认 0，正数工时且验收完成才进入独立贝利审核；贝利、考勤、商城在 `/beli`，请假独立入口 `/leave`；当前版本号仍为 2.0.9，未发布生产。
+- **文档核对（2026-10-19）**：工作流、每日记录与回归用例已对照本批开发功能核查；MCP 当前为 43 个工具。最近核查及测试结果见 `milestone/2026-10-19.md`、`.agent/test/report-2026-10-19.md`；生产发布状态不得与 GitHub 同步混淆。
 
 ---
 
@@ -120,4 +125,4 @@ punkrecord/
 
 ---
 
-*最后更新：2026-09-29*
+*最后更新：2026-10-19*

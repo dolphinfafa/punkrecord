@@ -88,6 +88,13 @@ def _enrich_meeting(meeting: MeetingRecord, session: Session) -> MeetingResponse
     return data
 
 
+def _settle_attendance(meeting, session):
+    if meeting.meeting_date and meeting.status in (MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED):
+        from app.services.beli import reconcile_attendance
+        session.flush()
+        reconcile_attendance(session, meeting.meeting_date)
+
+
 def _build_meeting_summary_user_message(
     meeting: MeetingRecord,
     transcript_text: str,
@@ -377,6 +384,7 @@ async def _run_asr(meeting_id: UUID):
                 logger.error("ASR failed for meeting %s: %s", meeting_id, result["error"])
                 meeting.status = MeetingStatus.FAILED
                 session.add(meeting)
+                _settle_attendance(meeting, session)
                 session.commit()
                 return
 
@@ -386,6 +394,7 @@ async def _run_asr(meeting_id: UUID):
                 logger.warning("ASR returned 0 segments for meeting %s", meeting_id)
                 meeting.status = MeetingStatus.FAILED
                 session.add(meeting)
+                _settle_attendance(meeting, session)
                 session.commit()
                 return
 
@@ -411,7 +420,10 @@ async def _run_asr(meeting_id: UUID):
             if duration_seconds is not None:
                 meeting.duration_seconds = int(duration_seconds)
             meeting.status = MeetingStatus.TRANSCRIBED
+            session.flush()
+            meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), meeting.speaker_mapping or {})
             session.add(meeting)
+            _settle_attendance(meeting, session)
             session.commit()
             logger.info("ASR completed for meeting %s, %d segments", meeting_id, len(segments))
 
@@ -423,6 +435,7 @@ async def _run_asr(meeting_id: UUID):
                 if meeting:
                     meeting.status = MeetingStatus.FAILED
                     session.add(meeting)
+                    _settle_attendance(meeting, session)
                     session.commit()
         except Exception:
             pass
@@ -478,11 +491,13 @@ async def create_meeting(
             created_by=current_user.id,
         )
         session.add(meeting)
+        _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
         meeting.status = MeetingStatus.TRANSCRIBING
         session.add(meeting)
+        _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
@@ -497,6 +512,7 @@ async def create_meeting(
             created_by=current_user.id,
         )
         session.add(meeting)
+        _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
@@ -537,6 +553,7 @@ async def upload_audio(
     meeting.status = MeetingStatus.TRANSCRIBING
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -563,6 +580,7 @@ async def retranscribe_audio(
     meeting.status = MeetingStatus.TRANSCRIBING
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -634,6 +652,7 @@ async def upload_transcript_document(
     meeting.status = MeetingStatus.TRANSCRIBED
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -661,6 +680,7 @@ async def update_attendees(
     meeting.attendees = data.get("attendees", [])
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -746,7 +766,12 @@ async def delete_meeting(
         except Exception:
             pass
 
+    day = meeting.meeting_date
     session.delete(meeting)
+    session.flush()
+    if day:
+        from app.services.beli import reconcile_attendance
+        reconcile_attendance(session, day)
     session.commit()
     return success_response({"message": "会议记录已删除"})
 
@@ -823,6 +848,7 @@ async def update_transcript(
     meeting.attendees = _attendee_names_from_speakers(segments, meeting.speaker_mapping or {})
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
     return success_response({
@@ -850,6 +876,7 @@ async def update_speakers(
     meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting_id), meeting.speaker_mapping)
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
     return success_response(_enrich_meeting(meeting, session).model_dump())
@@ -1049,6 +1076,7 @@ async def archive_meeting(
     meeting.archived_document_id = kb_doc.id
     meeting.updated_at = now_cn()
     session.add(meeting)
+    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 

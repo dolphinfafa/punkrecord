@@ -1,5 +1,31 @@
 # 后端架构与 API 接口
 
+## 2026-10-16 开发环境接口变更
+
+- 新建待办及批量开发任务要求 `due_at`；`estimated_hours` 默认 0，允许非负数、最多两位小数。PATCH允许省略但不能显式清空；带时区的截止时间归一化到上海时间。
+- `GET /api/v1/project/projects/{id}/bugs`：标题子串查询与分页，参数 `title/page/page_size/status/agent_status/developer/tester`，返回 `{items,total}`。
+- 功能清单同步新增任务时需要 `{due_at,estimated_hours?}` 默认计划，工时省略为 0；重复同步保留既有任务身份与状态，不删除其他任务或Bug。
+- 0 工时不阻止任务验收，不创建贝利审核。规则生效后完成的任务补录正数工时自动入队；生效前已完成或缺少可靠提交/完成时间的任务不追溯。未发奖任务归零时保留奖励记录并设为 `excluded`，恢复正数后回到 `pending`；已发奖必须先重开冲销。审核接口不接受以修改审核工时绕过退出状态。
+- 请假原 `/todo/leaves` 路径兼容保留，但内部不创建或更新Todo；历史请假待办不再进入普通列表，旧状态操作拒绝写入。旧用户余额调整与假期重置接口不再接受写入。
+- 历史待验收任务缺少 `submitted_at` 时拒绝直接验收，执行人需撤回并重新提交；不得用审核时间伪造提交时间。
+- `GET /iam/compensation-access` 返回当前用户是否管理员；管理员专用 `GET/PUT /iam/users/{id}/salary` 维护 `basic_salary`。工资不进入公开用户响应、贝利响应或MCP。
+
+新增 `/api/v1/beli`，所有接口要求有效账号，非L0只能查看自己的信息：
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| GET | `/accounts`、`/ledger?user_id=&page=` | 员工余额、假期与流水 |
+| POST | `/accounts/{user_id}/adjust` | L0手动调整，传入金额/天数、原因和UUID请求键 |
+| GET / POST | `/rewards`、`/rewards/{todo_id}/review` | 独立奖励列表和L0审核；支持改工时、日期、重要级 |
+| GET / PUT | `/calendar`、`/calendar/{date}` | 节假日、调休维护 |
+| GET / POST | `/attendance`、`/attendance/{id}/void` | 日考勤与L0扣款作废 |
+| GET / POST / PUT | `/products`、`/products/{id}` | 商品查询、创建、编辑和上下架 |
+| GET / POST | `/products/{id}/image` | 带认证的商品图片查看和上传 |
+| GET / POST | `/orders` | 兑换记录与兑换申请 |
+| POST | `/orders/{id}/action` | 批准、拒绝、取消、发货 |
+
+MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`update_todo`允许将工时设置为 0。新增 `search_project_bugs` 返回分页结果及图片URL；新增 `list_leaves_to_review`、`approve_leave`、`reject_leave` 独立请假审批工具。
+
 > 本文档描述后端服务的架构设计和所有 API 端点。属于 `project-index.md` 的子文档。
 
 ---
@@ -21,6 +47,7 @@
 | `auth.py` | `/api/v1/auth` | 认证（登录、登出、当前用户） |
 | `iam.py` | `/api/v1/iam` | 组织管理（用户、部门、职位、权限、实体） |
 | `todo.py` | `/api/v1/todo` | 任务管理（任务、请假） |
+| `beli.py` | `/api/v1/beli` | 独立账户、奖励审核、早会考勤、日历、商城和兑换 |
 | `contract.py` | `/api/v1/contract` | 合同管理（合同、对手方、付款计划） |
 | `project.py` | `/api/v1/project` | 项目管理（项目、阶段、成员、任务、导出） |
 | `finance.py` | `/api/v1/finance` | 财务管理（账户、交易、发票、报销、Excel 导出） |
@@ -59,15 +86,15 @@
 | GET | `/api/v1/iam/users` | 用户列表 |
 | GET/PATCH | `/api/v1/iam/users/{user_id}` | 用户详情/更新（含档案字段） |
 | POST | `/api/v1/iam/users/{user_id}/reset-password` | 管理员重置用户密码（默认 `punkrecord123`） |
-| POST | `/api/v1/iam/users/{user_id}/reset-leave-balances` | 重置用户假期余额 |
-| POST | `/api/v1/iam/users/reset-leave-balances` | 重置所有用户假期余额 |
+| POST | `/api/v1/iam/users/{user_id}/reset-leave-balances` | 已停用，返回400；改用独立贝利调整 |
+| POST | `/api/v1/iam/users/reset-leave-balances` | 已停用，返回400；改用独立贝利调整 |
 | POST | `/api/v1/iam/users/{user_id}/id-card-image` | 上传身份证图片（JPG/PNG/WebP） |
 | POST | `/api/v1/iam/users/{user_id}/resume` | 上传简历（PDF） |
 | GET | `/api/v1/iam/users/{user_id}/files/{filename}` | 下载用户文件（需认证，前端须用 axios+blob） |
 | GET | `/api/v1/iam/entities` | 实体列表 |
 | GET/POST | `/api/v1/iam/our-entities` | 我方实体 |
 | GET | `/api/v1/iam/org-chart` | 组织架构图 |
-| GET/POST/PATCH/DELETE | `/api/v1/iam/beli-rules` | Beli 积分规则 CRUD |
+| GET/POST/PATCH/DELETE | `/api/v1/iam/beli-rules` | 历史规则兼容接口，不再参与任务奖励结算；前端入口移除 |
 
 ### 任务管理（Todo）
 
@@ -129,8 +156,8 @@
 | POST | `/api/v1/todo/leaves` | 提交请假 |
 | GET | `/api/v1/todo/leaves/my` | 我的请假记录 |
 | GET | `/api/v1/todo/leaves/team/pending` | 待审批请假 |
-| POST | `/api/v1/todo/leaves/{id}/approve` | 批准请假（同步 TodoItem 状态为 done） |
-| POST | `/api/v1/todo/leaves/{id}/reject` | 驳回请假（同步 TodoItem 状态为 dismissed） |
+| POST | `/api/v1/todo/leaves/{id}/approve` | 批准独立请假单、扣假期并记录流水，重算相关早会 |
+| POST | `/api/v1/todo/leaves/{id}/reject` | 驳回独立请假单，不改动 TodoItem |
 
 ### 合同管理
 
@@ -260,7 +287,7 @@
 
 **微信入站指令规则（v2.0.8，2026-08-31）**：
 - 用户发送“待办/审批/审核”等短指令时，系统查询真实待审批任务并逐条推送，消息带编号和单号；本人进行中的任务仅返回数量，避免长列表刷屏。
-- 支持“通过 1”“拒绝 2 理由:xxx”“通过 <todo_id>”等编号/单号审批指令；若任务关联请假单，会同步审批/驳回请假申请。
+- 支持“通过 1”“拒绝 2 理由:xxx”“通过 <todo_id>”等编号/单号审批指令；独立请假使用 `leave:<uuid>` 标识，直接调用请假审批接口，不再联动待办。
 - 支持“全部通过”“都同意”“通过全部”“全部拒绝 理由:xxx”等批量审批指令，实时查询当前待我审批任务后逐条执行。
 - 自由问答走 LiteLLM 兜底，但会先注入真实待办/审批数量；凡问及具体事项而实时数据不可用时，要求用户发送“待办”查询，避免编造。
 - 后台 `wechat_notification_retry_worker` 每轮执行离线队列补发和通道保活检查；`20260818_0001` 为 `wechat_notify_binding` 增加 `last_inbound_at`、`keepalive_notified_at` 字段，距 24 小时通道过期不足 1 小时时只提醒一次。
@@ -294,16 +321,17 @@
 - **认证**：客户端发 `Authorization: Bearer pat_xxx`（复用 Agent Token）。工具从请求头取 token，用 `httpx` 携带该 token **转发本机 REST**（`settings.INTERNAL_API_BASE_URL`）——零逻辑重复，权限/通知/项目联动与页面一致。
 - **依赖**：需 Python **3.10+**（生产原为 3.9，需升级）。`requirements.txt` 已 pin 协调集（fastapi 0.135.1 / starlette 0.52.1 / pydantic 2.12.5 / mcp 1.27.2）。
 - **配置**：`INTERNAL_API_BASE_URL`（dev 15085 / prod 9086）、`MCP_PUBLIC_URL`（展示用）。
-- **工具（39）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`get_todo_image`/`get_bug_image`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`update_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`。
+- **工具（43）**：读 `get_me`/`list_my_todos`/`get_todo`/`list_todo_images`/`get_todo_image`/`get_bug_image`/`list_my_leaves`/`list_projects`/`get_project`/`list_project_todos`/`search_project_bugs`/`list_contracts`/`get_contract`/`list_contract_attachments`/`list_counterparties`/`list_transactions`/`list_accounts`/`search_kb`/`list_meetings`/`get_meeting`/`get_meeting_transcript`；写 `create_todo`/`update_todo`/`create_bug`（打 tags=bug+link.type=bug，进项目任务与 Bug 管理）/`upload_contract_attachment`/`delete_contract_attachment`/`retranscribe_meeting`/`upload_meeting_transcript`/`create_transactions`/`void_transaction`/`unvoid_transaction`/`delete_voided_transaction`/`start_todo`/`submit_todo`/`block_todo`/`dismiss_todo`/`create_leave`；审核 `list_tasks_to_review`/`approve_todo`/`reject_todo`/`list_leaves_to_review`/`approve_leave`/`reject_leave`。
 - **财务写入（v2.0.2 增补，2026-06-24）**：`list_accounts`（转发 `GET /finance/accounts`，取 `account_id`）+ `create_transactions(transactions: list[dict])` **批量写入交易明细**（逐条转发 `POST /finance/transactions`，字段白名单 `_TXN_ALLOWED_FIELDS`，`txn_direction` 按 `txn_type` 兜底推断，单条失败不中断整批，返回 `{total, created, failed, results[{index, success, id|error}]}`）。需 `finance.write` 权限。
 - **财务交易作废工具（v2.0.3，2026-07-01）**：`list_transactions` 支持 `account_id`/`txn_direction`/`status`/日期/分页筛选，`status=voided` 可查看作废交易；`void_transaction`/`unvoid_transaction`/`delete_voided_transaction` 分别转发财务交易作废、恢复和删除已作废交易。写操作需 `finance.write` 权限。
 - **合同附件与会议工具（v2.0.4，2026-07-08）**：新增 `get_contract`/`list_contract_attachments`/`upload_contract_attachment`/`delete_contract_attachment`，附件工具会返回 `view_path`/`download_path`；新增 `get_meeting`/`get_meeting_transcript`/`retranscribe_meeting`，用于查看会议详情、转写分段和触发重新转写。
 - **会议文稿导入工具（v2.0.5，2026-07-13）**：新增 `upload_meeting_transcript`，通过 base64 文件内容代理调用 `/meeting/records/{id}/upload-transcript`，支持 Word `.docx` 与 PDF 文稿替换会议转写分段。工具总数更新为 36。
 - **待办/Bug 图片读取（v2.0.6，2026-07-22）**：`get_todo`、`list_my_todos`、`list_project_todos`、`list_tasks_to_review` 及任务状态变更工具会补全 `link.todo_images` 与 `link.bug_images` 的 `api_download_url`/`download_url`；URL 不暴露 token，下载时需使用同一 `Authorization` 头。新增 `get_todo_image(todo_id, image_id)` 与 `get_bug_image(project_id, attachment_id)`，直接返回 `{file_name, content_type, size, content_base64}`，适合无法额外发 HTTP 下载请求的 MCP 客户端。工具总数更新为 38。
-- **待办编辑（v2.0.9，2026-09-29）**：`update_todo` 转发 `PATCH /todo/{todo_id}`，支持修改标题、描述、备注、优先级、起止时间、负责人、标签及项目关联信息；未传字段保持不变，权限规则与 Web 端一致。工具总数更新为 39。
+- **待办编辑（v2.0.9，2026-09-29）**：`update_todo` 转发 `PATCH /todo/{todo_id}`，支持修改标题、描述、备注、优先级、起止时间、负责人、标签及项目关联信息；未传字段保持不变，权限规则与 Web 端一致。当时工具总数为 39。
+- **开发增量（2026-10-16，2026-10-19 核对）**：增加项目 Bug 标题搜索及独立请假待审批、批准、驳回共 4 个工具，当前合计 43 个。任务创建截止日期必填、预计工时默认 0；编辑允许工时归零，贝利资格同步复用 REST 逻辑。此增量未部署生产。
 - **mcp-info 元端点（v2.0.2 增补，2026-06-24）**：`GET /api/v1/mcp-info` 每个工具新增 **`doc`** 字段（完整 docstring），供前端工具详情页 `/mcp/tools/:name` 渲染；`description` 仍为首行用于列表。
 - **运行环境**：dev 后端使用 conda env `punkrecord`；`dev.sh` 已指向 `/opt/miniconda3/envs/punkrecord/bin/python`，避免误用旧 `punk` 环境。
 
 ---
 
-*最后更新：2026-09-29*
+*最后更新：2026-10-19*

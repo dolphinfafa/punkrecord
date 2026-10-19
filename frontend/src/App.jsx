@@ -15,7 +15,6 @@ import EntityListPage from '@/pages/iam/EntityListPage';
 import DepartmentPage from '@/pages/iam/DepartmentPage';
 import JobTitlePage from '@/pages/iam/JobTitlePage';
 import OrgChartPage from '@/pages/iam/OrgChartPage';
-import BeliRulePage from '@/pages/iam/BeliRulePage';
 import ContractLayout from '@/pages/contract/ContractLayout';
 import ContractListPage from '@/pages/contract/ContractListPage';
 import CounterpartyListPage from '@/pages/contract/CounterpartyListPage';
@@ -23,6 +22,9 @@ import ProjectLayout from '@/pages/project/ProjectLayout';
 import ProjectListPage from '@/pages/project/ProjectListPage';
 import ProjectDetailPage from '@/pages/project/ProjectDetailPage';
 import DevelopmentProgressPage from '@/pages/project/DevelopmentProgressPage';
+import BugManagementPage from '@/pages/project/BugManagementPage';
+import BeliPage from '@/pages/beli/BeliPage';
+import LeavePage from '@/pages/leave/LeavePage';
 import DocumentListPage from '@/pages/kb/DocumentListPage';
 import DocumentDetailPage from '@/pages/kb/DocumentDetailPage';
 import ChatPage from '@/pages/kb/ChatPage';
@@ -92,12 +94,14 @@ function App() {
           }>
             <Route index element={<DashboardPage />} />
             <Route path="todo" element={<PermissionRoute permission="todo.read"><TodoPage /></PermissionRoute>} />
+            <Route path="beli" element={<BeliPage />} />
+            <Route path="leave" element={<PermissionRoute permission="todo.read"><LeavePage /></PermissionRoute>} />
             <Route path="iam" element={<PermissionRoute permission="iam.read"><IAMLayout /></PermissionRoute>}>
               <Route path="users" element={<UserListPage />} />
               <Route path="entities" element={<EntityListPage />} />
               <Route path="departments" element={<DepartmentPage />} />
               <Route path="job-titles" element={<JobTitlePage />} />
-              <Route path="beli-rules" element={<BeliRulePage />} />
+              <Route path="beli-rules" element={<Navigate to="/beli" replace />} />
               <Route path="org-chart" element={<OrgChartPage />} />
             </Route>
             <Route path="contract" element={<PermissionRoute permission="contract.read"><ContractLayout /></PermissionRoute>}>
@@ -108,6 +112,7 @@ function App() {
               <Route index element={<ProjectListPage />} />
               <Route path=":id" element={<ProjectDetailPage />} />
               <Route path=":id/dev-progress" element={<DevelopmentProgressPage />} />
+              <Route path=":id/bugs" element={<BugManagementPage />} />
             </Route>
 
             <Route path="finance" element={<PermissionRoute permission="finance.read"><FinanceLayout /></PermissionRoute>}>

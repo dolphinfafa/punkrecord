@@ -12,6 +12,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Query, Body, UploadFile, File
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
+from decimal import Decimal
+from pydantic import Field as SchemaField, field_validator
+from app.models.base import as_cn_naive
+from app.services.beli import protect_reward_plan, lock_todo, queue_reward
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlmodel import Session, select
@@ -195,6 +199,16 @@ def _collect_related_todos_for_project_todo(session: Session, todo: TodoItem) ->
 
 def _delete_todo_and_notifications(session: Session, todo: TodoItem) -> None:
     """Delete a single todo and its notification logs."""
+    from app.services.beli import reward_for
+    reward = reward_for(session, todo)
+    if reward and reward.status == "approved":
+        raise ValidationException("任务贝利已发放，请先重开冲销奖励后再删除")
+    if reward:
+        reward.status = "cancelled"
+        session.add(reward)
+    from app.models.shared import WeChatPendingNotification
+    for row in session.exec(select(WeChatPendingNotification).where(WeChatPendingNotification.todo_id == todo.id)).all():
+        session.delete(row)
     try:
         from app.models.todo import NotificationLog
         notifs = session.exec(select(NotificationLog).where(NotificationLog.todo_id == todo.id)).all()
@@ -926,6 +940,39 @@ async def list_project_todos(
     return success_response(result)
 
 
+@router.get("/projects/{project_id}/bugs", response_model=dict)
+async def list_project_bugs(project_id: UUID, title: str = "", page: int = Query(1, ge=1),
+                            page_size: int = Query(30, ge=1, le=100),
+                            status: str = "", agent_status: str = "", developer: str = "", tester: str = "",
+                            session: Session = Depends(get_session),
+                            current_user: User = Depends(require_permission("project.read"))):
+    project = session.get(Project, project_id)
+    if not project:
+        raise NotFoundException("未找到项目")
+    from sqlalchemy import func, or_, cast, String
+    query = select(TodoItem).where(TodoItem.source_type == TodoSourceType.PROJECT_TASK,
+        TodoItem.source_id == str(project_id), or_(TodoItem.link["type"].as_string() == "bug",
+        cast(TodoItem.tags, String).like('%"bug"%')))
+    if title.strip():
+        query = query.where(TodoItem.title.icontains(title.strip(), autoescape=True))
+    if status:
+        query = query.where(TodoItem.status == status)
+    if agent_status:
+        agent_field = TodoItem.link["agent_status"].as_string()
+        query = query.where(or_(agent_field.is_(None), agent_field == "") if agent_status == "none" else agent_field == agent_status)
+    if developer:
+        try:
+            query = query.where(TodoItem.assignee_user_id == UUID(developer))
+        except ValueError:
+            raise ValidationException("无效开发人员")
+    if tester:
+        query = query.where(TodoItem.link["tester_user_id"].as_string() == tester)
+    total = session.exec(select(func.count()).select_from(query.subquery())).one()
+    rows = session.exec(query.order_by(TodoItem.created_at.desc(), TodoItem.id).offset((page - 1) * page_size).limit(page_size)).all()
+    from app.api.todo import _enrich_todo
+    return success_response({"items": [_enrich_todo(row, session) for row in rows], "total": total})
+
+
 @router.post("/projects/{project_id}/todos/{todo_id}/assign", response_model=dict)
 async def assign_project_todo(
     project_id: UUID,
@@ -942,7 +989,7 @@ async def assign_project_todo(
     if current_user.id not in {project.pm_user_id, project.owner_user_id}:
         raise ForbiddenException("仅项目经理可分配任务")
 
-    todo = session.get(TodoItem, todo_id)
+    todo = lock_todo(session, todo_id)
     if not todo:
         raise NotFoundException("未找到任务")
     if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
@@ -960,9 +1007,11 @@ async def assign_project_todo(
     if not member and data.assignee_user_id != project.pm_user_id:
         raise ForbiddenException("只能指派给项目成员或项目经理")
 
+    protect_reward_plan(session, todo, {"assignee_user_id": data.assignee_user_id})
     todo.assignee_user_id = data.assignee_user_id
     todo.updated_at = now_cn()
     session.add(todo)
+    queue_reward(session, todo, backfill=True)
     session.commit()
     session.refresh(todo)
 
@@ -995,13 +1044,17 @@ async def update_project_todo_plan(
     if not project:
         raise NotFoundException("未找到项目")
 
-    todo = session.get(TodoItem, todo_id)
+    todo = lock_todo(session, todo_id)
     if not todo:
         raise NotFoundException("未找到任务")
     if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
         raise NotFoundException("任务不属于当前项目")
 
     is_pm_or_owner = current_user.id in {project.pm_user_id, project.owner_user_id}
+    protect_reward_plan(session, todo, data.model_dump(exclude_unset=True))
+    for field in ("due_at", "estimated_hours"):
+        if field in data.model_fields_set and getattr(data, field) is None:
+            raise ValidationException("截止日期和预计工时不可清空")
     if not is_pm_or_owner:
         if not _is_bug_todo(todo):
             raise ForbiddenException("仅项目经理可修改开发计划")
@@ -1014,6 +1067,7 @@ async def update_project_todo_plan(
             or data.title is not None
             or data.description is not None
             or data.dev_type is not None
+            or data.estimated_hours is not None
         ):
             raise ForbiddenException("项目组成员仅可修改 Bug 的开发人员")
 
@@ -1024,6 +1078,7 @@ async def update_project_todo_plan(
         and data.title is None
         and data.description is None
         and data.dev_type is None
+        and data.estimated_hours is None
     ):
         raise ValidationException("至少需要修改一个字段")
 
@@ -1042,6 +1097,8 @@ async def update_project_todo_plan(
             raise ForbiddenException("只能指派给项目成员或项目经理")
         todo.assignee_user_id = data.assignee_user_id
 
+    if data.estimated_hours is not None:
+        todo.estimated_hours = data.estimated_hours
     if data.due_at is not None:
         todo.due_at = data.due_at
     if data.priority is not None:
@@ -1068,6 +1125,7 @@ async def update_project_todo_plan(
 
     todo.updated_at = now_cn()
     session.add(todo)
+    queue_reward(session, todo, backfill=True)
     session.commit()
     session.refresh(todo)
 
@@ -1112,15 +1170,20 @@ async def batch_assign_project_todos(
         .where(TodoItem.id.in_(data.todo_ids))
         .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
         .where(TodoItem.source_id == str(project_id))
+        .order_by(TodoItem.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).all()
     if not todos:
         raise ValidationException("未找到可更新的任务")
 
     now = now_cn()
     for todo in todos:
+        protect_reward_plan(session, todo, {"assignee_user_id": data.assignee_user_id})
         todo.assignee_user_id = data.assignee_user_id
         todo.updated_at = now
         session.add(todo)
+        queue_reward(session, todo, backfill=True)
     session.commit()
     return success_response({"updated": len(todos), "assignee_user_id": str(data.assignee_user_id)})
 
@@ -1140,7 +1203,7 @@ async def delete_project_todo(
     if not project:
         raise NotFoundException("未找到项目")
 
-    todo = session.get(TodoItem, todo_id)
+    todo = lock_todo(session, todo_id)
     if not todo:
         raise NotFoundException("未找到任务")
     if todo.source_type != TodoSourceType.PROJECT_TASK or todo.source_id != str(project_id):
@@ -1161,7 +1224,7 @@ async def clear_project_todos(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("project.write"))
 ):
-    """Clear all development tasks in a project and linked mirrored todos."""
+    """Clear project tasks unless an approved reward still references them."""
     project = session.get(Project, project_id)
     if not project:
         raise NotFoundException("未找到项目")
@@ -1172,6 +1235,9 @@ async def clear_project_todos(
         select(TodoItem)
         .where(TodoItem.source_type == TodoSourceType.PROJECT_TASK)
         .where(TodoItem.source_id == str(project_id))
+        .order_by(TodoItem.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).all()
 
     deleted_total = 0
@@ -1183,16 +1249,23 @@ async def clear_project_todos(
     return success_response({"deleted": deleted_total})
 
 
+class SyncTaskPlan(BaseModel):
+    due_at: datetime
+    estimated_hours: Decimal = SchemaField(default=Decimal("0"), ge=0, max_digits=10, decimal_places=2)
+    _normalize_due = field_validator("due_at")(as_cn_naive)
+
+
 @router.post("/projects/{project_id}/sync-dev-tasks", response_model=dict)
 async def sync_dev_tasks_from_feature_list(
     project_id: UUID,
+    plan: Optional[SyncTaskPlan] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("project.write"))
 ):
-    """Strictly sync project tasks from feature list so task list matches feature list."""
+    """Create missing feature tasks without replacing existing work or Bugs."""
     from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
 
-    project = session.get(Project, project_id)
+    project = session.exec(select(Project).where(Project.id == project_id).with_for_update()).first()
     if not project:
         raise NotFoundException("Project not found")
     if current_user.id not in {project.pm_user_id, project.owner_user_id}:
@@ -1229,29 +1302,20 @@ async def sync_dev_tasks_from_feature_list(
         .where(TodoItem.source_id == str(project_id))
     ).all()
 
-    # Preserve assignee/priority/due for rows that can be matched by feature_key.
-    preserved: Dict[str, Dict[str, Any]] = {}
+    # Keep task identity, review history and attachments on repeated sync.
+    preserved = {}
     for todo in existing_todos:
         link = todo.link or {}
         feature_key = link.get("feature_key")
         if not feature_key:
             continue
-        preserved[feature_key] = {
-            "assignee_user_id": todo.assignee_user_id,
-            "priority": todo.priority,
-            "due_at": todo.due_at,
-        }
+        preserved[feature_key] = todo
 
     deleted = 0
-    with session.no_autoflush:
-        for todo in existing_todos:
-            if session.get(TodoItem, todo.id) is None:
-                continue
-            deleted += _delete_project_todo_with_related(session, todo)
-    session.flush()
+    if any(row["feature_key"] not in preserved for row in expected_rows) and plan is None:
+        raise ValidationException("同步新增任务需要填写默认截止日期")
 
     default_assignee = project.pm_user_id or project.owner_user_id or current_user.id
-    default_due_at = datetime.combine(project.due_at, datetime.min.time()) if project.due_at else None
 
     # Resolve our_entity_id: use project's value, or fall back to first available entity
     resolved_entity_id = project.our_entity_id
@@ -1266,19 +1330,21 @@ async def sync_dev_tasks_from_feature_list(
     notify_pairs = []  # (todo_id, assignee_user_id) for genuinely-new tasks only
     for row in expected_rows:
         feature_key = row["feature_key"]
-        keep = preserved.get(feature_key, {})
+        if feature_key in preserved:
+            continue
         todo = TodoItem(
             our_entity_id=resolved_entity_id,
-            assignee_user_id=keep.get("assignee_user_id") or default_assignee,
+            assignee_user_id=default_assignee,
             creator_user_id=project.pm_user_id or current_user.id,
             title=row["title"],
             description=row["description"],
             source_type=TodoSourceType.PROJECT_TASK,
             source_id=str(project_id),
             action_type=TodoActionType.DO,
-            priority=keep.get("priority") or TodoPriority.P2,
+            priority=TodoPriority.P2,
             status=TodoStatus.OPEN,
-            due_at=keep.get("due_at") or default_due_at,
+            due_at=plan.due_at,
+            estimated_hours=plan.estimated_hours,
             tags=[row["dev_type"]],
             link={
                 "project_id": str(project_id),
@@ -1293,8 +1359,7 @@ async def sync_dev_tasks_from_feature_list(
         )
         session.add(todo)
         session.flush()
-        if not keep:  # re-sync of a preserved task must not re-notify its assignee
-            notify_pairs.append((todo.id, todo.assignee_user_id))
+        notify_pairs.append((todo.id, todo.assignee_user_id))
         created += 1
 
     session.commit()
@@ -1916,9 +1981,11 @@ class DevTaskItem(BaseModel):
     description: Optional[str] = None
     assignee_user_id: UUID
     priority: str = "p2"
-    due_at: Optional[str] = None
+    due_at: datetime
+    estimated_hours: Decimal = SchemaField(default=Decimal("0"), ge=0, max_digits=10, decimal_places=2)
     dev_type: Optional[str] = None  # backend / frontend / ui / product
     feature_key: Optional[str] = None
+    _normalize_due = field_validator("due_at")(as_cn_naive)
 
 
 class GenerateDevTasksRequest(BaseModel):
@@ -1934,9 +2001,8 @@ async def generate_dev_tasks(
 ):
     """Batch-create TodoItems from feature list rows for the development stage."""
     from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoPriority, TodoStatus
-    from datetime import datetime as _dt
 
-    project = session.get(Project, project_id)
+    project = session.exec(select(Project).where(Project.id == project_id).with_for_update()).first()
     if not project:
         raise NotFoundException("未找到项目")
 
@@ -1952,13 +2018,13 @@ async def generate_dev_tasks(
     created_ids = []
     created_pairs = []  # (todo_id, assignee_user_id) for post-commit notify
     for item in payload.tasks:
+        if item.feature_key:
+            existing = session.exec(select(TodoItem).where(TodoItem.source_type == TodoSourceType.PROJECT_TASK,
+                TodoItem.source_id == str(project_id), TodoItem.link["feature_key"].as_string() == item.feature_key)).first()
+            if existing:
+                continue
         # Parse due_at
-        due_at = None
-        if item.due_at:
-            try:
-                due_at = _dt.fromisoformat(item.due_at)
-            except ValueError:
-                pass
+        due_at = item.due_at
 
         priority_map = {"p0": TodoPriority.P0, "p1": TodoPriority.P1, "p2": TodoPriority.P2, "p3": TodoPriority.P3}
         priority = priority_map.get(item.priority, TodoPriority.P2)
@@ -1979,6 +2045,7 @@ async def generate_dev_tasks(
             priority=priority,
             status=TodoStatus.OPEN,
             due_at=due_at,
+            estimated_hours=item.estimated_hours,
             tags=[item.dev_type] if item.dev_type else [],
             link={
                 "project_id": str(project_id),

@@ -179,3 +179,10 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.todo-editor .modal-header { flex-shrink: 0; }
+.todo-editor .modal-body { min-height: 0; }
+@media (max-width: 600px) {
+    .todo-editor .form-row { grid-template-columns: minmax(0, 1fr); }
+    .todo-editor .modal-header, .todo-editor .modal-body { padding: 16px; }
+}

@@ -4,7 +4,9 @@ Project module Pydantic schemas
 from datetime import date, datetime
 from typing import Optional, Any, Dict, List
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.models.base import as_cn_naive
+from decimal import Decimal
 
 
 class ProjectCreate(BaseModel):
@@ -146,6 +148,8 @@ class ProjectTaskResponse(BaseModel):
     reviewed_by_user_id: Optional[UUID] = None
     reviewer_name: Optional[str] = None
     due_at: Optional[datetime] = None
+    estimated_hours: Optional[Decimal] = None
+    submitted_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     done_at: Optional[datetime] = None
     blocked_reason: Optional[str] = None
@@ -169,10 +173,12 @@ class ProjectTaskPlanUpdateRequest(BaseModel):
     """Update project task planning fields"""
     assignee_user_id: Optional[UUID] = None
     due_at: Optional[datetime] = None
+    estimated_hours: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     priority: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     dev_type: Optional[str] = None
+    _normalize_due = field_validator("due_at")(as_cn_naive)
 
 
 class ProjectTaskBatchAssignRequest(BaseModel):

@@ -14,6 +14,8 @@ import {
     Mic,
     MessageSquare,
     Plug,
+    Wallet,
+    CalendarDays,
     LogOut,
     ChevronLeft,
     ChevronRight
@@ -24,6 +26,8 @@ import './Sidebar.css';
 const MENU_ITEMS = [
     { path: '/', label: '工作台', icon: LayoutDashboard, permission: null },
     { path: '/todo', label: '待办事项', icon: CheckSquare, permission: 'todo.read' },
+    { path: '/leave', label: '请假管理', icon: CalendarDays, permission: 'todo.read' },
+    { path: '/beli', label: '贝利', icon: Wallet, permission: null },
     { path: '/iam', label: '用户管理', icon: Users, permission: 'iam.read' },
     { path: '/contract', label: '合同管理', icon: FileText, permission: 'contract.read' },
     { path: '/project', label: '项目管理', icon: Briefcase, permission: 'project.read' },
@@ -38,7 +42,15 @@ export default function Sidebar() {
     const { logout, user, hasPermission } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [collapsed, setCollapsed] = useState(false);
+    const [manualCollapsed, setCollapsed] = useState(false);
+    const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+    const collapsed = isMobile || manualCollapsed;
+    useEffect(() => {
+        const media = window.matchMedia('(max-width: 768px)');
+        const update = () => setIsMobile(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
     const [todoCounts, setTodoCounts] = useState({ my_active: 0, team_pending_review: 0 });
 
     const canReadTodo = hasPermission('todo.read');
@@ -135,9 +147,10 @@ export default function Sidebar() {
             </nav>
 
             <div className="sidebar-footer">
-                <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
+                {!isMobile && <button className="collapse-btn" title={collapsed ? '展开导航' : '收起导航'} onClick={() => setCollapsed(!collapsed)}>
                     {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                </button>
+                </button>}
+                {collapsed && <button className="collapse-btn" title="退出登录" onClick={logout}><LogOut size={16} /></button>}
 
                 <div className="user-section">
                     <div className="user-info">

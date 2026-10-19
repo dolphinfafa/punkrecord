@@ -371,6 +371,14 @@ async def list_project_todos(ctx: Context, project_id: str) -> dict:
 
 
 @mcp.tool()
+async def search_project_bugs(ctx: Context, project_id: str, title: str = "", page: int = 1) -> dict:
+    """在当前项目所有端按标题模糊查询 Bug，返回分页结果和图片 URL。"""
+    data = await _call(ctx, "GET", f"/project/projects/{project_id}/bugs",
+                       params={"title": title, "page": page, "page_size": 30})
+    return _enrich_todo_list_media_urls(ctx, data)
+
+
+@mcp.tool()
 async def list_contracts(ctx: Context, status: Optional[str] = None, page_size: int = 20) -> dict:
     """查看合同列表（需 contract.read 权限）。"""
     return await _call(ctx, "GET", "/contract/contracts", params={"status": status, "page_size": page_size})
@@ -470,8 +478,9 @@ async def create_todo(
     ctx: Context,
     title: str,
     assignee_user_id: str,
+    due_at: str,
+    estimated_hours: float = 0,
     priority: str = "p2",
-    due_at: Optional[str] = None,
     description: Optional[str] = None,
     project_name: Optional[str] = None,
     project_id: Optional[str] = None,
@@ -481,7 +490,8 @@ async def create_todo(
     """创建任务。
 
     - assignee_user_id：执行人用户 UUID（可先用 get_me 或 list 接口获取）。
-    - priority：p0-p3（默认 p2）；due_at：ISO 时间，如 2026-06-10T18:00:00。
+    - priority：p0-p3（默认 p2）；due_at 截止时间必填，estimated_hours 预计小时数默认 0，允许非负数。
+    - 只有正数工时且已验收完成的任务才进入独立贝利审核。
     - 关联项目（任选其一）：project_name（项目名精确匹配）或 project_id；
       dev_type 任务类型：dev_backend/dev_frontend/dev_ui/dev_product/other。
     - tags：标签数组。
@@ -494,7 +504,8 @@ async def create_todo(
     if dev_type:
         link["dev_type"] = dev_type
 
-    body: dict = {"title": title, "assignee_user_id": assignee_user_id, "priority": priority}
+    body: dict = {"title": title, "assignee_user_id": assignee_user_id, "priority": priority,
+                  "estimated_hours": estimated_hours}
     if due_at:
         body["due_at"] = due_at
     if description:
@@ -516,6 +527,7 @@ async def update_todo(
     notes: Optional[str] = None,
     priority: Optional[str] = None,
     due_at: Optional[str] = None,
+    estimated_hours: Optional[float] = None,
     start_at: Optional[str] = None,
     assignee_user_id: Optional[str] = None,
     tags: Optional[list[str]] = None,
@@ -526,7 +538,7 @@ async def update_todo(
     """编辑待办事项（需 todo.write 权限，且当前用户必须有权访问该任务）。
 
     - todo_id：待办 UUID，可先用 list_my_todos 或 get_todo 获取。
-    - priority：p0-p3；due_at/start_at：ISO 时间。
+    - priority：p0-p3；due_at/start_at：ISO 时间；estimated_hours：非负小时数，最多两位小数，0 不参与贝利审核。
     - 可修改标题、描述、备注、负责人、标签及项目关联信息。
     - 只传需要修改的字段；未传字段保持不变。
     """
@@ -537,6 +549,7 @@ async def update_todo(
         "notes": notes,
         "priority": priority,
         "due_at": due_at,
+        "estimated_hours": estimated_hours,
         "start_at": start_at,
         "assignee_user_id": assignee_user_id,
         "tags": tags,
@@ -564,6 +577,8 @@ async def update_todo(
 async def create_bug(
     ctx: Context,
     title: str,
+    due_at: str,
+    estimated_hours: float = 0,
     project_name: Optional[str] = None,
     project_id: Optional[str] = None,
     description: Optional[str] = None,
@@ -576,6 +591,7 @@ async def create_bug(
     """在项目中创建一个 Bug（会同时出现在项目任务与「Bug 管理」）。
 
     - 必须关联项目：project_name（精确匹配）或 project_id 二选一。
+    - due_at 截止时间必填；estimated_hours 默认 0，正数工时且验收完成后才进入贝利审核。
     - actual_result（实际表现）/expected_result（期望行为）/reproduce_steps（复现步骤）选填。
     - assignee_user_id 缺省时分配给当前 API Key 对应用户。
     - 通过打 tags=["bug"] 与 link.type="bug" 使其被识别为 Bug。
@@ -601,6 +617,8 @@ async def create_bug(
 
     body: dict = {
         "title": title,
+        "due_at": due_at,
+        "estimated_hours": estimated_hours,
         "assignee_user_id": assignee_user_id,
         "priority": priority,
         "tags": ["bug"],
@@ -682,6 +700,24 @@ async def create_leave(
     if reason:
         body["reason"] = reason
     return await _call(ctx, "POST", "/todo/leaves", json=body)
+
+
+@mcp.tool()
+async def list_leaves_to_review(ctx: Context) -> list:
+    """查看待我审批的独立请假单，不包含在任务审核队列中。"""
+    return await _call(ctx, "GET", "/todo/leaves/team/pending")
+
+
+@mcp.tool()
+async def approve_leave(ctx: Context, leave_id: str) -> dict:
+    """批准独立请假单；扣减假期并重算相关早会考勤，不修改待办状态。"""
+    return await _call(ctx, "POST", f"/todo/leaves/{leave_id}/approve")
+
+
+@mcp.tool()
+async def reject_leave(ctx: Context, leave_id: str, comment: str) -> dict:
+    """驳回独立请假单，comment 为驳回理由；不修改待办状态。"""
+    return await _call(ctx, "POST", f"/todo/leaves/{leave_id}/reject", json={"comment": comment})
 
 
 # ─── Contract write tools ─────────────────────────────────────────────────────

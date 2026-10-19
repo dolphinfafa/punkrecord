@@ -2,15 +2,19 @@
 
 PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含后端 API、Web 管理后台和微信小程序三个客户端。
 
+2026-10-16 的任务、请假、贝利与商城升级目前仅在开发环境，版本号仍为 2.0.9，未发布生产。
+
 ## 功能模块
 
 | 模块 | 说明 |
 |------|------|
 | 认证与权限 | JWT 认证、双通道 RBAC（角色权限 + 职位权限）、首次登录档案完善 |
-| 组织管理（IAM） | 用户、部门（树形）、职位、权限、实体、组织架构图、Beli 积分 |
-| 任务管理（Todo） | 个人/团队任务、状态机、图片附件、请假申请与审批（自动创建审批任务） |
+| 组织管理（IAM） | 用户、部门（树形）、职位、权限、实体、组织架构图、管理员专用工资维护 |
+| 任务管理（Todo） | 个人/团队任务、状态机、图片附件、截止日期必填、预计工时默认0；与项目任务共享记录，正数工时以绿色贝利任务卡片区分并参与独立奖励审核 |
+| 请假管理 | 独立申请与审批、半天假期、工作日历；不创建或联动待办 |
+| 贝利 | 独立账户与假期调整、任务奖励双重审核、早会考勤扣款、商品兑换与审批发货 |
 | 合同管理 | 合同 CRUD、交易方管理（含编辑）、付款计划、AI 生成合同 |
-| 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、Bug 管理（编辑/配图CRUD/筛选/Agent状态）、验收报告 |
+| 项目管理 | B2B/B2C 项目、阶段管理、成员管理（搜索/筛选）、功能清单、报价单、原型确认单、开发进度、独立 Bug 页面（标题查询/编辑/配图/筛选/Agent状态）、验收报告 |
 | 财务管理 | 账户、交易记录（编辑、日期/状态筛选、作废/恢复、删除已作废交易、Excel导出）、发票、报销 |
 | AI 能力 | AI 对话、功能清单生成、合同起草、会议纪要生成（OpenAI 兼容 LLM；默认 GPT-5.6 Sol） |
 | 企业大脑（KB） | 知识库文档管理、AI 自动分类标签、RAG 语义检索对话 |
@@ -30,7 +34,7 @@ PunkRecord 是一套面向中小型团队的企业级项目管理平台，包含
 punkrecord/
 ├── backend/                 # FastAPI 后端服务
 │   ├── app/
-│   │   ├── api/             # 路由模块（auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog, wechat_notify, mcp）
+│   │   ├── api/             # 路由模块（auth, iam, todo, beli, contract, project, finance, ai, kb, meeting, changelog, wechat_notify, mcp）
 │   │   ├── core/            # 配置、数据库、认证、响应、异常处理、文件存储
 │   │   ├── models/          # SQLModel ORM 模型
 │   │   ├── schemas/         # Pydantic 请求/响应 Schema
@@ -45,6 +49,7 @@ punkrecord/
 │       └── pages/           # 按业务域划分的页面
 ├── miniprogram/             # 微信小程序客户端
 ├── milestone/               # 里程碑工作记录
+├── .agent/test/              # 测试指引与回归用例
 ├── prd/                     # 产品需求文档
 └── .agent/workflows/        # Agent 工作流文档与索引
 ```
@@ -119,5 +124,6 @@ npm run dev
 ## 更多信息
 
 - 详细技术文档：`.agent/workflows/project-index.md`
+- 测试方法和用例：`.agent/test/README.md`、`.agent/test/cases.md`
 - 里程碑记录：`milestone/` 目录
 - 产品需求文档：`prd/` 目录

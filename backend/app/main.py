@@ -12,9 +12,10 @@ from app.core.config import settings
 from app.core.database import create_db_and_tables
 from app.core.exceptions import AtlasException
 from app.core.response import error_response
-from app.api import auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog, wechat_notify
+from app.api import auth, iam, todo, contract, project, finance, ai, kb, meeting, changelog, wechat_notify, beli
 from app.api.mcp_server import mcp as mcp_server
 from app.services.wechat_notify_queue import wechat_notification_retry_worker
+from app.services.beli import attendance_reconciliation_worker
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,16 @@ async def lifespan(app: FastAPI):
         # Background worker: replay queued WeChat notifications once the
         # push channel reactivates (see services/wechat_notify_queue.py).
         retry_task = asyncio.create_task(wechat_notification_retry_worker())
+        attendance_task = asyncio.create_task(attendance_reconciliation_worker())
         try:
             yield
         finally:
             retry_task.cancel()
+            attendance_task.cancel()
             with suppress(asyncio.CancelledError):
                 await retry_task
+            with suppress(asyncio.CancelledError):
+                await attendance_task
 
 
 # Create FastAPI app
@@ -54,6 +59,7 @@ app.mount("/api/v1/mcp", mcp_server.streamable_http_app())
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(iam.router, prefix="/api/v1")
 app.include_router(todo.router, prefix="/api/v1")
+app.include_router(beli.router, prefix="/api/v1")
 app.include_router(contract.router, prefix="/api/v1")
 app.include_router(project.router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")

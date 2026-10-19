@@ -101,9 +101,10 @@ export const projectApi = {
     generateDevTasks: async (projectId, tasks) => {
         return client.post(`/project/projects/${projectId}/generate-dev-tasks`, { tasks });
     },
-    syncDevTasks: async (projectId) => {
-        return client.post(`/project/projects/${projectId}/sync-dev-tasks`);
+    syncDevTasks: async (projectId, plan) => {
+        return client.post(`/project/projects/${projectId}/sync-dev-tasks`, plan);
     },
+    getProjectBugs: (projectId, params) => client.get(`/project/projects/${projectId}/bugs`, { params }),
 
     // Contract context (enriched data for contract generation)
     getProjectContractContext: async (projectId) => {

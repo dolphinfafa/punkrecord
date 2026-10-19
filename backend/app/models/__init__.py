@@ -3,6 +3,8 @@ Models package initialization
 Import all models here for easy access
 """
 from app.models.base import BaseDBModel, UUIDModel, TimestampModel
+from app.models.beli import (BeliAccount, BeliLedger, TaskReward, WorkdayOverride,
+                             BeliPolicy, MorningAttendance, BeliProduct, BeliOrder)
 from app.models.iam import (
     User, Role, Permission, RolePermission, UserRole,
     OurEntity, OrgUnit, OrgMembership, BeliRule,

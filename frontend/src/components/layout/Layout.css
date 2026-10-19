@@ -10,11 +10,16 @@
 
 .main-content {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     padding: 32px;
     background-color: #eff1f5;
     /* Light background for content area */
     color: #4c4f69;
+}
+
+@media (max-width: 768px) {
+    .main-content { padding: 12px; }
 }
 
 @media (prefers-color-scheme: dark) {

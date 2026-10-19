@@ -54,6 +54,18 @@
 
 .todo-item { margin-bottom: 14rpx; }
 
+.todo-item.beli-task {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.beli-task-label {
+  margin-top: 8rpx;
+  color: #047857;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
 .todo-row {
   display: flex;
   justify-content: space-between;

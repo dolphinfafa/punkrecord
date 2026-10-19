@@ -140,6 +140,7 @@ export default function GenerateTasksModal({ isOpen, project, onClose, onSuccess
                 assignee_user_id: defaultAssignee,
                 priority: 'p2',
                 due_at: defaultDue,
+                estimated_hours: 0,
                 dev_type: devType,
                 feature_key: key,
             };
@@ -155,6 +156,7 @@ export default function GenerateTasksModal({ isOpen, project, onClose, onSuccess
     const handleGenerate = async () => {
         const tasks = Object.values(taskConfigs).filter(t => t.assignee_user_id);
         if (tasks.length === 0) { setError('至少需要为一个任务分配负责人'); return; }
+        if (tasks.some(t => !t.due_at || !Number.isFinite(Number(t.estimated_hours)) || Number(t.estimated_hours) < 0)) { setError('每个任务必须填写截止日期，预计工时不能为负数'); return; }
         setSubmitting(true);
         setError(null);
         try {
@@ -163,7 +165,8 @@ export default function GenerateTasksModal({ isOpen, project, onClose, onSuccess
                 description: t.description,
                 assignee_user_id: t.assignee_user_id,
                 priority: t.priority,
-                due_at: t.due_at ? new Date(t.due_at).toISOString() : null,
+                due_at: `${t.due_at}T18:00:00`,
+                estimated_hours: Number(t.estimated_hours),
                 dev_type: t.dev_type,
                 feature_key: t.feature_key,
             }));
@@ -304,6 +307,7 @@ export default function GenerateTasksModal({ isOpen, project, onClose, onSuccess
                                     value={cfg.due_at || ''}
                                     onChange={e => updateConfig(key, 'due_at', e.target.value)}
                                 />
+                                <label style={{ gridColumn: '1 / -1' }}>预计工时（小时） <input type="number" min="0" step="0.01" value={cfg.estimated_hours} onChange={e => updateConfig(key, 'estimated_hours', e.target.value)} style={{ ...S.input, maxWidth: 160 }} /></label>
                             </div>
                         );
                     })}

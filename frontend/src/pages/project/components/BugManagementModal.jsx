@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X, Plus, RefreshCw, Bug, ExternalLink, Play, Send, RotateCcw, Trash2, FileText, Copy, Check, ChevronDown, ChevronUp, Edit3, Image } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import projectApi from '@/api/project';
@@ -94,6 +94,7 @@ function defaultBugForm(project, currentUserId, testerMembers, developerMembers)
         developer_user_id: developer,
         priority: 'p1',
         due_at: project?.due_at || '',
+        estimated_hours: 0,
         actual_result: '',
         expected_result: '',
         reproduce_steps: '',
@@ -203,8 +204,22 @@ Agent 状态 (link.agent_status):  (空) --> ai_fixing --> ai_fixed --> (员工�
 `;
 }
 
-export default function BugManagementModal({ isOpen, onClose, project }) {
+export default function BugManagementModal({ isOpen, onClose, project, asPage = false }) {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const query = searchParams.get('title') || '';
+    const pageValue = Number(searchParams.get('page'));
+    const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+    const requestSerial = useRef(0);
+    const setFilters = (values, replace = false) => setSearchParams(previous => {
+        const next = new URLSearchParams(previous);
+        Object.entries(values).forEach(([key, value]) => {
+            if (value) next.set(key, value); else next.delete(key);
+        });
+        next.delete('page');
+        return next;
+    }, { replace });
+    const [total, setTotal] = useState(0);
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -221,10 +236,10 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     const [docExpanded, setDocExpanded] = useState(false);
     const [docCopied, setDocCopied] = useState(false);
     // Filters
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterAgentStatus, setFilterAgentStatus] = useState('');
-    const [filterDeveloper, setFilterDeveloper] = useState('');
-    const [filterTester, setFilterTester] = useState('');
+    const filterStatus = searchParams.get('status') || '';
+    const filterAgentStatus = searchParams.get('agent_status') || '';
+    const filterDeveloper = searchParams.get('developer') || '';
+    const filterTester = searchParams.get('tester') || '';
 
     const bugListAll = useMemo(() => todos.filter(isBugTodo), [todos]);
     const bugList = useMemo(() => {
@@ -270,42 +285,49 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
 
     const loadData = async () => {
         if (!project?.id) return;
+        const serial = ++requestSerial.current;
         try {
             setLoading(true);
             setMessage('');
             const [todoRes, memberRes] = await Promise.all([
-                projectApi.getProjectTodos(project.id),
+                projectApi.getProjectBugs(project.id, { title: query, page, status: filterStatus, agent_status: filterAgentStatus, developer: filterDeveloper, tester: filterTester }),
                 projectApi.getProjectMembers(project.id),
             ]);
-            const loadedTodos = todoRes.data || [];
+            if (serial !== requestSerial.current) return;
+            const loadedTodos = todoRes.data?.items || [];
+            setTotal(todoRes.data?.total || 0);
             const loadedMembers = normalizeMembers(project, memberRes.data || []);
             setTodos(loadedTodos);
             setMembers(loadedMembers);
         } catch (err) {
-            setMessage(err?.response?.data?.message || err?.message || '加载 Bug 列表失败');
+            if (serial === requestSerial.current) setMessage(err?.response?.data?.message || err?.message || '加载 Bug 列表失败');
         } finally {
-            setLoading(false);
+            if (serial === requestSerial.current) setLoading(false);
         }
     };
 
     useEffect(() => {
         if (!isOpen) return;
-        loadData();
+        const timer = setTimeout(loadData, 250);
+        return () => { clearTimeout(timer); requestSerial.current += 1; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, project?.id]);
+    }, [isOpen, project?.id, query, page, filterStatus, filterAgentStatus, filterDeveloper, filterTester]);
 
     useEffect(() => {
         if (!isOpen) return;
         const currentUserId = user?.id || '';
         setShowCreate(false);
         setForm(defaultBugForm(project, currentUserId, testerMembers, developerMembers));
-    }, [isOpen, project, user?.id, testerMembers, developerMembers]);
+    }, [isOpen, project?.id, user?.id]);
 
     if (!isOpen || !project) return null;
 
     const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
     const createBug = async () => {
+        if (!form.due_at || !Number.isFinite(Number(form.estimated_hours)) || Number(form.estimated_hours) < 0) {
+            setMessage('请填写截止日期，预计工时不能为负数'); return;
+        }
         if (!form.title.trim()) {
             setMessage('Bug 标题不能为空');
             return;
@@ -357,6 +379,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                 action_type: 'do',
                 priority: form.priority,
                 due_at: dueAt,
+                estimated_hours: Number(form.estimated_hours),
                 tags: ['bug', 'testing'],
                 link: {
                     type: 'bug',
@@ -399,6 +422,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
             developer_user_id: todo.assignee_user_id || link.developer_user_id || '',
             priority: todo.priority || 'p1',
             due_at: todo.due_at ? new Date(todo.due_at).toISOString().slice(0, 10) : '',
+            estimated_hours: todo.estimated_hours ?? 0,
             actual_result: link.actual_result || '',
             expected_result: link.expected_result || '',
             reproduce_steps: link.reproduce_steps || '',
@@ -410,6 +434,9 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
     };
 
     const updateBug = async () => {
+        if (!form.due_at || !Number.isFinite(Number(form.estimated_hours)) || Number(form.estimated_hours) < 0) {
+            setMessage('请填写截止日期，预计工时不能为负数'); return;
+        }
         if (!form.title.trim()) { setMessage('Bug 标题不能为空'); return; }
         if (!editingBug) return;
         try {
@@ -447,6 +474,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                 description: fullDescription,
                 priority: form.priority,
                 due_at: dueAt,
+                estimated_hours: Number(form.estimated_hours),
                 assignee_user_id: form.developer_user_id || undefined,
                 link: {
                     ...existingLink,
@@ -523,27 +551,29 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
 
     return (
         <div style={{
-            position: 'fixed',
+            position: asPage ? 'relative' : 'fixed',
             inset: 0,
-            zIndex: 1000,
-            background: 'rgba(2, 6, 23, 0.6)',
+            zIndex: asPage ? 'auto' : 1000,
+            background: asPage ? 'transparent' : 'rgba(2, 6, 23, 0.6)',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px',
+            padding: asPage ? '0' : '20px',
+            minWidth: 0,
         }}>
             <div style={{
-                width: 'min(1500px, 98%)',
-                maxHeight: '92vh',
+                width: asPage ? '100%' : 'min(1500px, 98%)',
+                maxHeight: asPage ? 'none' : '92vh',
                 background: '#fff',
-                borderRadius: '14px',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                borderRadius: asPage ? 0 : '8px',
+                boxShadow: asPage ? 'none' : '0 20px 60px rgba(0,0,0,0.3)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
             }}>
                 <div style={{
-                    background: 'linear-gradient(130deg, #1e3a8a 0%, #2563eb 45%, #0ea5e9 100%)',
+                    background: '#263d36',
                     color: '#fff',
                     padding: '14px 16px',
                     display: 'flex',
@@ -555,32 +585,35 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Bug size={18} />
                         <div>
-                            <div style={{ fontWeight: 700 }}>测试阶段 Bug 管理</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{project.name}</div>
+                            <div style={{ fontWeight: 700 }}>Bug 管理</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.9, overflowWrap: 'anywhere' }}>{project.name}</div>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                             onClick={() => setDocExpanded((prev) => !prev)}
-                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: docExpanded ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
+                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: docExpanded ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center', whiteSpace: 'nowrap' }}
                         >
                             <FileText size={14} /> Agent 文档 {docExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </button>
                         <button
                             onClick={loadData}
-                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
+                            title="刷新" aria-label="刷新"
+                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', borderRadius: '8px', width: 34, height: 34, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                         >
-                            <RefreshCw size={14} /> 刷新
+                            <RefreshCw size={16} />
                         </button>
                         <button
                             onClick={() => navigate('/todo')}
-                            style={{ border: 'none', background: '#111827', color: '#fff', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
+                            title="打开待办" aria-label="打开待办"
+                            style={{ border: 'none', background: '#111827', color: '#fff', borderRadius: '8px', width: 34, height: 34, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                         >
-                            <ExternalLink size={14} /> 打开待办
+                            <ExternalLink size={16} />
                         </button>
                         <button
                             onClick={onClose}
-                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}
+                            title={asPage ? '返回项目' : '关闭'} aria-label={asPage ? '返回项目' : '关闭'}
+                            style={{ border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', borderRadius: '8px', width: 34, height: 34, cursor: 'pointer', flexShrink: 0 }}
                         >
                             <X size={16} />
                         </button>
@@ -637,6 +670,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                 )}
 
                 <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <input aria-label="搜索Bug标题" type="search" placeholder="搜索 Bug 标题" value={query} onChange={e => setFilters({ title: e.target.value }, true)} style={{ width: '100%', maxWidth: 460, padding: 10, border: '1px solid #cbd5e1', borderRadius: 6 }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <span style={{ fontSize: '0.86rem', color: '#334155' }}>Bug 总数：<strong>{bugList.length}</strong>{bugListAll.length !== bugList.length && <span style={{ color: '#94a3b8' }}> / {bugListAll.length}</span>}</span>
@@ -663,17 +697,17 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>筛选：</span>
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                        <select aria-label="Bug状态" value={filterStatus} onChange={(e) => setFilters({ status: e.target.value })} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部状态</option>
                             {Object.entries(STATUS_LABELS).filter(([k]) => !k.startsWith('ai_')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
-                        <select value={filterAgentStatus} onChange={(e) => setFilterAgentStatus(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                        <select aria-label="Agent状态" value={filterAgentStatus} onChange={(e) => setFilters({ agent_status: e.target.value })} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部Agent状态</option>
                             <option value="none">无Agent</option>
                             <option value="ai_fixing">AI 处理中</option>
                             <option value="ai_fixed">AI 已完成</option>
                         </select>
-                        <select value={filterDeveloper} onChange={(e) => setFilterDeveloper(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                        <select aria-label="开发人员" value={filterDeveloper} onChange={(e) => setFilters({ developer: e.target.value })} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部开发人员</option>
                             {(() => {
                                 const devIds = [...new Set(bugListAll.map(t => t.assignee_user_id).filter(Boolean))];
@@ -683,7 +717,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                 });
                             })()}
                         </select>
-                        <select value={filterTester} onChange={(e) => setFilterTester(e.target.value)} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
+                        <select aria-label="测试人员" value={filterTester} onChange={(e) => setFilters({ tester: e.target.value })} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem', color: '#334155' }}>
                             <option value="">全部测试人员</option>
                             {(() => {
                                 const testerIds = [...new Set(bugListAll.map(t => t.link?.tester_user_id).filter(Boolean))];
@@ -694,7 +728,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                             })()}
                         </select>
                         {(filterStatus || filterAgentStatus || filterDeveloper || filterTester) && (
-                            <button onClick={() => { setFilterStatus(''); setFilterAgentStatus(''); setFilterDeveloper(''); setFilterTester(''); }} style={{ border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.78rem', textDecoration: 'underline' }}>清除</button>
+                            <button onClick={() => setFilters({ status: '', agent_status: '', developer: '', tester: '' })} style={{ border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.78rem', textDecoration: 'underline' }}>清除</button>
                         )}
                     </div>
                 </div>
@@ -706,7 +740,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                                 <Edit3 size={14} /> 编辑 Bug：{editingBug.title}
                             </div>
                         )}
-                        <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
+                        <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
                             <label style={{ fontSize: '0.83rem', color: '#334155' }}>
                                 Bug 标题
                                 <input value={form.title} onChange={(e) => setField('title', e.target.value)} placeholder="例如：登录后白屏" style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
@@ -740,10 +774,12 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                             </label>
                             <label style={{ fontSize: '0.83rem', color: '#334155' }}>
                                 截止日期
-                                <input type="date" value={form.due_at} onChange={(e) => setField('due_at', e.target.value)} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
+                                <input required type="date" value={form.due_at} onChange={(e) => setField('due_at', e.target.value)} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
+                                <label style={{ display: 'block', marginTop: 8 }}>预计工时（小时）</label>
+                                <input type="number" min="0" step="0.01" value={form.estimated_hours} onChange={e => setField('estimated_hours', e.target.value)} style={{ width: '100%', padding: 8 }} />
                             </label>
                         </div>
-                        <div style={{ marginTop: '10px', display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+                        <div style={{ marginTop: '10px', display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))' }}>
                             <label style={{ fontSize: '0.83rem', color: '#334155' }}>
                                 实际结果
                                 <textarea value={form.actual_result} onChange={(e) => setField('actual_result', e.target.value)} rows={2} style={{ width: '100%', marginTop: '5px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }} />
@@ -824,7 +860,7 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                     ) : bugList.length === 0 ? (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '28px 0', textAlign: 'center' }}>暂无 Bug，点击上方"新建 Bug"开始记录</div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1360px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
                                     {['标题', '状态', 'Agent状态', '优先级', '开发人员', '审核人', '截止日期', '操作', '待办联动'].map((h) => (
@@ -956,6 +992,11 @@ export default function BugManagementModal({ isOpen, onClose, project }) {
                 </div>
             </div>
 
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12 }}>
+                <button disabled={page <= 1} onClick={() => setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('page', page - 1); return p; })}>上一页</button>
+                <span>第 {page} 页 · 共 {total} 项</span>
+                <button disabled={page * 30 >= total} onClick={() => setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('page', page + 1); return p; })}>下一页</button>
+            </div>
             <BugDetailModal
                 isOpen={Boolean(selectedBug)}
                 onClose={() => setSelectedBug(null)}

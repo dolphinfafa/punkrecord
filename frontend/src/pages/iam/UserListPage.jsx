@@ -1,12 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import iamApi from '@/api/iam';
+import client from '@/api/client';
 import ImagePasteUpload from '@/components/common/ImagePasteUpload';
 import './IAMPage.css';
 
 const STATUS_LABELS = { active: '在职', inactive: '停用' };
 
-function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments, canEditLeaveBalance, showNotification }) {
+function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments, showNotification }) {
     const [form, setForm] = useState({
         display_name: '',
         username: '',
@@ -23,13 +24,6 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
         home_address: '',
         graduation_school: '',
         education_level: '',
-        leave_annual_remaining: 5,
-        leave_maternity_remaining: 15,
-        leave_marriage_remaining: 3,
-        leave_personal_remaining: 3,
-        leave_sick_remaining: 3,
-        beili_adjust_action: 'add',
-        beili_adjust_amount: '',
     });
     const [loading, setLoading] = useState(false);
     const [idCardBlobUrl, setIdCardBlobUrl] = useState(null);
@@ -75,13 +69,6 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                 home_address: initialData.home_address || '',
                 graduation_school: initialData.graduation_school || '',
                 education_level: initialData.education_level || '',
-                leave_annual_remaining: initialData.leave_annual_remaining ?? 5,
-                leave_maternity_remaining: initialData.leave_maternity_remaining ?? 15,
-                leave_marriage_remaining: initialData.leave_marriage_remaining ?? 3,
-                leave_personal_remaining: initialData.leave_personal_remaining ?? 3,
-                leave_sick_remaining: initialData.leave_sick_remaining ?? 3,
-                beili_adjust_action: 'add',
-                beili_adjust_amount: '',
             });
         } else {
             setForm({
@@ -100,13 +87,6 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                 home_address: '',
                 graduation_school: '',
                 education_level: '',
-                leave_annual_remaining: 5,
-                leave_maternity_remaining: 15,
-                leave_marriage_remaining: 3,
-                leave_personal_remaining: 3,
-                leave_sick_remaining: 3,
-                beili_adjust_action: 'add',
-                beili_adjust_amount: '',
             });
         }
     }, [initialData, isOpen]);
@@ -142,20 +122,6 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
             };
             if (!isEdit) data.password = form.password;
             if (isEdit) data.status = form.status;
-
-            if (isEdit && canEditLeaveBalance) {
-                data.leave_annual_remaining = Number(form.leave_annual_remaining || 0);
-                data.leave_maternity_remaining = Number(form.leave_maternity_remaining || 0);
-                data.leave_marriage_remaining = Number(form.leave_marriage_remaining || 0);
-                data.leave_personal_remaining = Number(form.leave_personal_remaining || 0);
-                data.leave_sick_remaining = Number(form.leave_sick_remaining || 0);
-
-                const adjustAmount = Number(form.beili_adjust_amount || 0);
-                if (adjustAmount > 0) {
-                    data.beili_adjust_action = form.beili_adjust_action;
-                    data.beili_adjust_amount = adjustAmount;
-                }
-            }
 
             await onSubmit(data);
             onClose();
@@ -356,68 +322,6 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                         </label>
                     </div>
 
-                    {isEdit && (
-                        <div className="iam-form-row">
-                            <div className="iam-form-group">
-                                <label>年假</label>
-                                <input type="number" step="0.5" min="0" value={form.leave_annual_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_annual_remaining: e.target.value }))} />
-                            </div>
-                            <div className="iam-form-group">
-                                <label>产假</label>
-                                <input type="number" step="0.5" min="0" value={form.leave_maternity_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_maternity_remaining: e.target.value }))} />
-                            </div>
-                        </div>
-                    )}
-
-                    {isEdit && (
-                        <div className="iam-form-row">
-                            <div className="iam-form-group">
-                                <label>婚假</label>
-                                <input type="number" step="0.5" min="0" value={form.leave_marriage_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_marriage_remaining: e.target.value }))} />
-                            </div>
-                            <div className="iam-form-group">
-                                <label>事假</label>
-                                <input type="number" step="0.5" min="0" value={form.leave_personal_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_personal_remaining: e.target.value }))} />
-                            </div>
-                            <div className="iam-form-group">
-                                <label>病假</label>
-                                <input type="number" step="0.5" min="0" value={form.leave_sick_remaining} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, leave_sick_remaining: e.target.value }))} />
-                            </div>
-                        </div>
-                    )}
-
-                    {isEdit && (
-                        <div className="iam-form-row">
-                            <div className="iam-form-group">
-                                <label>贝利调整</label>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                    当前余额：{Number(initialData?.beili_balance || 0).toFixed(0)} 贝利
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <select value={form.beili_adjust_action} disabled={!canEditLeaveBalance} onChange={e => setForm(p => ({ ...p, beili_adjust_action: e.target.value }))}>
-                                        <option value="add">增加</option>
-                                        <option value="subtract">扣除</option>
-                                    </select>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={form.beili_adjust_amount}
-                                        disabled={!canEditLeaveBalance}
-                                        onChange={e => setForm(p => ({ ...p, beili_adjust_amount: e.target.value }))}
-                                        placeholder="本次调整数量"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {isEdit && !canEditLeaveBalance && (
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                            仅 L0 管理员可调整假期余额和贝利。
-                        </div>
-                    )}
-
                     <div className="iam-modal-footer">
                         <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
                         <button type="submit" className="btn-primary" disabled={loading}>{loading ? '保存中...' : '保存'}</button>
@@ -428,49 +332,18 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
     );
 }
 
-function LeaveResetModal({ isOpen, onClose, onConfirm }) {
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) setLoading(false);
-    }, [isOpen]);
-
-    const handleConfirm = async () => {
-        if (!window.confirm('确定要重置所有员工的假期余额吗？')) return;
-        try {
-            setLoading(true);
-            await onConfirm();
-            onClose();
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (!isOpen) return null;
-    return (
-        <div className="iam-modal-overlay" onClick={onClose}>
-            <div className="iam-modal" onClick={e => e.stopPropagation()}>
-                <div className="iam-modal-header">
-                    <h3>重置假期余额</h3>
-                    <button onClick={onClose}><X size={18} /></button>
-                </div>
-                <div className="iam-modal-body">
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        将所有员工假期余额重置为系统默认值（年假 5、产假 15、婚假 3、事假 3、病假 3）。
-                    </div>
-                    <div className="iam-modal-footer">
-                        <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
-                        <button type="button" onClick={handleConfirm} className="btn-primary" disabled={loading}>
-                            {loading ? '重置中...' : '确认重置'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export default function UserListPage() {
+    const [canManageSalary, setCanManageSalary] = useState(false);
+    const [salaryTarget, setSalaryTarget] = useState(null);
+    const [salary, setSalary] = useState('');
+    const [salaryBusy, setSalaryBusy] = useState(false);
+    const [salaryError, setSalaryError] = useState('');
+    useEffect(() => { client.get('/iam/compensation-access').then(res => setCanManageSalary(res.data.allowed)).catch(() => {}); }, []);
+    const openSalary = async employee => {
+        setSalaryError('');
+        try { const res = await client.get(`/iam/users/${employee.id}/salary`); setSalary(res.data.basic_salary ?? ''); setSalaryTarget(employee); }
+        catch (err) { showNotification(err.response?.data?.message || err.message, 'error'); }
+    };
     const [users, setUsers] = useState([]);
     const [jobTitles, setJobTitles] = useState([]);
     const [departments, setDepartments] = useState([]);
@@ -480,7 +353,6 @@ export default function UserListPage() {
     const [notification, setNotification] = useState(null);
     const [search, setSearch] = useState('');
     const [currentUserLevel, setCurrentUserLevel] = useState(null);
-    const [resetModalOpen, setResetModalOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const pageSize = 20;
@@ -537,12 +409,6 @@ export default function UserListPage() {
         }
     };
 
-    const handleResetLeaveBalances = async () => {
-        await iamApi.resetAllLeaveBalances();
-        showNotification('所有员工假期余额已重置');
-        load();
-    };
-
     const filtered = users.filter(u =>
         u.display_name.includes(search)
         || (u.username || '').includes(search)
@@ -552,6 +418,12 @@ export default function UserListPage() {
 
     return (
         <div className="iam-page">
+            {salaryTarget && <div className="iam-modal-overlay" onClick={() => { if (!salaryBusy) setSalaryTarget(null); }}><form className="iam-modal" style={{ padding: 24, maxWidth: 420 }} onClick={e => e.stopPropagation()} onSubmit={async e => {
+                e.preventDefault(); setSalaryBusy(true); setSalaryError('');
+                try { await client.put(`/iam/users/${salaryTarget.id}/salary`, { basic_salary: salary }); setSalaryTarget(null); showNotification('基本工资已保存'); }
+                catch (err) { setSalaryError(err.response?.data?.message || err.message); }
+                finally { setSalaryBusy(false); }
+            }}><h3>{salaryTarget.display_name} · 基本工资</h3><label className="iam-form-group">基本月工资（元） *<input type="number" min="0.01" step="0.01" required value={salary} onChange={e => setSalary(e.target.value)} /></label>{salaryError && <p role="alert">{salaryError}</p>}<div className="iam-modal-footer"><button type="button" disabled={salaryBusy} onClick={() => setSalaryTarget(null)}>取消</button><button type="submit" disabled={salaryBusy}>保存</button></div></form></div>}
             {notification && (
                 <div className={`iam-notification ${notification.type}`}>{notification.msg}</div>
             )}
@@ -565,11 +437,7 @@ export default function UserListPage() {
                     <button className="btn-primary" onClick={() => { setEditTarget(null); setModalOpen(true); }}>
                         <Plus size={16} /> 新建员工
                     </button>
-                    {currentUserLevel === 0 && (
-                        <button className="btn-secondary" onClick={() => setResetModalOpen(true)}>
-                            重置假期余额
-                        </button>
-                    )}
+
                 </div>
             </div>
 
@@ -586,14 +454,13 @@ export default function UserListPage() {
                                 <th>职位</th>
                                 <th>直属上级</th>
                                 <th>层级</th>
-                                <th>贝利</th>
                                 <th>状态</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>暂无员工</td></tr>
                             ) : filtered.map(user => (
                                 <tr key={user.id}>
                                     <td>
@@ -610,11 +477,6 @@ export default function UserListPage() {
                                         <span className="badge" style={{ background: 'rgba(138,173,244,0.15)', color: 'var(--primary-color)' }}>L{user.level ?? 0}</span>
                                     </td>
                                     <td>
-                                        <span className="badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#047857' }}>
-                                            {Number(user.beili_balance || 0).toFixed(0)} 贝利
-                                        </span>
-                                    </td>
-                                    <td>
                                         <span className={`status-badge ${user.status}`}>
                                             {STATUS_LABELS[user.status] || user.status}
                                         </span>
@@ -624,6 +486,7 @@ export default function UserListPage() {
                                             <button className="btn-link" onClick={() => { setEditTarget(user); setModalOpen(true); }}>
                                                 <Edit2 size={14} /> 编辑
                                             </button>
+                                            {canManageSalary && user.status === 'active' && <button className="btn-link" onClick={() => openSalary(user)}><Edit2 size={14} />基本工资</button>}
                                             {currentUserLevel === 0 && (
                                                 <button className="btn-link" style={{ color: 'var(--warning-color)' }} onClick={() => handleResetPassword(user)}>
                                                     <KeyRound size={14} /> 重置密码
@@ -661,15 +524,9 @@ export default function UserListPage() {
                 users={users}
                 jobTitles={jobTitles}
                 departments={departments}
-                canEditLeaveBalance={currentUserLevel === 0}
                 showNotification={showNotification}
             />
 
-            <LeaveResetModal
-                isOpen={resetModalOpen}
-                onClose={() => setResetModalOpen(false)}
-                onConfirm={handleResetLeaveBalances}
-            />
         </div>
     );
 }

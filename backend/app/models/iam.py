@@ -7,6 +7,8 @@ from uuid import UUID
 from enum import Enum
 from sqlmodel import Field, Relationship, SQLModel
 from app.models.base import BaseDBModel, now_cn
+from decimal import Decimal
+from sqlalchemy import Column, Numeric
 
 
 # Enums
@@ -128,6 +130,7 @@ class User(BaseDBModel, table=True):
     leave_sick_remaining: float = Field(default=3.0, nullable=False)
     leave_balance_reset_year: int = Field(default=now_cn().year, nullable=False)
     beili_balance: float = Field(default=0.0, nullable=False)
+    basic_salary: Optional[Decimal] = Field(default=None, sa_column=Column(Numeric(12, 2)))
 
     # Relationships
     user_roles: List["UserRole"] = Relationship(back_populates="user")

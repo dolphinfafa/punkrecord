@@ -47,7 +47,7 @@
   </view>
 
   <block wx:if="{{displayTodos.length}}">
-    <view class="card todo-item" wx:for="{{displayTodos}}" wx:key="id">
+    <view class="card todo-item {{item.estimated_hours > 0 ? 'beli-task' : ''}}" wx:for="{{displayTodos}}" wx:key="id">
       <view class="todo-row">
         <text class="todo-title">{{item.titleText}}</text>
         <text class="badge {{item.status}}">{{item.statusLabel}}</text>
@@ -55,6 +55,8 @@
       <view class="muted" wx:if="{{activeScope === 'team'}}">负责人：{{item.assigneeText || '未设置'}}</view>
       <view class="muted">优先级：{{item.priorityText}}</view>
       <view class="muted">截止时间：{{item.dueText}}</view>
+      <view class="muted">预计工时：{{item.estimated_hours || 0}} 小时</view>
+      <view class="beli-task-label" wx:if="{{item.estimated_hours > 0}}">贝利任务</view>
       <view class="todo-desc" wx:if="{{item.descriptionText}}">{{item.descriptionText}}</view>
       <view class="actions">
         <button

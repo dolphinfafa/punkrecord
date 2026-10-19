@@ -108,3 +108,34 @@ def test_bulk_not_triggered_by_questions():
     from app.services.wechat_inbound import parse_bulk_command
     for t in ["全部通过的申请都会发吗", "都通过的话要不要通知他们", "你好", ""]:
         assert parse_bulk_command(t) is None, t
+
+
+def test_typed_leave_ids_in_explicit_and_quoted_commands():
+    assert parse_action_reply(f'通过 leave:{UUID_STR}')['todo_id'] == f'leave:{UUID_STR}'
+    assert parse_action_reply(f'拒绝 请假 {UUID_STR} 理由:有冲突')['todo_id'] == f'leave:{UUID_STR}'
+    assert parse_quote_command(f'[引用: 请假申请\n单号: leave:{UUID_STR}]\n通过')['todo_id'] == f'leave:{UUID_STR}'
+    assert parse_quote_command(f'[引用: 请假申请\n单号: {UUID_STR}]\n通过')['todo_id'] == f'leave:{UUID_STR}'
+
+
+def test_leave_approval_uses_independent_endpoint(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+    from app.services import wechat_inbound as api
+    user = object()
+    call = AsyncMock(return_value={'applicant_name': 'Employee'})
+    monkeypatch.setattr(api, '_internal_call', call)
+    result = asyncio.run(api._exec_approval(user, {'todo_id': f'leave:{UUID_STR}', 'action': 'approve', 'comment': None}))
+    call.assert_awaited_once_with(user, 'POST', f'/todo/leaves/{UUID_STR}/approve', {'comment': None})
+    assert 'Employee' in result
+
+
+def test_pending_reviews_combines_leaves_without_todo_mirrors(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+    from app.services import wechat_inbound as api
+    call = AsyncMock(side_effect=[{'id': 'boss'}, {'items': [{'id': 'task', 'title': 'Task'}]},
+        [{'id': UUID_STR, 'applicant_name': 'Employee', 'start_at': '2026-10-16', 'end_at': '2026-10-17'}]])
+    monkeypatch.setattr(api, '_internal_call', call)
+    results = asyncio.run(api._pending_reviews(object()))
+    assert [row['id'] for row in results] == ['task', f'leave:{UUID_STR}']
+    assert call.await_args_list[-1].args[2] == '/todo/leaves/team/pending'

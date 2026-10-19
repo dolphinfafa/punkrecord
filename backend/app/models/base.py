@@ -9,6 +9,10 @@ from sqlmodel import Field, SQLModel
 CN_TZ = timezone(timedelta(hours=8))
 
 
+def as_cn_naive(value):
+    return value.astimezone(CN_TZ).replace(tzinfo=None) if value is not None and value.tzinfo else value
+
+
 def now_cn() -> datetime:
     return datetime.now(CN_TZ).replace(tzinfo=None)
 

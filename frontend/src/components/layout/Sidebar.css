@@ -1,5 +1,6 @@
 /* Sidebar.css */
 .sidebar {
+  flex-shrink: 0;
   width: 260px;
   height: 100vh;
   background-color: #1e1e2e;
@@ -42,6 +43,8 @@
 }
 
 .sidebar-nav {
+  overflow-y: auto;
+  min-height: 0;
   flex: 1;
   padding: 24px 12px;
   display: flex;

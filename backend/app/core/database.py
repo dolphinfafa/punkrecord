@@ -11,6 +11,7 @@ engine = create_engine(
     echo=settings.DEBUG,
     pool_pre_ping=True,  # Enable connection health checks
     pool_recycle=3600,  # Recycle connections after 1 hour
+    hide_parameters=True,
 )
 
 

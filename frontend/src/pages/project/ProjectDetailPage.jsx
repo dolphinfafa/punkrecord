@@ -317,7 +317,7 @@ export default function ProjectDetailPage() {
                                                                     <button
                                                                         className="btn-link text-primary"
                                                                         style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                                        onClick={() => setBugManageStage({ ...stage, project_name: project.name })}
+                                                                        onClick={() => navigate(`/project/${project.id}/bugs`)}
                                                                     >
                                                                         <FileText size={14} /> Bug管理
                                                                     </button>

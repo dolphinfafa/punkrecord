@@ -209,6 +209,7 @@ export default function TodoDetailModal({
                                     </div>
                                 </div>
                             )}
+                            <div className="info-item"><Clock size={16} /><div><div className="info-label">预计工时</div><div className="info-value">{todo.estimated_hours ?? 0} 小时</div></div></div>
                             {todo.done_at && (
                                 <div className="info-item">
                                     <CheckCircle size={16} />

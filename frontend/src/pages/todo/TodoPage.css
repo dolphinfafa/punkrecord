@@ -419,10 +419,53 @@
     background: var(--bg-color);
 }
 
+.todo-card.beli-task,
+.todo-item.beli-task {
+    background: #ecfdf5;
+    border-color: #6ee7b7;
+}
+
+.todo-card.beli-task:hover,
+.todo-item.beli-task:hover {
+    border-color: #059669;
+}
+
+.beli-task-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    color: #047857;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 20px;
+}
+
+.card-labels {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .todo-card.beli-task,
+    .todo-item.beli-task {
+        background: #12372c;
+        border-color: #348268;
+    }
+
+    .beli-task-badge {
+        color: #6ee7b7;
+    }
+}
+
 .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
 }
 
 .card-title {
@@ -438,9 +481,22 @@
 
 .card-footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
+    gap: 6px;
     margin-top: auto;
+}
+
+.card-footer .meta-tag {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+}
+
+.card-footer svg {
+    flex-shrink: 0;
 }
 
 .due-date {
@@ -533,6 +589,7 @@
 
 .todo-meta {
     display: flex;
+    flex-wrap: wrap;
     gap: 16px;
     font-size: 12px;
     color: var(--text-secondary);

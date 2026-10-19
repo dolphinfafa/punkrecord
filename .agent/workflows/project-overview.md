@@ -6,6 +6,18 @@ line-ending: LF
 
 # PunkRecord 项目技术全景
 
+## 2026-10-16 开发环境架构增量
+
+本次尚未发布生产，版本号保持2.0.9。
+
+- 项目、Bug与待办继续共用 `TodoItem`；同步功能清单保留任务ID，不再删除重建。新任务截止日期必填，预计工时默认 0。
+- 请假仍兼容旧REST路径，但独立存储、独立通知和审批；不再创建审批待办。工作日历供请假天数和早会考勤共同使用。
+- 贝利采用账户、冻结额、事件唯一键流水、独立奖励审核。正数工时任务验收后才进入奖励队列，L0审核通过才入账，重开任务先冲销。生效后完成的 0 工时任务补录后自动入队，历史已完成不追溯；未发奖任务归零后退出资格但保留审核记录。
+- 商城订单采用申请冻结、L0审核扣款、假期到账或实物发货的流程。资金和库存变化使用事务与行锁；MySQL并发验证必须使用隔离库。
+- 早会转写或名单保存后按精确姓名自动结算；后台定期补结算，L0可以带原因作废扣款。仅启用日之后有记录的工作日参与。
+- 工资字段仅管理员专用接口可读写，奖励内部快照不直接返回客户端；数据库日志隐藏参数。
+- Agent测试入口为 `.agent/test/README.md`，业务用例为 `.agent/test/cases.md`，每次功能变更同步维护。
+
 > 本文档旨在帮助新成员或协作 Agent 快速理解 PunkRecord 的整体技术架构。
 > 如需查找具体文件路径和模块定位，请参阅 `project-index.md`。
 
@@ -34,7 +46,7 @@ PunkRecord 是一套面向中小型团队的**企业级项目管理平台**，�
 |--------|---------|
 | IAM | 用户、部门（树形）、职位、组织架构、实体管理、RBAC 权限 |
 | Todo | 任务全生命周期、看板拖拽、团队协作、图片附件粘贴/预览、微信通知与微信入站审批 |
-| Leave | 请假申请与审批、额度自动扣减、年度重置 |
+| Leave | 独立请假申请与审批、额度自动扣减及审计；L0在贝利页面维护额度 |
 | Project | B2B/B2C 项目管理、阶段流转、开发进度、Bug 管理、验收报告 |
 | Contract | 三方合同管理、PDF/图片附件、AI 智能生成、Word 导出 |
 | Finance | 账户、交易、发票、报销、实时余额 |
@@ -342,6 +354,7 @@ Meeting 模块（会议记录）
 | `department_id` | FK -> OrgUnit | 可选 | 所属部门 |
 | `leave_*_remaining` | float | 各类假期余额 | 年假5/产假15/婚假3/事假3/病假3 |
 | `beili_balance` | float | 默认 0 | Beli 积分余额 |
+| `basic_salary` | Decimal(12,2) | 可选，管理员专用 | 基本工资，不能进入公开用户/MCP/贝利响应 |
 
 #### TodoItem（任务）
 
@@ -357,14 +370,16 @@ Meeting 模块（会议记录）
 | `action_type` | TodoActionType | 必填 | 操作类型（do/approve/review/ack） |
 | `priority` | TodoPriority | 默认 P2 | 优先级（P0-P3） |
 | `status` | TodoStatus | 默认 OPEN，索引 | 状态 |
-| `due_at` | datetime | 可选 | 截止时间 |
+| `due_at` | datetime | 存量可空，新建必填 | 截止时间 |
+| `estimated_hours` | Decimal(10,2) | 新建默认0，非负数 | 预计工时，小时；仅正数参与贝利审核 |
+| `submitted_at` | datetime | 提交时记录 | 最终通过版本的提交时间，用于奖励延期计算 |
 | `start_at` | datetime | 可选 | 开始时间 |
 | `done_at` | datetime | 可选 | 完成时间 |
 | `done_by_user_id` | FK -> User | 可选 | 完成操作人 |
 | `reviewed_by_user_id` | FK -> User | 可选 | 审核员 |
 | `review_comment` | str | 可选 | 审核评语 |
 | `tags` | JSON | 默认 [] | 标签列表 |
-| `link` | JSON | 可选 | 关联对象链接（project_id、leave_id 等） |
+| `link` | JSON | 可选 | 项目关联和图片元数据；`leave_id` 仅历史留存，不再创建或联动 |
 | `blocked_reason` | str | 可选 | 阻塞原因 |
 | `dismiss_reason` | str | 可选 | 忽略原因 |
 
@@ -372,7 +387,7 @@ Meeting 模块（会议记录）
 
 **团队任务规则**：显示 `(creator==me AND assignee!=me) OR (reviewed_by==me)` 的任务，排除自指派。
 
-**请假审批待办**：请假提交后自动创建 TodoItem（creator=assignee=申请人，reviewed_by=上级，source_type=approval_step）。审批/驳回时同步更新 TodoItem 状态为 done/dismissed。
+**独立请假审批**：直接操作 LeaveRequest，通知通过 NotificationLog.leave_id 关联；不创建或修改 TodoItem。历史请假待办保留，但不出现在普通列表，旧写操作拒绝执行。
 
 #### Project（项目）
 
@@ -584,12 +599,14 @@ ApprovalInstance
 /                               受保护布局
   +-- /                         仪表盘
   +-- /todo                     任务管理
+  +-- /leave                    独立请假管理
+  +-- /beli                     贝利、奖励审核、考勤和商城
   +-- /iam
   |     +-- /users              用户管理
   |     +-- /entities           实体管理
   |     +-- /departments        部门管理
   |     +-- /job-titles         职位管理
-  |     +-- /beli-rules         积分规则
+  |     +-- /beli-rules         旧地址重定向至 /beli
   |     +-- /org-chart          组织架构图
   +-- /contract
   |     +-- /list               合同列表
@@ -597,6 +614,7 @@ ApprovalInstance
   +-- /project                  项目列表
   |     +-- /:id                项目详情
   |     +-- /:id/dev-progress   开发进度
+  |     +-- /:id/bugs           独立Bug管理与标题搜索
   +-- /finance
   |     +-- /accounts           账户管理
   |     +-- /transactions       交易记录
@@ -773,4 +791,4 @@ User -- job_title_id --> JobTitle --< JobTitlePermission >-- Permission
 
 ---
 
-*最后更新：2026-09-29*
+*最后更新：2026-10-16*

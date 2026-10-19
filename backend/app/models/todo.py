@@ -7,6 +7,8 @@ from uuid import UUID
 from enum import Enum
 from sqlmodel import Field, Column, JSON, SQLModel
 from sqlalchemy import Text
+from decimal import Decimal
+from sqlalchemy import Numeric
 from app.models.base import BaseDBModel
 
 
@@ -68,6 +70,8 @@ class TodoItem(BaseDBModel, table=True):
     status: TodoStatus = Field(default=TodoStatus.OPEN, nullable=False, index=True)
     
     due_at: Optional[datetime] = None
+    estimated_hours: Optional[Decimal] = Field(default=Decimal("0"), sa_column=Column(Numeric(10, 2), server_default="0"))
+    submitted_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     
     tags: list = Field(default=[], sa_column=Column(JSON))
@@ -100,7 +104,8 @@ class NotificationLog(BaseDBModel, table=True):
     """Notification log"""
     __tablename__ = "notification_log"
 
-    todo_id: UUID = Field(foreign_key="todo_item.id", nullable=False, index=True)
+    todo_id: Optional[UUID] = Field(default=None, foreign_key="todo_item.id", index=True)
+    leave_id: Optional[UUID] = Field(default=None, foreign_key="leave_request.id", index=True)
     recipient_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     channel: NotificationChannel = Field(nullable=False)
     status: NotificationStatus = Field(default=NotificationStatus.PENDING, nullable=False)

@@ -48,6 +48,7 @@ function defaultTaskForm(project, members) {
         assignee_user_id: project?.pm_user_id || members?.[0]?.id || '',
         priority: 'p2',
         due_at: project?.due_at || '',
+        estimated_hours: 0,
         dev_type: 'dev_backend',
     };
 }
@@ -83,6 +84,8 @@ export default function DevelopmentProgressPage() {
     const [batchAssigneeUserId, setBatchAssigneeUserId] = useState('');
     const [batchAssigning, setBatchAssigning] = useState(false);
     const [clearingAll, setClearingAll] = useState(false);
+    const [syncPlanOpen, setSyncPlanOpen] = useState(false);
+    const [syncPlan, setSyncPlan] = useState({ due_at: '', estimated_hours: 0 });
 
     const refreshTasks = useCallback(async () => {
         const todoRes = await projectApi.getProjectTodos(id);
@@ -92,22 +95,25 @@ export default function DevelopmentProgressPage() {
     }, [id]);
 
     const syncFeatureTasks = useCallback(async () => {
-        if (!window.confirm('注意：如果同步了功能清单，现有的任务全部都会被清空。是否执行？')) return;
+        if (!syncPlan.due_at || !Number.isFinite(Number(syncPlan.estimated_hours)) || Number(syncPlan.estimated_hours) < 0) {
+            setSyncPlanOpen(true); return;
+        }
         setGenerating(true);
         setSyncingTasks(true);
         setOpMessage(null);
         try {
-            const syncRes = await projectApi.syncDevTasks(id);
+            const syncRes = await projectApi.syncDevTasks(id, { due_at: `${syncPlan.due_at}T18:00:00`, estimated_hours: Number(syncPlan.estimated_hours) });
+            setSyncPlanOpen(false);
             await refreshTasks();
             const summary = syncRes?.data || {};
-            setOpMessage(`已同步功能清单任务：重建 ${summary.created || 0}，清理 ${summary.deleted || 0}`);
+            setOpMessage(`已同步功能清单任务：新增 ${summary.created || 0}，已有任务保留`);
         } catch (err) {
             setOpMessage(err?.response?.data?.message || err?.message || '同步功能清单任务失败');
         } finally {
             setGenerating(false);
             setSyncingTasks(false);
         }
-    }, [id, refreshTasks]);
+    }, [id, refreshTasks, syncPlan]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -261,6 +267,7 @@ export default function DevelopmentProgressPage() {
             assignee_user_id: task.assignee_user_id || project?.pm_user_id || '',
             priority: (task.priority || 'p2').toLowerCase(),
             due_at: task.due_at ? new Date(task.due_at).toISOString().slice(0, 10) : '',
+            estimated_hours: task.estimated_hours ?? 0,
             dev_type: task?.tags?.[0] || 'dev_backend',
         });
         setTaskModalOpen(true);
@@ -272,6 +279,9 @@ export default function DevelopmentProgressPage() {
     };
 
     const submitTaskModal = async () => {
+        if (!taskForm.due_at || !Number.isFinite(Number(taskForm.estimated_hours)) || Number(taskForm.estimated_hours) < 0) {
+            setOpMessage('请填写截止日期，预计工时不能为负数'); return;
+        }
         if (!taskForm.title.trim()) {
             setOpMessage('任务标题不能为空');
             return;
@@ -297,6 +307,7 @@ export default function DevelopmentProgressPage() {
                     action_type: 'do',
                     priority: taskForm.priority,
                     due_at: dueAt,
+                    estimated_hours: Number(taskForm.estimated_hours),
                     tags: [taskForm.dev_type],
                     link: {
                         project_id: id,
@@ -314,6 +325,7 @@ export default function DevelopmentProgressPage() {
                     assignee_user_id: taskForm.assignee_user_id,
                     priority: taskForm.priority,
                     due_at: dueAt,
+                    estimated_hours: Number(taskForm.estimated_hours),
                     dev_type: taskForm.dev_type,
                 });
                 setOpMessage('任务已更新');
@@ -421,6 +433,12 @@ export default function DevelopmentProgressPage() {
 
     return (
         <div className="page-content dev-progress-page">
+            {syncPlanOpen && <div className="modal-overlay" onClick={() => setSyncPlanOpen(false)}><form className="modal-content" onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); syncFeatureTasks(); }} style={{ padding: 24, maxWidth: 440 }}>
+                <h3>同步功能清单任务</h3>
+                <label>新增任务默认截止日期 *<input type="date" required value={syncPlan.due_at} onChange={e => setSyncPlan(prev => ({ ...prev, due_at: e.target.value }))} /></label>
+                <label>每项新增任务预计工时（小时）<input type="number" min="0" step="0.01" value={syncPlan.estimated_hours} onChange={e => setSyncPlan(prev => ({ ...prev, estimated_hours: e.target.value }))} /></label>
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}><button type="button" onClick={() => setSyncPlanOpen(false)}>取消</button><button type="submit" disabled={syncingTasks}>同步</button></div>
+            </form></div>}
             <div className="dev-progress-toolbar">
                 <button className="dev-progress-back" onClick={() => navigate(`/project/${id}`)}>
                     <ArrowLeft size={15} /> 返回项目
@@ -778,9 +796,11 @@ export default function DevelopmentProgressPage() {
                                     <label>截止日期</label>
                                     <input
                                         type="date"
-                                        value={taskForm.due_at}
+                                        required value={taskForm.due_at}
                                         onChange={(e) => setTaskForm((prev) => ({ ...prev, due_at: e.target.value }))}
                                     />
+                                    <label>预计工时（小时）</label>
+                                    <input type="number" min="0" step="0.01" value={taskForm.estimated_hours} onChange={e => setTaskForm(prev => ({ ...prev, estimated_hours: e.target.value }))} />
                                 </div>
                             </div>
                         </div>
