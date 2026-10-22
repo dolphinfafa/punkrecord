@@ -13,20 +13,21 @@ from app.core.response import success_response
 from app.models.iam import User
 from app.models.shared import ChangeLog
 from pydantic import BaseModel
+from app.schemas.text import NonBlankText
 
 router = APIRouter(prefix="/changelog", tags=["Changelog"])
 
 
 class ChangeLogCreate(BaseModel):
-    version: str
-    title: str
-    content: str
+    version: NonBlankText
+    title: NonBlankText
+    content: NonBlankText
 
 
 class ChangeLogUpdate(BaseModel):
-    version: Optional[str] = None
-    title: Optional[str] = None
-    content: Optional[str] = None
+    version: NonBlankText = None
+    title: NonBlankText = None
+    content: NonBlankText = None
 
 
 def _require_l0(user: User, session: Session):

@@ -44,6 +44,7 @@ class MeetingRecord(BaseDBModel, table=True):
     asr_task_id: Optional[str] = Field(default=None)
     meeting_date: Optional[date] = Field(default=None, index=True)
     speaker_mapping: dict = Field(default={}, sa_column=Column(JSON))
+    speaker_user_mapping: dict = Field(default_factory=dict, sa_column=Column(JSON))
     attendees: Optional[list] = Field(default=None, sa_column=Column(JSON))
     summary: Optional[str] = Field(default=None, sa_column=Column(TEXT))
     created_by: UUID = Field(foreign_key="users.id")

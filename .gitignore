@@ -64,3 +64,5 @@ backend/atlas.db
 logs/
 *.log
 punkrecord/
+# Local test feedback, including documents and screenshots.
+/test_result/

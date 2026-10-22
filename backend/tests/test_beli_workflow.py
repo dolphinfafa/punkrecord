@@ -168,7 +168,7 @@ def test_zero_hours_completion_then_backfill_is_independent_and_idempotent(db, s
     session, boss, employee, _, entity, actor, client = db
     actor[0] = employee if self_created else boss
     response = client.post('/api/v1/todo', json={'title': 'Zero hours', 'assignee_user_id': str(employee.id),
-                                               'due_at': '2026-10-20T18:00:00'})
+                                               'due_at': (now_cn() + timedelta(days=1)).isoformat()})
     todo_id = response.json()['data']['id']
     actor[0] = employee
     assert client.post(f'/api/v1/todo/{todo_id}/submit').status_code == 200
@@ -507,7 +507,7 @@ def test_self_created_task_still_needs_independent_reward_review(db):
     session, boss, employee, _, entity, actor, client = db
     actor[0] = employee
     result = client.post('/api/v1/todo', json={'title': 'Self task', 'assignee_user_id': str(employee.id),
-        'our_entity_id': str(entity.id), 'due_at': '2026-10-20T18:00:00', 'estimated_hours': 2})
+        'our_entity_id': str(entity.id), 'due_at': (now_cn() + timedelta(days=1)).isoformat(), 'estimated_hours': 2})
     todo_id = result.json()['data']['id']
     assert client.post(f'/api/v1/todo/{todo_id}/submit').status_code == 200
     assert session.get(TodoItem, todo_id).status == TodoStatus.DONE

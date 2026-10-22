@@ -10,6 +10,7 @@ import {
     Plus, Trash2, UserPlus, CornerDownRight, CornerUpRight
 } from 'lucide-react';
 import './MeetingDetailPage.css';
+import SpeakerEmployeeSelect from './components/SpeakerEmployeeSelect';
 
 const STATUS_MAP = {
     uploading: { label: '上传中', className: 'status-uploading' },
@@ -94,6 +95,9 @@ export default function MeetingDetailPage() {
     // Transcript
     const [segments, setSegments] = useState([]);
     const [speakerMapping, setSpeakerMapping] = useState({});
+    const [speakerUserMapping, setSpeakerUserMapping] = useState({});
+    const [employees, setEmployees] = useState([]);
+    const [employeeError, setEmployeeError] = useState('');
     const [transcriptChanged, setTranscriptChanged] = useState(false);
     const [speakerMappingDirty, setSpeakerMappingDirty] = useState(false);
     const [savingTranscript, setSavingTranscript] = useState(false);
@@ -181,10 +185,9 @@ export default function MeetingDetailPage() {
             if (data.summary) {
                 setSummary(data.summary);
             }
-            if (data.speaker_mapping && Object.keys(data.speaker_mapping).length > 0) {
-                setSpeakerMapping(prev => ({ ...prev, ...data.speaker_mapping }));
-                setSpeakerMappingDirty(false);
-            }
+            setSpeakerMapping(data.speaker_mapping || {});
+            setSpeakerUserMapping(data.speaker_user_mapping || {});
+            setSpeakerMappingDirty(false);
             if (data.archived_document_id) {
                 setArchiveResult({ doc_id: data.archived_document_id });
             }
@@ -194,6 +197,14 @@ export default function MeetingDetailPage() {
             setError(err.message || '加载会议详情失败');
             return null;
         }
+    }, [id]);
+
+    useEffect(() => {
+        let cancelled = false;
+        meetingApi.getEmployees().then(response => {
+            if (!cancelled) { setEmployees(response.data || []); setEmployeeError(''); }
+        }).catch(() => { if (!cancelled) setEmployeeError('员工列表加载失败，暂可填写姓名'); });
+        return () => { cancelled = true; };
     }, [id]);
 
     const loadTranscript = useCallback(async () => {
@@ -442,7 +453,7 @@ export default function MeetingDetailPage() {
             const response = await meetingApi.updateTranscript(id, { replace: true, segments: payload });
             if (response.data?.meeting && !speakerMappingDirty) setMeeting(response.data.meeting);
             if (speakerMappingDirty) {
-                const speakerResponse = await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
+                const speakerResponse = await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping, speaker_user_mapping: speakerUserMapping });
                 if (speakerResponse.data) setMeeting(speakerResponse.data);
                 setSpeakerMappingDirty(false);
             }
@@ -456,23 +467,20 @@ export default function MeetingDetailPage() {
         }
     };
 
-    const handleSaveSpeakers = async () => {
+    const handleSaveSpeakers = async (mapping = speakerMapping, bindings = speakerUserMapping) => {
         try {
             setSavingSpeakers(true);
-            const response = await meetingApi.updateSpeakers(id, { speaker_mapping: speakerMapping });
-            if (response.data) setMeeting(response.data);
+            const response = await meetingApi.updateSpeakers(id, { speaker_mapping: mapping, speaker_user_mapping: bindings });
+            if (response.data) {
+                setMeeting(response.data);
+                setSpeakerMapping(response.data.speaker_mapping || {});
+                setSpeakerUserMapping(response.data.speaker_user_mapping || {});
+            }
             setSpeakerMappingDirty(false);
             setSavingSpeakers(false);
         } catch (err) {
             alert(getApiErrorMessage(err, '保存失败'));
             setSavingSpeakers(false);
-        }
-    };
-
-    const handleSpeakerKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleSaveSpeakers();
         }
     };
 
@@ -840,7 +848,6 @@ export default function MeetingDetailPage() {
                                 <Users size={16} />
                                 <span>说话人识别</span>
                                 {savingSpeakers && <Loader2 size={14} className="spin" />}
-                                {!savingSpeakers && <span className="speaker-hint">输入姓名后失焦或回车保存</span>}
                                 <button
                                     type="button"
                                     className="speaker-add-btn"
@@ -851,6 +858,7 @@ export default function MeetingDetailPage() {
                                     新增讲话人
                                 </button>
                             </div>
+                            {employeeError && <div role="alert">{employeeError}</div>}
                             <div className="speaker-mapping-grid">
                                 {speakerIds.map((sid) => {
                                     const sc = getSpeakerColor(sid, speakerIds);
@@ -860,22 +868,15 @@ export default function MeetingDetailPage() {
                                             <label className="speaker-id-label" style={{ background: sc.bg, color: sc.color }}>
                                                 {sid}
                                             </label>
-                                            <input
-                                                type="text"
-                                                value={speakerMapping[sid] || ''}
-                                                onChange={(e) => {
-                                                    setSpeakerMapping(prev => ({
-                                                        ...prev,
-                                                        [sid]: e.target.value
-                                                    }));
+                                            <SpeakerEmployeeSelect speakerId={sid} name={speakerMapping[sid] || ''}
+                                                employeeId={speakerUserMapping[sid]} employees={employees} disabled={savingSpeakers}
+                                                onChange={(name, uid) => {
+                                                    setSpeakerMapping(prev => ({ ...prev, [sid]: name }));
+                                                    setSpeakerUserMapping(prev => ({ ...prev, [sid]: uid }));
                                                     setSpeakerMappingDirty(true);
                                                 }}
-                                                onKeyDown={handleSpeakerKeyDown}
-                                                onBlur={handleSaveSpeakers}
-                                                className="speaker-name-input"
-                                                placeholder="输入姓名，失焦或回车保存"
-                                                style={{ borderColor: sc.border + '60' }}
-                                            />
+                                                onSave={(name, uid) => handleSaveSpeakers(
+                                                    { ...speakerMapping, [sid]: name }, { ...speakerUserMapping, [sid]: uid })} />
                                         </div>
                                     );
                                 })}

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "Atlas Enterprise Management System"
-    APP_VERSION: str = "2.0.9"
+    APP_VERSION: str = "2.1.0"
     APP_ENV: str = "development"
     DEBUG: bool = False
     
@@ -52,8 +52,8 @@ class Settings(BaseSettings):
     KB_RAG_TOP_K: int = 5
 
     # Volcengine ASR
-    VOLC_ASR_APP_KEY: str = "7858270680"
-    VOLC_ASR_ACCESS_KEY: str = "jWugJCpq3wc-7-lWclvF69r23YjDVKXP"
+    VOLC_ASR_APP_KEY: str = ""
+    VOLC_ASR_ACCESS_KEY: str = ""
 
     # Public base URL for ASR audio callback (Volcengine needs to fetch audio via URL)
     PUBLIC_BASE_URL: str = "https://dev-cn-01.yios.cn/punkrecord"

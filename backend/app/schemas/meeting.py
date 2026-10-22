@@ -31,6 +31,7 @@ class MeetingResponse(BaseModel):
     status: str
     asr_task_id: Optional[str] = None
     speaker_mapping: dict = {}
+    speaker_user_mapping: Optional[dict] = None
     attendees: Optional[list] = None
     summary: Optional[str] = None
     created_by: UUID
@@ -79,6 +80,7 @@ class TranscriptBatchUpdate(BaseModel):
 
 class SpeakerMappingUpdate(BaseModel):
     speaker_mapping: Dict[str, str]
+    speaker_user_mapping: Optional[Dict[str, Optional[UUID]]] = None
 
 
 class MeetingStatusResponse(BaseModel):

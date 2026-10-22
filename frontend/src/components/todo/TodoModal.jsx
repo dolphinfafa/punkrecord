@@ -109,8 +109,8 @@ export default function TodoModal({ isOpen, onClose, onSubmit, initialData = nul
             const selectedProject = projects.find((item) => item.id === formData.project_id);
             const submitData = {
                 title: formData.title,
-                description: formData.description || null,
-                notes: formData.notes || null,
+                description: mode === 'edit' ? formData.description : (formData.description || null),
+                notes: mode === 'edit' ? formData.notes : (formData.notes || null),
                 assignee_user_id: formData.assignee_user_id,
                 priority: formData.priority,
                 due_at: `${formData.due_at}T18:00:00`,

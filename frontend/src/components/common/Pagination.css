@@ -1,0 +1,5 @@
+.shared-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 18px 0; font-size: 13px; color: var(--text-secondary, #65716a); }
+.shared-pagination > div { display: flex; gap: 12px; align-items: center; }
+.shared-pagination button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--border-color, #ccd5d0); border-radius: 6px; background: var(--bg-primary, #fff); color: inherit; cursor: pointer; white-space: nowrap; }
+.shared-pagination button:disabled { opacity: .45; cursor: default; }
+.shared-pagination button:hover:not(:disabled) { background: var(--bg-hover, #edf4ef); }

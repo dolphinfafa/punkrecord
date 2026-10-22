@@ -6,16 +6,17 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, field_validator
+from app.schemas.text import NonBlankText, PlainText
 
 
 class CounterpartyCreate(BaseModel):
     """Counterparty creation schema"""
-    name: str
+    name: NonBlankText
     type: str
     identifier: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[PlainText] = None
     phone: Optional[str] = None
-    bank_name: Optional[str] = None
+    bank_name: Optional[PlainText] = None
     bank_account: Optional[str] = None
 
 
@@ -67,7 +68,7 @@ class PaymentPlanResponse(BaseModel):
 class ContractCreate(BaseModel):
     """Contract creation schema"""
     contract_no: Optional[str] = None  # Auto-generated (CNT-<ts>) when omitted
-    name: str
+    name: NonBlankText
     contract_type: str
     party_a_id: UUID  # 甲方 (Our Entity)
     party_b_id: UUID  # 乙方 (Counterparty)
@@ -86,7 +87,7 @@ class ContractCreate(BaseModel):
 class ContractUpdate(BaseModel):
     """Contract update schema"""
     contract_no: Optional[str] = None
-    name: Optional[str] = None
+    name: NonBlankText = None
     contract_type: Optional[str] = None
     status: Optional[str] = None
     party_a_id: Optional[UUID] = None

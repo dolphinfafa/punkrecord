@@ -1,11 +1,51 @@
 .project-detail-page {
-    max-width: min(1600px, calc(100vw - 48px));
+    max-width: 1600px;
+    min-width: 0;
 }
 
 .project-detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
     gap: 1.5rem;
+}
+
+.project-detail-grid > *,
+.project-heading,
+.project-name {
+    min-width: 0;
+}
+
+.project-heading-icon {
+    flex-shrink: 0;
+}
+
+.project-name,
+.project-detail-page .description {
+    overflow-wrap: anywhere;
+}
+
+.project-detail-page .description p {
+    white-space: pre-wrap;
+}
+
+.project-detail-page .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+    gap: 1.5rem;
+}
+
+.project-detail-page .toolbar,
+.project-detail-page .toolbar-actions {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.stage-note-error {
+    display: block;
+    color: var(--error-color, #b91c1c);
+    font-size: 13px;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
 }
 
 .stage-card {
@@ -57,10 +97,6 @@
 }
 
 @media (max-width: 1200px) {
-    .project-detail-page {
-        max-width: calc(100vw - 24px);
-    }
-
     .project-detail-grid {
         grid-template-columns: 1fr;
     }

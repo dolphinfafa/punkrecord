@@ -6,6 +6,9 @@ import projectApi from '@/api/project';
 import { todoApi } from '@/api/todo';
 import BugDetailModal from '@/components/common/BugDetailModal';
 import ImagePasteUpload from '@/components/common/ImagePasteUpload';
+import Pagination from '@/components/common/Pagination';
+
+const PAGE_SIZE = 30;
 
 const STATUS_LABELS = {
     open: '待处理',
@@ -290,7 +293,7 @@ export default function BugManagementModal({ isOpen, onClose, project, asPage = 
             setLoading(true);
             setMessage('');
             const [todoRes, memberRes] = await Promise.all([
-                projectApi.getProjectBugs(project.id, { title: query, page, status: filterStatus, agent_status: filterAgentStatus, developer: filterDeveloper, tester: filterTester }),
+                projectApi.getProjectBugs(project.id, { title: query, page, page_size: PAGE_SIZE, status: filterStatus, agent_status: filterAgentStatus, developer: filterDeveloper, tester: filterTester }),
                 projectApi.getProjectMembers(project.id),
             ]);
             if (serial !== requestSerial.current) return;
@@ -374,6 +377,7 @@ export default function BugManagementModal({ isOpen, onClose, project, asPage = 
                 assignee_user_id: form.developer_user_id,
                 title: `[BUG] ${form.title.trim()}`,
                 description: fullDescription,
+                notes: form.description?.trim() || '',
                 source_type: 'project_task',
                 source_id: project.id,
                 action_type: 'do',
@@ -412,9 +416,9 @@ export default function BugManagementModal({ isOpen, onClose, project, asPage = 
     const startEditBug = (todo) => {
         const link = todo.link || {};
         setEditingBug(todo);
-        // Extract notes from link.notes or parse from composed description
+        // Explicit empty notes must not revive older composed notes.
         const notesMatch = (todo.description || '').match(/【备注】([\s\S]*)$/);
-        const notesOnly = link.notes || (notesMatch ? notesMatch[1].trim() : '');
+        const notesOnly = todo.notes ?? link.notes ?? (notesMatch ? notesMatch[1].trim() : '');
         setForm({
             title: (todo.title || '').replace(/^\[BUG\]\s*/, ''),
             description: notesOnly,
@@ -471,7 +475,8 @@ export default function BugManagementModal({ isOpen, onClose, project, asPage = 
             const fullDescription = descParts.length > 0 ? descParts.join('\n') : null;
             await todoApi.update(editingBug.id, {
                 title: `[BUG] ${form.title.trim()}`,
-                description: fullDescription,
+                description: fullDescription ?? '',
+                notes: form.description?.trim() || '',
                 priority: form.priority,
                 due_at: dueAt,
                 estimated_hours: Number(form.estimated_hours),
@@ -992,11 +997,8 @@ export default function BugManagementModal({ isOpen, onClose, project, asPage = 
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12 }}>
-                <button disabled={page <= 1} onClick={() => setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('page', page - 1); return p; })}>上一页</button>
-                <span>第 {page} 页 · 共 {total} 项</span>
-                <button disabled={page * 30 >= total} onClick={() => setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('page', page + 1); return p; })}>下一页</button>
-            </div>
+            <Pagination page={page} pageSize={PAGE_SIZE} total={total} loading={loading}
+                onChange={nextPage => setSearchParams(previous => { const params = new URLSearchParams(previous); params.set('page', nextPage); return params; })} />
             <BugDetailModal
                 isOpen={Boolean(selectedBug)}
                 onClose={() => setSelectedBug(null)}

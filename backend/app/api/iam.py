@@ -262,6 +262,9 @@ async def delete_job_title(
     users = session.exec(select(User).where(User.job_title_id == job_title_id)).all()
     if users:
         raise HTTPException(status_code=400, detail="该职位下还有员工，无法删除")
+    for association in session.exec(select(JobTitlePermission).where(JobTitlePermission.job_title_id == job_title_id)).all():
+        session.delete(association)
+    session.flush()
     session.delete(jt)
     session.commit()
     return success_response({"message": "删除成功"})

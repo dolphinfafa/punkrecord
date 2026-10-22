@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Check, X, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Plus, Check, X, RefreshCw } from 'lucide-react';
+import Pagination from '@/components/common/Pagination';
 import client from '@/api/client';
 import { todoApi } from '@/api/todo';
 import '@/pages/beli/BeliPage.css';
@@ -8,6 +9,7 @@ const types = { annual: '年假', maternity: '产假', marriage: '婚假', perso
 const statuses = { pending: '待审批', approved: '已批准', rejected: '已拒绝', cancelled: '已取消' };
 export default function LeavePage() {
     const [rows, setRows] = useState([]), [tab, setTab] = useState('my'), [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
     const [profile, setProfile] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
     const [dialog, setDialog] = useState(null), [form, setForm] = useState({}), [busy, setBusy] = useState(false);
     const load = useCallback(async () => {
@@ -15,6 +17,7 @@ export default function LeavePage() {
         try {
             const [me, data] = await Promise.all([client.get('/auth/me'), tab === 'my' ? todoApi.listMyLeaves({ page, page_size: 30 }) : todoApi.listTeamPendingLeaves()]);
             setProfile(me.data); setRows(tab === 'my' ? data.data.items : data.data);
+            setTotal(tab === 'my' ? data.data.total : data.data.length);
         } catch (err) { setError(err.response?.data?.message || err.message); }
         finally { setLoading(false); }
     }, [tab, page]);
@@ -38,7 +41,7 @@ export default function LeavePage() {
         {error && !dialog && <div role="alert" className="beli-error">{error}</div>}
         <div className="beli-table-wrap"><table><thead><tr><th>申请人</th><th>类型</th><th>起止时间</th><th>状态</th><th>原因 / 审批意见</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{row.applicant_name}</td><td>{types[row.leave_type]}</td><td>{row.start_at.replace('T', ' ')}<br />{row.end_at.replace('T', ' ')}</td><td>{statuses[row.status]}</td><td>{row.reason}<br />{row.review_comment}</td><td>{tab === 'team' && <button onClick={() => { setDialog(row); setForm({ action: 'approve', reason: '' }); }}><Check size={16} />审批</button>}</td></tr>)}</tbody></table></div>
         {loading ? <div className="beli-empty">加载中...</div> : !rows.length && <div className="beli-empty">暂无请假记录</div>}
-        {tab === 'my' && <div className="beli-pager"><button title="上一页" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft size={18} /></button>{page}<button title="下一页" disabled={rows.length < 30} onClick={() => setPage(p => p + 1)}><ChevronRight size={18} /></button></div>}
+        {tab === 'my' && <Pagination page={page} pageSize={30} total={total} loading={loading} onChange={setPage} />}
         {dialog && <div className="beli-overlay" onClick={() => { if (!busy) setDialog(null); }}><form role="dialog" aria-modal="true" aria-label="请假申请与审批" className="beli-dialog" onClick={e => e.stopPropagation()} onSubmit={submit}><header><h2>{dialog === 'create' ? '申请请假' : '审批请假'}</h2><button type="button" title="关闭" disabled={busy} onClick={() => setDialog(null)}><X size={18} /></button></header>
             {dialog === 'create' ? <><label className="beli-field">假期类型<select value={form.leave_type} onChange={e => field('leave_type', e.target.value)}>{Object.entries(types).map(([type, name]) => <option key={type} value={type}>{name}</option>)}</select></label>{['start', 'end'].map(side => <label className="beli-field" key={side}>{side === 'start' ? '开始' : '结束'} *<input type="date" required value={form[`${side}_date`]} onChange={e => field(`${side}_date`, e.target.value)} /><select value={form[`${side}_half`]} onChange={e => field(`${side}_half`, e.target.value)}><option value="am">上午</option><option value="pm">下午</option></select></label>)}</> : <><p>{dialog.applicant_name} · {types[dialog.leave_type]}</p><label className="beli-field">审批结果<select value={form.action} onChange={e => field('action', e.target.value)}><option value="approve">批准</option><option value="reject">拒绝</option></select></label></>}
             <label className="beli-field">{dialog === 'create' ? '请假原因' : '审批意见'}<textarea required={form.action === 'reject'} value={form.reason} onChange={e => field('reason', e.target.value)} /></label>{error && <div role="alert" className="beli-error">{error}</div>}<footer><button type="button" disabled={busy} onClick={() => setDialog(null)}>取消</button><button type="submit" disabled={busy}>{busy ? '处理中...' : '提交'}</button></footer>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import projectApi from '@/api/project';
 import './ProjectDetailPage.css';
@@ -34,6 +34,9 @@ export default function ProjectDetailPage() {
     const [prototypeConfirmStage, setPrototypeConfirmStage] = useState(null);
     const [bugManageStage, setBugManageStage] = useState(null);
     const [showProjectAttachments, setShowProjectAttachments] = useState(false);
+    const savedStageNotes = useRef({});
+    const [savingStageNotes, setSavingStageNotes] = useState({});
+    const [stageNoteErrors, setStageNoteErrors] = useState({});
 
     useEffect(() => {
         if (id) {
@@ -50,7 +53,9 @@ export default function ProjectDetailPage() {
             ]);
 
             setProject(projRes.data);
-            setStages(stagesRes.data?.items || stagesRes.data || []);
+            const loadedStages = stagesRes.data?.items || stagesRes.data || [];
+            setStages(loadedStages);
+            savedStageNotes.current = Object.fromEntries(loadedStages.map(stage => [stage.id, stage.deliverables || '']));
             setError(null);
         } catch (err) {
             setError(err.message || '加载项目详情失败');
@@ -71,13 +76,30 @@ export default function ProjectDetailPage() {
     };
 
     const handleUpdateStage = async (stageId, field, value) => {
+        const isNote = field === 'deliverables';
+        if (isNote) {
+            setSavingStageNotes(prev => ({ ...prev, [stageId]: true }));
+            setStageNoteErrors(prev => ({ ...prev, [stageId]: '' }));
+        }
         try {
             // Optimistic update
             setStages(prev => prev.map(s => s.id === stageId ? { ...s, [field]: value } : s));
-            await projectApi.updateProjectStage(id, stageId, { [field]: value });
+            const response = await projectApi.updateProjectStage(id, stageId, { [field]: value });
+            setStages(prev => prev.map(stage => stage.id === stageId ? { ...stage, [field]: response.data[field] } : stage));
+            if (isNote) savedStageNotes.current[stageId] = response.data.deliverables || '';
         } catch (err) {
-            alert(err.message || '更新阶段失败');
-            loadData(); // revert on failure
+            if (isNote) {
+                const data = err?.response?.data;
+                const validation = Array.isArray(data?.detail) ? data.detail.find(item => item.loc?.at(-1) === field) : null;
+                const message = validation?.msg?.replace(/^Value error, /, '') || data?.message || err.message || '保存失败';
+                setStageNoteErrors(prev => ({ ...prev, [stageId]: `备注/交付物：${message}` }));
+                setStages(prev => prev.map(stage => stage.id === stageId ? { ...stage, deliverables: savedStageNotes.current[stageId] || '' } : stage));
+            } else {
+                alert(err.message || '更新阶段失败');
+                loadData(); // revert on failure
+            }
+        } finally {
+            if (isNote) setSavingStageNotes(prev => ({ ...prev, [stageId]: false }));
         }
     };
 
@@ -109,7 +131,7 @@ export default function ProjectDetailPage() {
                 <button className="btn btn-secondary" onClick={() => navigate('/project')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <ArrowLeft size={16} /> 返回列表
                 </button>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="toolbar-actions" style={{ display: 'flex', gap: '1rem' }}>
                     <button className="btn btn-primary" onClick={() => setShowEditModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Edit size={16} /> 编辑项目
                     </button>
@@ -133,14 +155,14 @@ export default function ProjectDetailPage() {
             <div className="detail-container project-detail-grid">
                 <div className="main-info">
                     <div className="card" style={{ padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #eee' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                            <div style={{ padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', color: '#0066ff' }}>
+                        <div className="project-heading" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
+                            <div className="project-heading-icon" style={{ padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', color: '#0066ff' }}>
                                 <Briefcase size={28} />
                             </div>
-                            <h2 style={{ margin: 0, fontSize: '1.8rem', color: '#1a1a1a' }}>{project.name}</h2>
+                            <h2 className="project-name" style={{ margin: 0, fontSize: '1.8rem', color: '#1a1a1a' }}>{project.name}</h2>
                         </div>
 
-                        <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                        <div className="info-grid">
                             <div className="info-item">
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                                     <FileText size={14} /> 项目编号
@@ -349,6 +371,10 @@ export default function ProjectDetailPage() {
                                                         <td className="col-note">
                                                             <input
                                                                 type="text"
+                                                                aria-label={`${stage.stage_name}备注/交付物`}
+                                                                aria-invalid={Boolean(stageNoteErrors[stage.id])}
+                                                                aria-describedby={stageNoteErrors[stage.id] ? `stage-note-error-${stage.id}` : undefined}
+                                                                disabled={Boolean(savingStageNotes[stage.id])}
                                                                 value={stage.deliverables || ''}
                                                                 placeholder="备注或交付物链接..."
                                                                 onChange={(e) => setStages(prev => prev.map(s => s.id === stage.id ? { ...s, deliverables: e.target.value } : s))}
@@ -362,6 +388,7 @@ export default function ProjectDetailPage() {
                                                                     outline: 'none'
                                                                 }}
                                                             />
+                                                            {stageNoteErrors[stage.id] && <span id={`stage-note-error-${stage.id}`} className="stage-note-error" role="alert">{stageNoteErrors[stage.id]}</span>}
                                                         </td>
                                                     </tr>
                                                 );

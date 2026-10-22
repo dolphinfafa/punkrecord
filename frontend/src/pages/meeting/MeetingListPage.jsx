@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
 import { format } from 'date-fns';
-import { Mic, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
+import { Mic, Plus, Trash2, Loader2, Search } from 'lucide-react';
 import UploadAudioModal from './components/UploadAudioModal';
 import './MeetingListPage.css';
+import Pagination from '@/components/common/Pagination';
 
 const STATUS_MAP = {
     uploading: { label: '上传中', className: 'status-uploading' },
@@ -87,8 +88,6 @@ export default function MeetingListPage() {
     const handleRowClick = (id) => {
         navigate(`/meeting/${id}`);
     };
-
-    const totalPages = Math.ceil(total / pageSize);
 
     const getStatusInfo = (status) => {
         return STATUS_MAP[status] || { label: status, className: 'status-unknown' };
@@ -230,29 +229,7 @@ export default function MeetingListPage() {
                         </table>
                     </div>
 
-                    {totalPages > 1 && (
-                        <div className="meeting-pagination">
-                            <span className="pagination-info">
-                                共 {total} 条记录，第 {page}/{totalPages} 页
-                            </span>
-                            <div className="pagination-buttons">
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                >
-                                    <ChevronLeft size={16} /> 上一页
-                                </button>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                >
-                                    下一页 <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <Pagination page={page} pageSize={pageSize} total={total} onChange={setPage} loading={loading} />
                 </>
             )}
 

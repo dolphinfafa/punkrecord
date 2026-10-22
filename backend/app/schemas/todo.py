@@ -7,15 +7,16 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 from app.models.base import as_cn_naive
 from decimal import Decimal
+from app.schemas.text import NonBlankText, PlainText
 
 
 class TodoCreate(BaseModel):
     """Todo creation schema"""
     our_entity_id: Optional[UUID] = None
     assignee_user_id: UUID
-    title: str
-    description: Optional[str] = Field(default=None, max_length=10000)
-    notes: Optional[str] = Field(default=None, max_length=2000)
+    title: NonBlankText
+    description: Optional[PlainText] = Field(default=None, max_length=10000)
+    notes: Optional[PlainText] = Field(default=None, max_length=2000)
     source_type: str = "custom"
     source_id: str = ""
     action_type: str = "do"
@@ -30,9 +31,9 @@ class TodoCreate(BaseModel):
 
 class TodoUpdate(BaseModel):
     """Todo update schema"""
-    title: Optional[str] = None
-    description: Optional[str] = Field(default=None, max_length=10000)
-    notes: Optional[str] = Field(default=None, max_length=2000)
+    title: NonBlankText = None
+    description: Optional[PlainText] = Field(default=None, max_length=10000)
+    notes: Optional[PlainText] = Field(default=None, max_length=2000)
     priority: Optional[Literal["p0", "p1", "p2", "p3"]] = None
     due_at: Optional[datetime] = None
     estimated_hours: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=2)
@@ -107,7 +108,7 @@ class LeaveRequestCreate(BaseModel):
     leave_type: Literal["annual", "maternity", "marriage", "personal", "sick"]
     start_at: datetime
     end_at: datetime
-    reason: Optional[str] = None
+    reason: Optional[PlainText] = None
     _normalize_times = field_validator("start_at", "end_at")(as_cn_naive)
 
 

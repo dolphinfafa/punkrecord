@@ -1,12 +1,13 @@
 import client from './client';
 
 export const meetingApi = {
-    createMeeting: (title, meetingType = 'morning', meetingDate = null, file = null) => {
+    createMeeting: (title, meetingType = 'morning', meetingDate = null, file = null, transcriptFile = null) => {
         const formData = new FormData();
         formData.append('title', title);
         formData.append('meeting_type', meetingType);
         if (meetingDate) formData.append('meeting_date', meetingDate);
         if (file) formData.append('file', file);
+        if (transcriptFile) formData.append('transcript_file', transcriptFile);
         return client.post('/meeting/records', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -34,6 +35,8 @@ export const meetingApi = {
         });
     },
     updateSpeakers: (id, data) => client.put(`/meeting/records/${id}/speakers`, data),
+    getEmployees: () => client.get('/meeting/employees'),
+    getTranscriptTemplate: () => client.get('/meeting/transcript-template', { responseType: 'blob' }),
     retranscribe: (id) => client.post(`/meeting/records/${id}/retranscribe`),
     archiveToKB: (id) => client.post(`/meeting/records/${id}/archive`),
     getAudioUrl: (id) => `/api/v1/meeting/records/${id}/audio`,

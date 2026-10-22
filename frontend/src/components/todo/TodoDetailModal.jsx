@@ -48,6 +48,8 @@ export default function TodoDetailModal({
     const canSubmit = isAssignee && ['open', 'in_progress', 'blocked'].includes(todo.status);
     const canApproveReject = isReviewer && todo.status === 'pending_review';
     const isFinished = ['done', 'dismissed'].includes(todo.status);
+    const hasDescription = Boolean(todo.description?.trim());
+    const hasNotes = Boolean(todo.notes?.trim());
 
     const handleBlock = () => {
         const reason = prompt('请输入阻塞原因:');
@@ -104,20 +106,20 @@ export default function TodoDetailModal({
                     </div>
 
                     {/* Description */}
-                    {todo.description && (
-                        <div className="detail-section">
-                            <h4>描述</h4>
-                            <p className="detail-description">{todo.description}</p>
-                        </div>
-                    )}
+                    <div className="detail-section">
+                        <h4>描述</h4>
+                        <p className={clsx('detail-description', { 'detail-description-empty': !hasDescription })}>
+                            {hasDescription ? todo.description : '暂无描述'}
+                        </p>
+                    </div>
 
                     {/* Notes */}
-                    {todo.notes && (
-                        <div className="detail-section">
-                            <h4>备注</h4>
-                            <p className="detail-description">{todo.notes}</p>
-                        </div>
-                    )}
+                    <div className="detail-section">
+                        <h4>备注</h4>
+                        <p className={clsx('detail-description', { 'detail-description-empty': !hasNotes })}>
+                            {hasNotes ? todo.notes : '暂无备注'}
+                        </p>
+                    </div>
 
                     {getBugImages(todo).length > 0 && todo?.link?.project_id && (
                         <div className="detail-section">

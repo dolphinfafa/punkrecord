@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { meetingApi } from '@/api/meeting';
-import { Plus, X, Loader2, AlertCircle, FileAudio, FileText, ClipboardEdit } from 'lucide-react';
+import { Plus, X, Loader2, AlertCircle, FileAudio, FileText, ClipboardEdit, Download } from 'lucide-react';
 import './UploadAudioModal.css';
 
 const MEETING_TYPES = [
@@ -43,19 +43,27 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                 title.trim(),
                 meetingType,
                 meetingDate,
-                inputMode === 'audio' ? audioFile : null
+                inputMode === 'audio' ? audioFile : null,
+                inputMode === 'transcript' ? transcriptFile : null
             );
-            let data = res.data;
-            if (inputMode === 'transcript' && data?.id) {
-                const transcriptRes = await meetingApi.uploadTranscript(data.id, transcriptFile);
-                data = transcriptRes.data?.meeting || data;
-            }
-            onSuccess(data);
+            onSuccess(res.data);
         } catch (err) {
             setError(err?.response?.data?.message || err.message || '创建失败，请重试');
         } finally {
             setCreating(false);
         }
+    };
+
+    const downloadTemplate = async () => {
+        try {
+            const blob = await meetingApi.getTranscriptTemplate();
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'meeting-transcript-template.docx';
+            anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch { setError('文稿模板下载失败'); }
     };
 
     const handleOverlayClick = (e) => {
@@ -171,7 +179,7 @@ export default function UploadAudioModal({ onClose, onSuccess }) {
                                     onChange={(e) => setTranscriptFile(e.target.files?.[0] || null)}
                                 />
                             </label>
-                            <span className="form-helper">文稿中按“讲话人1：内容”“张三：内容”等格式分段。</span>
+                            <button type="button" className="btn btn-secondary" disabled={creating} onClick={downloadTemplate}><Download size={15} />下载文稿模板</button>
                         </div>
                     )}
 

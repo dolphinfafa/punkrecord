@@ -7,32 +7,33 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 from app.models.base import as_cn_naive
 from decimal import Decimal
+from app.schemas.text import NonBlankText, PlainText
 
 
 class ProjectCreate(BaseModel):
     """Project creation schema"""
     our_entity_id: Optional[UUID] = None
     project_no: Optional[str] = None
-    name: str
+    name: NonBlankText
     project_type: str  # b2b or b2c
     pm_user_id: UUID
     customer_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     start_at: Optional[date] = None
     due_at: Optional[date] = None
-    description: Optional[str] = None
+    description: Optional[PlainText] = None
 
 
 class ProjectUpdate(BaseModel):
     """Project update schema"""
-    name: Optional[str] = None
+    name: NonBlankText = None
     status: Optional[str] = None
     pm_user_id: Optional[UUID] = None
     our_entity_id: Optional[UUID] = None
     customer_id: Optional[UUID] = None
     start_at: Optional[date] = None
     due_at: Optional[date] = None
-    description: Optional[str] = None
+    description: Optional[PlainText] = None
 
 
 class ProjectResponse(BaseModel):
@@ -90,7 +91,7 @@ class ProjectStageUpdate(BaseModel):
     actual_end_at: Optional[date] = None
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
-    deliverables: Optional[str] = None
+    deliverables: Optional[PlainText] = None
     feature_list: Optional[str] = None
 
 class StageStatusUpdate(BaseModel):
@@ -98,7 +99,7 @@ class StageStatusUpdate(BaseModel):
     status: Optional[str] = None
     blocked_reason: Optional[str] = None
     skip_reason: Optional[str] = None
-    deliverables: Optional[str] = None
+    deliverables: Optional[PlainText] = None
     feature_list: Optional[str] = None
     planned_start_at: Optional[date] = None
     planned_end_at: Optional[date] = None
@@ -175,8 +176,8 @@ class ProjectTaskPlanUpdateRequest(BaseModel):
     due_at: Optional[datetime] = None
     estimated_hours: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     priority: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: NonBlankText = None
+    description: Optional[PlainText] = None
     dev_type: Optional[str] = None
     _normalize_due = field_validator("due_at")(as_cn_naive)
 

@@ -118,6 +118,12 @@ def test_parse_transcript_text_without_speaker_labels_keeps_content():
     assert segments[0]["content"] == "这是已经整理好的会议记录，没有说话人标签。"
 
 
+def test_parse_quoted_dialogue_and_legitimate_apostrophe():
+    segments, mapping = _parse_transcript_text('"test_user1:早上好"\n\'test_user2:继续测试\'\nO\'Connor: 保留姓名撇号')
+    assert list(mapping.values()) == ['test_user1', 'test_user2', "O'Connor"]
+    assert [segment['content'] for segment in segments] == ['早上好', '继续测试', '保留姓名撇号']
+
+
 def test_replace_transcript_segments_inserts_deletes_and_reorders():
     with _make_session() as session:
         user = _add_test_user(session)

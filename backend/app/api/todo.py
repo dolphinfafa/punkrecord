@@ -56,6 +56,10 @@ def _enrich_todo(todo: TodoItem, session: Session) -> TodoResponse:
     creator = session.get(User, todo.creator_user_id)
     data = TodoResponse.model_validate(todo)
     link = dict(data.link or {})
+    # Older Bug forms stored notes only in link; explicit empty notes stay cleared.
+    if (data.notes is None and (link.get("type") == "bug" or "bug" in (data.tags or []))
+            and isinstance(link.get("notes"), str)):
+        data.notes = link["notes"]
     if "todo_images" in link:
         link["todo_images"] = _serialize_todo_images(todo)
         data.link = link

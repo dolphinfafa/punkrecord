@@ -228,18 +228,14 @@ def reconcile_attendance(session, day):
     existing = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)).all()
     if not meetings and not existing:
         return
-    names = {str(name).strip() for m in meetings for name in (m.attendees or []) if name}
     all_users = session.exec(select(User)).all()
     rows = {row.user_id: row for row in existing}
     # Historical eligibility and names must survive later employee profile changes.
     roster_names = {user.id: (rows[user.id].employee_name or user.display_name).strip()
                     if user.id in rows else user.display_name.strip() for user in all_users}
-    counts = {}
-    for user in all_users:
-        if user.created_at.date() > day:
-            continue
-        name = roster_names[user.id]
-        counts[name] = counts.get(name, 0) + 1
+    from app.services.meeting_participants import resolve_participants
+    present_ids, _ = resolve_participants(session, meetings,
+        [user for user in all_users if user.created_at.date() <= day], roster_names)
     leaves = session.exec(select(LeaveRequest).where(LeaveRequest.status == LeaveStatus.APPROVED,
         LeaveRequest.start_at < datetime.combine(day, time(12)),
         LeaveRequest.end_at > datetime.combine(day, time(10)))).all()
@@ -250,7 +246,7 @@ def reconcile_attendance(session, day):
             continue
         row = rows.get(user.id) or MorningAttendance(day=day, user_id=user.id)
         row.employee_name = roster_names[user.id]
-        present = row.employee_name in names and counts[row.employee_name] == 1
+        present = user.id in present_ids
         row.absent = bool(meetings and is_workday(session, day) and not present and user.id not in excused)
         should_charge = row.absent and not row.waived
         if should_charge != row.charged:

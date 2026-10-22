@@ -1,5 +1,17 @@
 # 数据模型
 
+## 2.1.0 待办备注兼容
+
+- 继续使用已有 `TodoItem.description`、`TodoItem.notes` 与 `link` 列，无新迁移。旧Bug只在响应层读取 `link.notes`，不回填数据库；顶层空串代表明确清空，不与null混用。
+- 本版迁移头仍为 `20261021_0001`，覆盖下述贝利及会议员工绑定变更。
+
+## 2026-10-21 会议身份绑定
+
+- `MeetingRecord.speaker_user_mapping`：可空 JSON，应用默认空字典。键为说话人 ID，值为员工 UUID 字符串；显式 null 表示外部人员，缺少键表示兼容旧数据。
+- `speaker_mapping` 和 `attendees` 继续保留姓名展示与旧接口契约；考勤优先稳定 ID，仅当前转写实际使用的说话人参与。
+- 迁移 `20261021_0001` 仅添加绑定列并为旧行设置空映射，不推测历史绑定、不重算贝利余额；可重复执行，不覆盖已有绑定。
+- 替换文稿成功时，用新文稿姓名覆盖 `speaker_mapping` 并清空 `speaker_user_mapping`；ASR 成功时两者都清空。失败保留原映射，避免新说话人继承旧身份。
+
 ## 2026-10-16 开发环境升级
 
 - `TodoItem` 增加 `estimated_hours: DECIMAL(10,2)`、`submitted_at`。存量允许空，新任务工时默认 0，截止日期必填；最终提交时间与验收通过时间分开。
@@ -98,8 +110,8 @@
 
 | 模型 | 说明 |
 |------|------|
-| `MeetingRecord` | 会议主表（音频文件、ASR状态、说话人映射、AI纪要、归档文档ID、会议日期、参会人员）。v2.0.7 起 `attendees` 由当前转写分段实际使用的 `speaker_id` 结合 `speaker_mapping` 自动派生，Web 前端不再手动维护 |
-| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；无时间码文稿导入时 `start_time`/`end_time` 可为空。v2.0.7 起支持通过完整分段列表保存来新增、插入、删除和重排分段，不新增数据库字段 |
+| `MeetingRecord` | 会议主表（音频文件、ASR状态、姓名映射 `speaker_mapping`、员工身份映射 `speaker_user_mapping`、AI纪要、归档文档ID、会议日期、参会人员）。`attendees` 由实际使用的说话人自动派生，Web 不手动维护 |
+| `MeetingTranscriptSegment` | 转写分段（说话人、时间范围、文本内容）。分段可来自豆包 ASR，也可由 Word `.docx` / PDF 文稿导入解析生成；`start_time`/`end_time` 为浮点数，无时间码时从上一段结尾顺延并估算时长，不代表真实音频对齐。v2.0.7 起支持通过完整分段列表保存来新增、插入、删除和重排分段，编辑增强本身未新增字段 |
 
 ### 共享模块（Shared）
 
@@ -116,4 +128,4 @@
 
 ---
 
-*最后更新：2026-10-16*
+*最后更新：2026-10-22*

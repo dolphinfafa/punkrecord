@@ -6,15 +6,16 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
+from app.schemas.text import NonBlankText, PlainText
 
 
 class FinanceAccountCreate(BaseModel):
     """Finance account creation schema"""
     entity_id: UUID
     account_category: str  # public or private
-    account_name: str
-    bank_name: Optional[str] = None
-    bank_branch: Optional[str] = None
+    account_name: NonBlankText
+    bank_name: Optional[PlainText] = None
+    bank_branch: Optional[PlainText] = None
     account_no: Optional[str] = None  # Bank account number, will be stored as masked
     currency: str = "CNY"
     initial_balance: Decimal = 0
@@ -26,9 +27,9 @@ class FinanceAccountUpdate(BaseModel):
     """Finance account update schema"""
     entity_id: Optional[UUID] = None
     account_category: Optional[str] = None
-    account_name: Optional[str] = None
-    bank_name: Optional[str] = None
-    bank_branch: Optional[str] = None
+    account_name: NonBlankText = None
+    bank_name: Optional[PlainText] = None
+    bank_branch: Optional[PlainText] = None
     account_no: Optional[str] = None  # Bank account number, will be stored as masked
     currency: Optional[str] = None
     initial_balance: Optional[Decimal] = None
@@ -69,7 +70,7 @@ class TransactionCreate(BaseModel):
     counterparty_id: Optional[UUID] = None
     employee_user_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
-    purpose: Optional[str] = None
+    purpose: Optional[PlainText] = None
     channel: Optional[str] = None
     reference_no: Optional[str] = None
     attachments: list = Field(default_factory=list)
@@ -85,7 +86,7 @@ class TransactionUpdate(BaseModel):
     counterparty_id: Optional[UUID] = None
     employee_user_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
-    purpose: Optional[str] = None
+    purpose: Optional[PlainText] = None
     attachments: Optional[list] = None
     reconcile_status: Optional[str] = None  # unreconciled / completed / reconciled
 

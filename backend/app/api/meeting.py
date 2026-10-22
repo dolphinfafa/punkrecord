@@ -5,6 +5,7 @@ import asyncio
 from app.models.base import now_cn
 import json
 import logging
+from io import BytesIO
 import re
 from typing import Optional
 from uuid import UUID, uuid4
@@ -23,7 +24,8 @@ from app.core.exceptions import NotFoundException, AtlasException, ValidationExc
 from app.core.response import success_response
 from app.core.config import settings
 from app.core.storage import save_file, get_file, delete_file, get_download_url
-from app.models.iam import User
+from app.models.iam import User, UserStatus
+from app.schemas.text import nonblank_text
 from app.models.meeting import MeetingRecord, MeetingTranscriptSegment, MeetingStatus, MeetingType
 from app.models.kb import KBDocument, KBDocumentStatus
 from app.schemas.meeting import (
@@ -163,6 +165,10 @@ def _parse_time_range(raw: str | None) -> tuple[Optional[float], Optional[float]
 
 def _speaker_id_for_label(label: str, aliases: dict[str, str], mapping: dict[str, str]) -> str:
     label = " ".join((label or "").strip().split())
+    for left, right in [("'", "'"), ('"', '"'), ('“', '”'), ('‘', '’')]:
+        if label.startswith(left) and label.endswith(right) and len(label) > 2:
+            label = label[1:-1].strip()
+            break
     compact = re.sub(r"\s+", "", label)
     numbered = re.match(r"^(讲话人|说话人|发言人|speaker|SPEAKER)[_-]?(\d+)$", compact, re.IGNORECASE)
     if numbered:
@@ -232,6 +238,15 @@ def _parse_transcript_text(text: str) -> tuple[list[dict], dict[str, str]]:
         if not line:
             close_current()
             continue
+
+        # Quoted dialogue lines sometimes wrap the entire "name: content" entry.
+        for left, right in [("'", "'"), ('"', '"'), ('“', '”'), ('‘', '’')]:
+            if line.startswith(left) and line.endswith(right):
+                candidate = line[1:-1].strip()
+                candidate_match = SPEAKER_LINE_RE.match(candidate)
+                if candidate_match and not candidate_match.group("speaker").endswith(right):
+                    line = candidate
+                break
 
         match = SPEAKER_LINE_RE.match(line)
         if match and match.group("speaker").strip() in METADATA_LABELS:
@@ -420,6 +435,8 @@ async def _run_asr(meeting_id: UUID):
             if duration_seconds is not None:
                 meeting.duration_seconds = int(duration_seconds)
             meeting.status = MeetingStatus.TRANSCRIBED
+            meeting.speaker_mapping = {}
+            meeting.speaker_user_mapping = {}
             session.flush()
             meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), meeting.speaker_mapping or {})
             session.add(meeting)
@@ -443,16 +460,68 @@ async def _run_asr(meeting_id: UUID):
 
 # ─── 1. Upload audio & create meeting ────────────────────────────────────────
 
+async def _read_transcript_document(file):
+    if not file.filename:
+        raise ValidationException("文稿文件名不能为空")
+    content_type = _normalize_transcript_content_type(file)
+    file_data = await file.read(MAX_TRANSCRIPT_DOCUMENT_SIZE + 1)
+    if not file_data:
+        raise ValidationException("文稿文件不能为空")
+    if len(file_data) > MAX_TRANSCRIPT_DOCUMENT_SIZE:
+        raise ValidationException("文稿文件不能超过 20MB")
+    try:
+        text = extract_text(file_data, content_type, file.filename)
+    except Exception:
+        logger.warning("Failed to extract meeting transcript document")
+        raise ValidationException("文稿解析失败，请确认文件为可复制文字的 Word/PDF")
+    parsed = _parse_transcript_text(text)
+    if not parsed[0]:
+        raise ValidationException("文稿中未解析到有效转写内容")
+    return parsed
+
+
+def _apply_transcript_import(meeting, parsed, session):
+    segments, mapping = parsed
+    session.add(meeting)
+    session.flush()
+    session.exec(delete(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting.id))
+    for item in segments:
+        session.add(MeetingTranscriptSegment(meeting_id=meeting.id,
+            **{key: item[key] for key in ("segment_index", "speaker_id", "start_time", "end_time", "content")}))
+    session.flush()
+    meeting.speaker_mapping = mapping
+    # A replacement document has a new speaker roster; old ID bindings cannot be reused.
+    meeting.speaker_user_mapping = {}
+    meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), mapping)
+    if any(segment.get("has_time") for segment in segments):
+        meeting.duration_seconds = int(max(segment["end_time"] for segment in segments)) or None
+    elif not meeting.audio_stored_name:
+        meeting.duration_seconds = None
+    meeting.summary = None
+    meeting.status = MeetingStatus.TRANSCRIBED
+    meeting.updated_at = now_cn()
+    session.add(meeting)
+    _settle_attendance(meeting, session)
+
+
 @router.post("/records", response_model=dict)
 async def create_meeting(
     title: str = Form(...),
     meeting_type: str = Form(default="morning"),
     meeting_date: Optional[str] = Form(default=None),
     file: Optional[UploadFile] = File(default=None),
+    transcript_file: Optional[UploadFile] = File(default=None),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_permission("meeting.write")),
 ):
-    """Create a new meeting record. Audio file is optional."""
+    """Create a meeting, optionally importing a transcript in the same transaction."""
+    try:
+        title = nonblank_text(title)
+    except ValueError:
+        raise ValidationException("请输入会议标题，不能只包含空白字符")
+    if file is not None and transcript_file is not None:
+        raise ValidationException("创建会议时请选择音频或文稿，不可同时上传")
+    parsed_transcript = await _read_transcript_document(transcript_file) if transcript_file is not None else None
     # Validate meeting_type
     valid_types = [t.value for t in MeetingType]
     if meeting_type not in valid_types:
@@ -470,7 +539,7 @@ async def create_meeting(
     if has_audio:
         file_data = await file.read()
         if not file_data:
-            has_audio = False
+            raise ValidationException("音频文件不能为空")
 
     if has_audio:
         original_name = file.filename or "audio"
@@ -511,13 +580,43 @@ async def create_meeting(
             status=MeetingStatus.TRANSCRIBED,
             created_by=current_user.id,
         )
-        session.add(meeting)
-        _settle_attendance(meeting, session)
+        if parsed_transcript is not None:
+            _apply_transcript_import(meeting, parsed_transcript, session)
+        else:
+            session.add(meeting)
+            _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
     resp = MeetingCreateResponse.model_validate(meeting)
     return success_response(resp.model_dump())
+
+
+@router.get("/employees")
+def meeting_employees(session: Session = Depends(get_session),
+                      current_user: User = Depends(require_permission("meeting.write"))):
+    users = session.exec(select(User).where(User.status == UserStatus.ACTIVE)
+                         .order_by(User.display_name, User.username, User.id)).all()
+    return success_response([{"id": user.id, "display_name": user.display_name, "username": user.username}
+                             for user in users])
+
+
+@router.get("/transcript-template")
+def transcript_template(current_user: User = Depends(require_permission("meeting.write"))):
+    from docx import Document
+    document = Document()
+    document.add_heading("会议文稿", 0)
+    document.add_paragraph("会议标题：项目早会")
+    document.add_paragraph("会议日期：2026-10-21")
+    document.add_paragraph("讲话人1：今天完成接口联调。")
+    document.add_paragraph("讲话人2：今天进行回归测试。")
+    document.add_paragraph("[00:10-00:15] 讲话人1：下午一起验收。")
+    buffer = BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+    return StreamingResponse(buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="meeting-transcript-template.docx"'})
 
 
 # ─── 1b. Upload audio to existing meeting ──────────────────────────────────
@@ -604,62 +703,15 @@ async def upload_transcript_document(
         raise AtlasException("会议正在处理中，请稍后再上传文稿")
     if meeting.status == MeetingStatus.ARCHIVED:
         raise AtlasException("已归档会议不能替换文稿")
-    if not file.filename:
-        raise ValidationException("文稿文件名不能为空")
-
-    content_type = _normalize_transcript_content_type(file)
-    file_data = await file.read()
-    if not file_data:
-        raise ValidationException("文稿文件不能为空")
-    if len(file_data) > MAX_TRANSCRIPT_DOCUMENT_SIZE:
-        raise ValidationException("文稿文件不能超过 20MB")
-
-    try:
-        text = extract_text(file_data, content_type, file.filename)
-    except Exception as exc:
-        logger.exception("Failed to extract meeting transcript document: %s", exc)
-        raise ValidationException("文稿解析失败，请确认文件为可复制文字的 Word/PDF")
-
-    segments, speaker_mapping = _parse_transcript_text(text)
-    if not segments:
-        raise ValidationException("文稿中未解析到有效转写内容")
-
-    old_segments = session.exec(
-        select(MeetingTranscriptSegment).where(MeetingTranscriptSegment.meeting_id == meeting_id)
-    ).all()
-    for old_segment in old_segments:
-        session.delete(old_segment)
-    session.flush()
-
-    for segment_data in segments:
-        session.add(MeetingTranscriptSegment(
-            meeting_id=meeting.id,
-            segment_index=segment_data["segment_index"],
-            speaker_id=segment_data["speaker_id"],
-            start_time=segment_data["start_time"],
-            end_time=segment_data["end_time"],
-            content=segment_data["content"],
-        ))
-    session.flush()
-
-    meeting.speaker_mapping = speaker_mapping
-    meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), speaker_mapping)
-    if any(segment.get("has_time") for segment in segments):
-        meeting.duration_seconds = int(max((segment["end_time"] for segment in segments), default=0)) or None
-    elif not meeting.audio_stored_name:
-        meeting.duration_seconds = None
-    meeting.summary = None
-    meeting.status = MeetingStatus.TRANSCRIBED
-    meeting.updated_at = now_cn()
-    session.add(meeting)
-    _settle_attendance(meeting, session)
+    parsed = await _read_transcript_document(file)
+    _apply_transcript_import(meeting, parsed, session)
     session.commit()
     session.refresh(meeting)
 
     return success_response({
         "meeting": _enrich_meeting(meeting, session).model_dump(),
-        "segments": len(segments),
-        "speakers": speaker_mapping,
+        "segments": len(parsed[0]),
+        "speakers": parsed[1],
     })
 
 
@@ -872,7 +924,27 @@ async def update_speakers(
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
-    meeting.speaker_mapping = data.speaker_mapping
+    old_mapping = meeting.speaker_mapping or {}
+    old_bindings = meeting.speaker_user_mapping or {}
+    mapping = {sid: name.strip() for sid, name in data.speaker_mapping.items()}
+    bindings = data.speaker_user_mapping
+    if bindings is None:
+        bindings = {sid: uid for sid, uid in old_bindings.items()
+                    if sid in mapping and mapping[sid] == old_mapping.get(sid)}
+    if set(bindings) - set(mapping):
+        raise ValidationException("员工绑定必须对应已有说话人")
+    normalized = {}
+    for sid, uid in bindings.items():
+        if uid is None:
+            normalized[sid] = None
+            continue
+        employee = session.get(User, UUID(str(uid)))
+        if not employee or (employee.status != UserStatus.ACTIVE and str(old_bindings.get(sid)) != str(uid)):
+            raise ValidationException("请选择有效的在职员工")
+        normalized[sid] = str(employee.id)
+        mapping[sid] = employee.display_name
+    meeting.speaker_mapping = mapping
+    meeting.speaker_user_mapping = normalized
     meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting_id), meeting.speaker_mapping)
     meeting.updated_at = now_cn()
     session.add(meeting)

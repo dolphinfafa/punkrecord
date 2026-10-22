@@ -79,3 +79,28 @@ def test_hours_upgrade_from_already_deployed_policy_schema():
         connection.execute(tasks.insert().values(id=3))
         assert connection.execute(sa.select(tasks.c.estimated_hours).where(tasks.c.id == 3)).scalar_one() == 0
     engine.dispose()
+
+
+def test_meeting_employee_binding_upgrade_preserves_legacy_records():
+    path = Path(__file__).resolve().parents[1] / 'db_migrations/versions/20261021_0001_meeting_employee_speakers.py'
+    spec = importlib.util.spec_from_file_location('meeting_binding_upgrade', path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = sa.create_engine('sqlite://')
+    metadata = sa.MetaData()
+    meetings = sa.Table('meeting_record', metadata, sa.Column('id', sa.Integer(), primary_key=True),
+                        sa.Column('speaker_mapping', sa.JSON()), sa.Column('attendees', sa.JSON()))
+    metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(meetings.insert().values(id=1, speaker_mapping={'speaker_1': 'Legacy'}, attendees=['Legacy']))
+        with Operations.context(MigrationContext.configure(connection)):
+            migration.upgrade()
+            migration.upgrade()
+        upgraded = sa.Table('meeting_record', sa.MetaData(), autoload_with=connection)
+        row = connection.execute(sa.select(upgraded)).mappings().one()
+        assert row['speaker_mapping'] == {'speaker_1': 'Legacy'}
+        assert row['attendees'] == ['Legacy'] and row['speaker_user_mapping'] == {}
+        connection.execute(upgraded.update().values(speaker_user_mapping={'speaker_1': str(uuid4())}))
+        with Operations.context(MigrationContext.configure(connection)): migration.upgrade()
+        assert connection.execute(sa.select(upgraded.c.speaker_user_mapping)).scalar_one()['speaker_1']
+    engine.dispose()

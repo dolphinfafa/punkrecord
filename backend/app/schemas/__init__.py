@@ -5,6 +5,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, EmailStr
+from app.schemas.text import NonBlankText, PlainText
 
 
 # Auth schemas
@@ -29,14 +30,14 @@ class TokenResponse(BaseModel):
 
 class JobTitleCreate(BaseModel):
     """Job title creation schema"""
-    name: str
-    description: Optional[str] = None
+    name: NonBlankText
+    description: Optional[PlainText] = None
 
 
 class JobTitleUpdate(BaseModel):
     """Job title update schema"""
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: NonBlankText = None
+    description: Optional[PlainText] = None
 
 
 class JobTitleResponse(BaseModel):
@@ -54,15 +55,15 @@ class JobTitleResponse(BaseModel):
 
 class DepartmentCreate(BaseModel):
     """Department creation schema"""
-    name: str
-    description: Optional[str] = None
+    name: NonBlankText
+    description: Optional[PlainText] = None
     parent_org_unit_id: Optional[UUID] = None
 
 
 class DepartmentUpdate(BaseModel):
     """Department update schema"""
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: NonBlankText = None
+    description: Optional[PlainText] = None
     parent_org_unit_id: Optional[UUID] = None
 
 
@@ -86,7 +87,7 @@ DepartmentResponse.model_rebuild()
 
 class UserCreate(BaseModel):
     """User creation schema"""
-    display_name: str
+    display_name: NonBlankText
     username: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -99,7 +100,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     """User update schema"""
-    display_name: Optional[str] = None
+    display_name: NonBlankText = None
     email: Optional[str] = None
     phone: Optional[str] = None
     is_shareholder: Optional[bool] = None
@@ -218,25 +219,25 @@ OrgChartNode.model_rebuild()
 
 
 class BeliRuleCreate(BaseModel):
-    name: str
+    name: NonBlankText
     rule_type: str = "task_timeliness"
     enabled: bool = True
     early_days: int = 0
     reward_beili: float = 0.0
     late_days: int = 0
     penalty_beili: float = 0.0
-    note: Optional[str] = None
+    note: Optional[PlainText] = None
 
 
 class BeliRuleUpdate(BaseModel):
-    name: Optional[str] = None
+    name: NonBlankText = None
     rule_type: Optional[str] = None
     enabled: Optional[bool] = None
     early_days: Optional[int] = None
     reward_beili: Optional[float] = None
     late_days: Optional[int] = None
     penalty_beili: Optional[float] = None
-    note: Optional[str] = None
+    note: Optional[PlainText] = None
 
 
 class BeliRuleResponse(BaseModel):

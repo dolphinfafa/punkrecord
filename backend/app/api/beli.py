@@ -9,15 +9,17 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
+from sqlalchemy import func
 from app.core.auth import get_current_user
 from app.core.database import get_session
 from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.core.response import success_response
+from app.schemas.text import NonBlankText, PlainText
 from app.core.storage import save_file, get_file
 from app.models.base import now_cn
 from app.models.iam import User, UserStatus
 from app.models.todo import TodoItem, TodoStatus
-from app.models.meeting import MeetingRecord
+from app.models.meeting import MeetingRecord, MeetingStatus
 from app.models.beli import (BeliLedger, TaskReward, WorkdayOverride, MorningAttendance,
                             BeliProduct, BeliOrder)
 from app.services.beli import (LEAVE_FIELDS, require_l0, account_for, post_entry, change_leave,
@@ -25,6 +27,12 @@ from app.services.beli import (LEAVE_FIELDS, require_l0, account_for, post_entry
     validate_plan)
 
 router = APIRouter(prefix="/beli", tags=["Beli"])
+
+
+def page_data(session, query, page, serialize=lambda row: row):
+    total = session.exec(select(func.count()).select_from(query.order_by(None).subquery())).one()
+    rows = session.exec(query.offset((page - 1) * 30).limit(30)).all()
+    return {"items": [serialize(row) for row in rows], "total": total, "page": page, "page_size": 30}
 
 
 def check_employee(session, user_id, viewer):
@@ -65,26 +73,34 @@ def accounts(session: Session = Depends(get_session), user: User = Depends(get_c
 
 
 @router.get("/ledger")
-def ledger(user_id: UUID, page: int = Query(1, ge=1), session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+def ledger(user_id: UUID, page: int = Query(1, ge=1), paginated: bool = False, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     check_employee(session, user_id, user)
-    rows = session.exec(select(BeliLedger).where(BeliLedger.user_id == user_id)
-                        .order_by(BeliLedger.created_at.desc(), BeliLedger.id).offset((page - 1) * 30).limit(30)).all()
-    return success_response(rows)
+    data = page_data(session, select(BeliLedger).where(BeliLedger.user_id == user_id)
+                     .order_by(BeliLedger.created_at.desc(), BeliLedger.id), page)
+    return success_response(data if paginated else data["items"])
 
 
 class Adjustment(BaseModel):
     amount: Decimal = Field(max_digits=12, decimal_places=2)
-    reason: str = Field(min_length=1, max_length=500)
+    reason: NonBlankText = Field(min_length=1, max_length=500)
     request_key: UUID
     leave_type: Optional[Literal["annual", "maternity", "marriage", "personal", "sick"]] = None
+
+    @model_validator(mode="after")
+    def validate_leave_amount(self):
+        if self.leave_type and abs(self.amount) > Decimal("99999999.5"):
+            raise ValueError("假期调整天数不能超过 99999999.5")
+        return self
 
 
 @router.post("/accounts/{user_id}/adjust")
 def adjust(user_id: UUID, data: Adjustment, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     require_l0(user)
     employee = check_employee(session, user_id, user)
-    if not employee.manager_user_id or not data.reason.strip() or data.amount == 0:
-        raise ValidationException("请选择非 L0 员工，填写调整金额及原因")
+    if not employee.manager_user_id:
+        raise ValidationException("请选择非 L0 员工")
+    if data.amount == 0:
+        raise ValidationException("调整金额不能为 0")
     key = f"adjust:{user_id}:{data.request_key}"
     if data.leave_type:
         if data.amount % Decimal("0.5"):
@@ -97,7 +113,7 @@ def adjust(user_id: UUID, data: Adjustment, session: Session = Depends(get_sessi
 
 
 @router.get("/rewards")
-def rewards(status: Optional[str] = None, page: int = Query(1, ge=1), session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+def rewards(status: Optional[str] = None, page: int = Query(1, ge=1), paginated: bool = False, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     query = select(TaskReward)
     if user.manager_user_id:
         query = query.where(TaskReward.user_id == user.id)
@@ -106,8 +122,9 @@ def rewards(status: Optional[str] = None, page: int = Query(1, ge=1), session: S
     if status in ("pending", "rejected"):
         query = query.join(TodoItem, TodoItem.id == TaskReward.todo_id).where(
             TodoItem.status == TodoStatus.DONE, TodoItem.estimated_hours > 0)
-    rows = session.exec(query.order_by(TaskReward.updated_at.desc()).offset((page - 1) * 30).limit(30)).all()
-    return success_response([safe_reward(row, session) for row in rows])
+    data = page_data(session, query.order_by(TaskReward.updated_at.desc(), TaskReward.id), page,
+                     lambda row: safe_reward(row, session))
+    return success_response(data if paginated else data["items"])
 
 
 class RewardReview(BaseModel):
@@ -176,19 +193,28 @@ def attendance(day: Optional[date] = None, page: int = Query(1, ge=1), session: 
         query = query.where(MorningAttendance.user_id == user.id)
     if day:
         query = query.where(MorningAttendance.day == day)
-    rows = session.exec(query.order_by(MorningAttendance.day.desc(), MorningAttendance.id).offset((page - 1) * 30).limit(30)).all()
-    result = [{**row.model_dump(), "name": row.employee_name or session.get(User, row.user_id).display_name} for row in rows]
+    data = page_data(session, query.order_by(MorningAttendance.day.desc(), MorningAttendance.id), page,
+                     lambda row: {**row.model_dump(), "name": row.employee_name or session.get(User, row.user_id).display_name})
     unmatched = []
     if not user.manager_user_id and day:
-        users = session.exec(select(User).where(User.status == UserStatus.ACTIVE)).all()
-        names = [u.display_name.strip() for u in users]
-        meetings = session.exec(select(MeetingRecord).where(MeetingRecord.meeting_date == day, MeetingRecord.meeting_type == "morning")).all()
-        unmatched = sorted({str(n) for m in meetings for n in (m.attendees or []) if names.count(str(n).strip()) != 1})
-    return success_response({"items": result, "unmatched_names": unmatched})
+        from app.services.meeting_participants import resolve_participants
+        users = session.exec(select(User)).all()
+        meetings = session.exec(select(MeetingRecord).where(MeetingRecord.meeting_date == day,
+            MeetingRecord.meeting_type == "morning", MeetingRecord.status.in_([
+                MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED]))).all()
+        snapshots = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)).all()
+        _, unmatched = resolve_participants(session, meetings,
+            [u for u in users if u.created_at.date() <= day],
+            {row.user_id: row.employee_name for row in snapshots if row.employee_name})
+    from app.models.beli import BeliPolicy
+    policy = session.exec(select(BeliPolicy)).first()
+    data.update(unmatched_names=unmatched, starts_on=policy.starts_on if policy else None,
+                policy_active=bool(policy and (not day or day >= policy.starts_on)))
+    return success_response(data)
 
 
 class Waiver(BaseModel):
-    reason: str = Field(min_length=1, max_length=500)
+    reason: NonBlankText = Field(min_length=1, max_length=500)
 
 
 @router.post("/attendance/{attendance_id}/void")
@@ -209,8 +235,8 @@ def void_attendance(attendance_id: UUID, data: Waiver, session: Session = Depend
 
 
 class ProductInput(BaseModel):
-    name: str = Field(min_length=1, max_length=150)
-    description: str = Field(default="", max_length=2000)
+    name: NonBlankText = Field(min_length=1, max_length=150)
+    description: PlainText = Field(default="", max_length=2000)
     kind: Literal["leave", "physical"]
     price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     stock: int = Field(ge=0)
@@ -305,12 +331,13 @@ def order_create(data: OrderInput, session: Session = Depends(get_session), user
 
 
 @router.get("/orders")
-def orders(page: int = Query(1, ge=1), session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+def orders(page: int = Query(1, ge=1), paginated: bool = False, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     query = select(BeliOrder).order_by(BeliOrder.created_at.desc())
     if user.manager_user_id:
         query = query.where(BeliOrder.user_id == user.id)
-    rows = session.exec(query.offset((page - 1) * 30).limit(30)).all()
-    return success_response([{**r.model_dump(), "user_name": session.get(User, r.user_id).display_name} for r in rows])
+    data = page_data(session, query.order_by(BeliOrder.id), page,
+                     lambda r: {**r.model_dump(), "user_name": session.get(User, r.user_id).display_name})
+    return success_response(data if paginated else data["items"])
 
 
 class OrderAction(BaseModel):

@@ -1,5 +1,24 @@
 # 后端架构与 API 接口
 
+## 2.1.0 待办备注兼容
+
+- `_enrich_todo` 统一个人、团队、详情、项目Bug及相关写入响应：仅当顶层 `notes` 为null，且 `link.type=bug` 或标签含bug时，读取字符串类型的 `link.notes` 作为响应备注。不迁移或回写数据库；显式空串优先，非Bug元数据不作备注处理。
+- `PATCH /todo/{id}` 的描述/备注：省略或null保持原值，空串明确清空。前端普通待办与Bug编辑均遵循该契约。
+- MCP工具仍为43个，已有待办/Bug读取复用上述REST响应，无需新增工具。配置默认版本为2.1.0，ASR凭证只从环境提供。
+
+## 2026-10-22 阶段备注校验补漏
+
+- 实际阶段更新路由使用 `StageStatusUpdate`，其 `deliverables` 现与 `ProjectStageUpdate` 一致复用 `PlainText`：纯空白返回422，有内容时去首尾空白并保留内部空格和换行。
+- 空串仍可清空；省略或null不改已有值。`feature_list`等结构化文本、阶段状态规则与响应结构不变，不新增迁移或MCP工具。
+
+## 2026-10-21 开发反馈修复
+
+- 普通文本显式使用 `NonBlankText` / `PlainText`：过滤首尾空白，保留内部空格、换行。必填文本不能空白或显式 null；PATCH 省略不变。选填文本允许原有空串/null 清空，但不接受纯空格；不对密码、账号、枚举及特殊格式字段做全局处理。
+- `/beli/ledger`、`/beli/rewards`、`/beli/orders` 增加可选 `paginated=true`，返回 `{items,total,page,page_size}`；默认仍返回数组，兼容现有客户端。`/beli/attendance` 保持对象并增加总数、页大小、`starts_on`、`policy_active`。
+- 贝利调整金额为 0 明确返回原因；金额及价格最多两位小数、最大绝对值 `9999999999.99`，价格必须为正。假期调整受流水天数字段约束，最大绝对值 `99999999.5`，仍以 0.5 天为单位。
+- 无员工使用的职位删除前，同一事务清理职位权限关联；有员工使用时仍拒绝删除。
+- MCP 工具数量保持 43，已有待办写入和会议读取/文稿导入工具继续复用 REST 校验与新增响应字段。
+
 ## 2026-10-16 开发环境接口变更
 
 - 新建待办及批量开发任务要求 `due_at`；`estimated_hours` 默认 0，允许非负数、最多两位小数。PATCH允许省略但不能显式清空；带时区的截止时间归一化到上海时间。
@@ -118,7 +137,7 @@ MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`upd
 
 **任务字段（v2.0.2 增补，2026-06-24）**：
 - `description`（描述）：列类型 **`TEXT`**，上限 **1 万字符**（原 `varchar(255)`）；`TodoCreate`/`TodoUpdate` 加 `max_length=10000` 校验。
-- `notes`（备注）：**新增**独立字段，列类型 `TEXT`，上限 2000 字符；create/update/response 全支持。与 Bug 专用的 `link.notes` 无关。
+- `notes`（备注）：独立字段，列类型 `TEXT`，上限 2000 字符；create/update/response 全支持。2.1.0起Bug表单同步写入此字段，旧 `link.notes` 仅按本文兼容规则补齐响应。
 - ⚠️ 生产部署需手动 ALTER（`AUTO_CREATE` 只建新表不改列）：`ALTER TABLE todo_item MODIFY COLUMN description TEXT NULL;` 与 `ALTER TABLE todo_item ADD COLUMN notes TEXT NULL;`（迁移文件 `20260624_0001_todo_desc_text_and_notes.py`）。
 
 **AI Agent 工作流**：AI 修复状态存储在 `TodoItem.link.agent_status` 字段（值为 `ai_fixing` / `ai_fixed`），与 `todo.status` 完全解耦。AI 只需关注 `agent_status`，不改变任务本身的状态。
@@ -179,7 +198,8 @@ MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`upd
 |------|------|------|
 | POST/GET | `/api/v1/project/projects` | 项目创建/列表 |
 | GET/PATCH/DELETE | `/api/v1/project/projects/{id}` | 项目详情/更新/删除 |
-| GET/PATCH | `/api/v1/project/projects/{id}/stages` | 阶段列表/更新。**阶段须按序推进**：将某阶段置 `in_progress`/`done` 前，其所有 `sequence_no` 更小的前序阶段必须为 `done` 或 `skipped`，否则 400 拒绝；跳过须显式置 `skipped` |
+| GET | `/api/v1/project/projects/{id}/stages` | 阶段列表 |
+| PATCH | `/api/v1/project/projects/{id}/stages/{stage_id}` | 更新阶段，实际请求Schema为 `StageStatusUpdate`；备注/交付物 `deliverables` 执行普通文本校验。**阶段须按序推进**：将某阶段置 `in_progress`/`done` 前，其所有前序阶段必须为 `done` 或 `skipped`，否则400拒绝；跳过须显式置 `skipped` |
 | POST/GET/DELETE | `/api/v1/project/projects/{id}/attachments` | 项目附件 |
 | POST/GET/DELETE | `/api/v1/project/projects/{id}/members` | 项目成员 |
 | GET | `/api/v1/project/projects/{id}/todos` | 项目任务列表 |
@@ -245,7 +265,9 @@ MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`upd
 
 | 方法 | 路径 | 权限 | 说明 |
 |------|------|------|------|
-| POST | `/api/v1/meeting/records` | meeting.write | 创建会议（音频可选，支持 `meeting_date` 参数，无音频时状态直接 transcribed） |
+| POST | `/api/v1/meeting/records` | meeting.write | multipart 创建会议，支持 `title/meeting_type/meeting_date`，`file` 音频与 `transcript_file` 文稿二选一；文稿解析、会议/分段写入和考勤在同一事务提交，失败不残留会议或扣款 |
+| GET | `/api/v1/meeting/employees` | meeting.write | 在职员工最小目录，仅返回 `id/display_name/username`，不要求 iam.read，不返回工资等隐私 |
+| GET | `/api/v1/meeting/transcript-template` | meeting.write | 下载动态生成的 DOCX 文稿模板 |
 | POST | `/api/v1/meeting/records/{id}/upload-audio` | meeting.write | 为无音频会议上传音频并触发 ASR；音频会统一归一化为 16k 单声道 mp3。大文件/长音频按大小或 45 分钟时长切片，切片间保留 12 秒重叠并在合并转录段时去重，避免边界漏字与时间轴错位 |
 | POST | `/api/v1/meeting/records/{id}/retranscribe` | meeting.write | 对已有音频重新转写；新 ASR 成功后才替换旧分段，失败时保留旧转写 |
 | POST | `/api/v1/meeting/records/{id}/upload-transcript` | meeting.write | 上传已识别好的 Word `.docx` 或 PDF 文稿（最大 20MB）并导入转写分段；支持 `讲话人1：内容`、`Speaker 1: 内容`、`张三：内容`、带时间码格式，以及 `讲话人1  00:20` 后下一行跟正文的录音文稿格式；导入成功会替换旧分段、更新说话人映射、自动同步参会人员、清空旧纪要并置为 transcribed |
@@ -256,16 +278,20 @@ MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`upd
 | GET | `/api/v1/meeting/records/{id}/status` | meeting.read | 轮询 ASR 状态 |
 | GET | `/api/v1/meeting/records/{id}/transcript` | meeting.read | 获取转写分段 |
 | PATCH | `/api/v1/meeting/records/{id}/transcript` | meeting.write | 批量更新分段文本和说话人。默认兼容旧模式（仅更新已有分段）；传 `replace=true` 时按提交的完整 `segments` 列表整体替换，支持新增分段、插入行、删除行和重排 `segment_index`，保存后返回最新分段列表和会议详情，并自动同步参会人员 |
-| PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新说话人映射；保存后按当前转写分段实际使用的 `speaker_id` 自动同步参会人员 |
+| PUT | `/api/v1/meeting/records/{id}/speakers` | meeting.write | 更新 `speaker_mapping`，可选 `speaker_user_mapping: {speaker_id: UUID或null}`；ID绑定员工、null明确外部人员。旧客户端省略时保留未改名绑定。按实际使用的分段同步参会人员及幂等考勤；替换文稿清理旧绑定，ASR成功时同时清理旧姓名和身份映射 |
 | POST | `/api/v1/meeting/records/{id}/summarize` | meeting.write | AI 生成纪要（SSE，JSON body 支持 `prompt`/`previous_meeting_id`，无转录时可用自定义提示词作为会议内容生成纪要）。请求会把会议标题、会议日期、参会人员和转写文稿一并放入 LLM 上下文；**仅当 LLM 实际产出内容才落库并置 SUMMARIZED；为空/失败时不改状态、不存空总结，SSE 返回 error**（避免"已总结但空"） |
 | POST | `/api/v1/meeting/records/{id}/archive` | meeting.write | 归档到企业大脑 |
 | GET | `/api/v1/meeting/records/{id}/audio` | meeting.read | 下载/播放音频 |
+
+**文稿时间与身份规则（2026-10-21）**：
+- 有时间码时使用文稿时间；缺少起点时从上一段结尾继续，缺少有效终点时按文本长度估算，`start_time/end_time` 返回浮点数而非 null。估算时间不是音频对齐结果；没有音频和原始时间码时，不生成会议总时长。
+- 替换文稿成功后，`speaker_mapping` 使用新文稿解析的姓名，`speaker_user_mapping` 重置为空；ASR 成功后两个映射都清空，必须重新确认姓名与员工身份，避免旧姓名通过兼容匹配误计考勤。解析或转写失败保留原分段与映射。
 
 **会议转写编辑规则（v2.0.7，2026-08-17）**：
 - 前端编辑转写文本、新增讲话人、切换说话人、插入/删除行后，统一通过 `PATCH /transcript` 的 `replace=true` 模式保存完整分段列表。
 - `TranscriptSegmentUpdate.id` 允许为空或临时字符串；后端仅当其为有效 UUID 且属于当前会议时更新原分段，否则创建新分段，避免前端插入行触发 422。
 - `MeetingRecord.attendees` 不再作为 Web 前端的手动输入来源；后端会根据保存后的分段顺序收集实际使用的 `speaker_id`，再用 `speaker_mapping` 转成显示名并去重，写回参会人员。
-- 本版本不新增数据库字段，不需要 Alembic 迁移。
+- 上述 v2.0.7 编辑增强本身未新增数据库字段；2026-10-21 员工绑定另需迁移 `20261021_0001`，不能据此省略迁移。
 
 **会议纪要上下文规则（v2.0.8，2026-08-31）**：
 - `summarize` 会先构造“会议基础信息”块，包含 `MeetingRecord.title`、`meeting_date` 和当前参会人员，再拼接上次会议纪要与当前转写文稿。
@@ -334,4 +360,4 @@ MCP `create_todo`、`create_bug`要求截止日期，预计工时默认 0；`upd
 
 ---
 
-*最后更新：2026-10-19*
+*最后更新：2026-10-22*
