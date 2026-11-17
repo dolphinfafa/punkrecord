@@ -90,13 +90,6 @@ def _enrich_meeting(meeting: MeetingRecord, session: Session) -> MeetingResponse
     return data
 
 
-def _settle_attendance(meeting, session):
-    if meeting.meeting_date and meeting.status in (MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED):
-        from app.services.beli import reconcile_attendance
-        session.flush()
-        reconcile_attendance(session, meeting.meeting_date)
-
-
 def _build_meeting_summary_user_message(
     meeting: MeetingRecord,
     transcript_text: str,
@@ -399,7 +392,6 @@ async def _run_asr(meeting_id: UUID):
                 logger.error("ASR failed for meeting %s: %s", meeting_id, result["error"])
                 meeting.status = MeetingStatus.FAILED
                 session.add(meeting)
-                _settle_attendance(meeting, session)
                 session.commit()
                 return
 
@@ -409,7 +401,6 @@ async def _run_asr(meeting_id: UUID):
                 logger.warning("ASR returned 0 segments for meeting %s", meeting_id)
                 meeting.status = MeetingStatus.FAILED
                 session.add(meeting)
-                _settle_attendance(meeting, session)
                 session.commit()
                 return
 
@@ -440,7 +431,6 @@ async def _run_asr(meeting_id: UUID):
             session.flush()
             meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting.id), meeting.speaker_mapping or {})
             session.add(meeting)
-            _settle_attendance(meeting, session)
             session.commit()
             logger.info("ASR completed for meeting %s, %d segments", meeting_id, len(segments))
 
@@ -452,7 +442,6 @@ async def _run_asr(meeting_id: UUID):
                 if meeting:
                     meeting.status = MeetingStatus.FAILED
                     session.add(meeting)
-                    _settle_attendance(meeting, session)
                     session.commit()
         except Exception:
             pass
@@ -501,7 +490,6 @@ def _apply_transcript_import(meeting, parsed, session):
     meeting.status = MeetingStatus.TRANSCRIBED
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
 
 
 @router.post("/records", response_model=dict)
@@ -560,13 +548,11 @@ async def create_meeting(
             created_by=current_user.id,
         )
         session.add(meeting)
-        _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
         meeting.status = MeetingStatus.TRANSCRIBING
         session.add(meeting)
-        _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
@@ -584,7 +570,6 @@ async def create_meeting(
             _apply_transcript_import(meeting, parsed_transcript, session)
         else:
             session.add(meeting)
-            _settle_attendance(meeting, session)
         session.commit()
         session.refresh(meeting)
 
@@ -652,7 +637,6 @@ async def upload_audio(
     meeting.status = MeetingStatus.TRANSCRIBING
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -679,7 +663,6 @@ async def retranscribe_audio(
     meeting.status = MeetingStatus.TRANSCRIBING
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -732,7 +715,6 @@ async def update_attendees(
     meeting.attendees = data.get("attendees", [])
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 
@@ -800,7 +782,10 @@ async def delete_meeting(
     current_user: User = Depends(require_permission("meeting.write")),
 ):
     """Delete meeting record, its transcript segments, and audio file."""
-    meeting = session.get(MeetingRecord, meeting_id)
+    from app.services.beli import lock_attendance_policy
+    lock_attendance_policy(session)
+    meeting = session.exec(select(MeetingRecord).where(MeetingRecord.id == meeting_id)
+                           .with_for_update().execution_options(populate_existing=True)).first()
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
@@ -900,7 +885,6 @@ async def update_transcript(
     meeting.attendees = _attendee_names_from_speakers(segments, meeting.speaker_mapping or {})
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
     return success_response({
@@ -948,7 +932,6 @@ async def update_speakers(
     meeting.attendees = _attendee_names_from_speakers(_load_transcript_segments(session, meeting_id), meeting.speaker_mapping)
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
     return success_response(_enrich_meeting(meeting, session).model_dump())
@@ -964,7 +947,8 @@ async def summarize_meeting(
     current_user: User = Depends(require_permission("meeting.write")),
 ):
     """Generate AI meeting summary via SSE streaming."""
-    meeting = session.get(MeetingRecord, meeting_id)
+    meeting = session.exec(select(MeetingRecord).where(MeetingRecord.id == meeting_id)
+                           .with_for_update().execution_options(populate_existing=True)).first()
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
@@ -1020,9 +1004,17 @@ async def summarize_meeting(
         attendees_list,
         previous_summary,
     )
+    from app.services.beli import capture_attendance_snapshot, reconcile_attendance, lock_attendance_policy
+    attendance_snapshot = capture_attendance_snapshot(session, meeting)
+    generation_id = uuid4()
+    meeting.summary_generation_id = generation_id
+    session.add(meeting)
+    # Release the meeting lock before waiting on the external streaming service.
+    session.commit()
 
     async def generate():
         full_text = ""
+        completed = False
         url = f"{settings.LITELLM_BASE_URL}/chat/completions"
         payload = {
             "model": settings.LITELLM_MODEL,
@@ -1040,14 +1032,18 @@ async def summarize_meeting(
         try:
             async with httpx.AsyncClient(verify=False, timeout=120.0) as client:
                 async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                    resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):
                             continue
                         raw = line[6:]
                         if raw.strip() == "[DONE]":
+                            completed = True
                             break
                         try:
                             chunk = json.loads(raw)
+                            if chunk.get("error"):
+                                raise AtlasException("AI 服务返回错误，请重试")
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
                             text = delta.get("content", "")
                             if text:
@@ -1059,26 +1055,32 @@ async def summarize_meeting(
             logger.exception("LLM streaming failed: %s", e)
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
-        # Only persist when the LLM actually produced content; otherwise keep the
-        # previous status so we never end up with "summarized but empty summary".
-        if full_text.strip():
+        # Partial streams must not replace the confirmed summary or attendance.
+        if completed and full_text.strip():
             try:
                 with Session(engine) as db:
-                    m = db.get(MeetingRecord, m_id)
-                    if m:
+                    if attendance_snapshot is not None:
+                        lock_attendance_policy(db)
+                    m = db.exec(select(MeetingRecord).where(MeetingRecord.id == m_id)
+                                .with_for_update().execution_options(populate_existing=True)).first()
+                    if m and m.summary_generation_id == generation_id:
                         m.summary = full_text
                         m.status = MeetingStatus.SUMMARIZED
-                        if attendees_list:
-                            m.attendees = attendees_list
+                        m.attendance_snapshot = attendance_snapshot
                         m.updated_at = now_cn()
                         db.add(m)
+                        db.flush()
+                        if attendance_snapshot is not None:
+                            reconcile_attendance(db, m.meeting_date)
                         db.commit()
+                    else:
+                        yield f"data: {json.dumps({'error': '已有更新的总结请求或会议已删除，本次结果未保存'}, ensure_ascii=False)}\n\n"
             except Exception as e:
                 logger.error("Failed to save summary: %s", e)
                 yield f"data: {json.dumps({'error': '会议纪要保存失败，请重试'}, ensure_ascii=False)}\n\n"
         else:
-            logger.warning("Empty summary for meeting %s — not persisting", m_id)
-            yield f"data: {json.dumps({'error': 'AI 纪要生成失败：未获取到内容（请检查 AI 服务连通性后重试）'}, ensure_ascii=False)}\n\n"
+            logger.warning("Empty or incomplete summary for meeting %s — not persisting", m_id)
+            yield f"data: {json.dumps({'error': 'AI 纪要生成失败：未获取到完整内容，请重试'}, ensure_ascii=False)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -1148,7 +1150,6 @@ async def archive_meeting(
     meeting.archived_document_id = kb_doc.id
     meeting.updated_at = now_cn()
     session.add(meeting)
-    _settle_attendance(meeting, session)
     session.commit()
     session.refresh(meeting)
 

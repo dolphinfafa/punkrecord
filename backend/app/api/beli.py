@@ -19,7 +19,6 @@ from app.core.storage import save_file, get_file
 from app.models.base import now_cn
 from app.models.iam import User, UserStatus
 from app.models.todo import TodoItem, TodoStatus
-from app.models.meeting import MeetingRecord, MeetingStatus
 from app.models.beli import (BeliLedger, TaskReward, WorkdayOverride, MorningAttendance,
                             BeliProduct, BeliOrder)
 from app.services.beli import (LEAVE_FIELDS, require_l0, account_for, post_entry, change_leave,
@@ -197,15 +196,9 @@ def attendance(day: Optional[date] = None, page: int = Query(1, ge=1), session: 
                      lambda row: {**row.model_dump(), "name": row.employee_name or session.get(User, row.user_id).display_name})
     unmatched = []
     if not user.manager_user_id and day:
-        from app.services.meeting_participants import resolve_participants
-        users = session.exec(select(User)).all()
-        meetings = session.exec(select(MeetingRecord).where(MeetingRecord.meeting_date == day,
-            MeetingRecord.meeting_type == "morning", MeetingRecord.status.in_([
-                MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED]))).all()
-        snapshots = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)).all()
-        _, unmatched = resolve_participants(session, meetings,
-            [u for u in users if u.created_at.date() <= day],
-            {row.user_id: row.employee_name for row in snapshots if row.employee_name})
+        from app.services.beli import attendance_meetings
+        unmatched = sorted({name for meeting in attendance_meetings(session, day)
+                            for name in (meeting.attendance_snapshot or {}).get("unmatched_names", [])})
     from app.models.beli import BeliPolicy
     policy = session.exec(select(BeliPolicy)).first()
     data.update(unmatched_names=unmatched, starts_on=policy.starts_on if policy else None,

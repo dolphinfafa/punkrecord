@@ -25,7 +25,7 @@ from app.schemas.finance import FinanceAccountCreate, FinanceAccountUpdate, Tran
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectStageUpdate, StageStatusUpdate, ProjectTaskPlanUpdateRequest
 from app.schemas.todo import TodoCreate, TodoUpdate, LeaveRequestCreate
 from app.services.beli import reconcile_attendance, account_for
-from test_beli_workflow import db, meeting, make_project  # Shared isolated SQLite fixture.
+from test_beli_workflow import db, meeting, make_project, confirm_attendance  # Shared isolated SQLite fixture.
 from test_meeting_transcript_import import _make_session
 
 
@@ -239,10 +239,13 @@ def test_pdf_import_preserves_speakers(db):
     assert saved['speaker_mapping'] == {'speaker_1': 'employee', 'speaker_2': 'other'}
 
 
-def test_meeting_import_settlement_failure_rolls_back(db, monkeypatch):
+def test_meeting_import_transaction_failure_rolls_back(db, monkeypatch):
     session, boss, employee, _, _, actor, client = db
-    def fail(*args): raise RuntimeError('synthetic settlement failure')
-    monkeypatch.setattr(meeting_api, '_settle_attendance', fail)
+    original = meeting_api._apply_transcript_import
+    def fail(*args):
+        original(*args)
+        raise RuntimeError('synthetic import transaction failure')
+    monkeypatch.setattr(meeting_api, '_apply_transcript_import', fail)
     response = client.post('/api/v1/meeting/records', data={'title': '回滚测试'},
         files={'transcript_file': ('meeting.docx', docx_bytes('讲话人1：测试'))})
     assert response.status_code == 500
@@ -266,7 +269,8 @@ def test_successful_asr_cannot_reuse_old_speaker_identity(db, monkeypatch):
     session.expire_all()
     assert row.speaker_mapping == {} and row.speaker_user_mapping == {}
     assert row.attendees == ['speaker_1']
-    assert account_for(session, employee.id)[1].balance == 1500
+    assert account_for(session, employee.id)[1].balance == 2000
+    assert row.attendance_snapshot['present_user_ids'] == [str(employee.id)]
 
 
 def test_employee_id_binding_external_name_legacy_and_rename(db):
@@ -287,6 +291,8 @@ def test_employee_id_binding_external_name_legacy_and_rename(db):
     for _ in range(2):
         response = client.put(f'/api/v1/meeting/records/{row.id}/speakers', json=payload)
         assert response.status_code == 200, response.text
+    assert account_for(session, employee.id)[1].balance == 1500
+    confirm_attendance(session, row)
     assert account_for(session, employee.id)[1].balance == 2000
     assert account_for(session, other.id)[1].balance == -500  # Unused speaker never counts.
     assert client.get('/api/v1/beli/attendance', params={'day': str(day)}).json()['data']['unmatched_names'] == []
@@ -300,10 +306,13 @@ def test_employee_id_binding_external_name_legacy_and_rename(db):
     response = client.put(f'/api/v1/meeting/records/{row.id}/speakers', json={
         'speaker_mapping': {'speaker_1': employee.username}, 'speaker_user_mapping': {'speaker_1': None}})
     assert response.status_code == 200
+    assert account_for(session, employee.id)[1].balance == 2000
+    confirm_attendance(session, row)
     assert account_for(session, employee.id)[1].balance == 1500
     # Unbound legacy labels resolve a unique username before a nonunique name.
     client.put(f'/api/v1/meeting/records/{row.id}/speakers', json={
         'speaker_mapping': {'speaker_1': employee.username}, 'speaker_user_mapping': {}})
+    confirm_attendance(session, row)
     assert account_for(session, employee.id)[1].balance == 2000
 
 

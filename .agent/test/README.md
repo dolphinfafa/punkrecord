@@ -2,6 +2,8 @@
 
 每次功能更新必须同步相关测试代码和本目录用例。未执行的项目明确写“未验证”，不得以构建成功替代业务验收。
 
+最新验证见 [2026-11-17 测试报告](report-2026-11-17.md)：2.1.1总结触发考勤及员工编辑内工资维护，开发迁移头 `20261117_0001`；本次用户已授权GitHub同步及生产发布，生产验收另记于报告末节。
+
 最近一次生产部署验证见 [2026-11-07 测试报告](report-2026-11-07.md)，功能反馈全量浏览器记录见 [2026-10-22 测试报告](report-2026-10-22.md)，用例见 [回归用例](cases.md)；历史报告保留，不将以前的结果当作本轮重跑。
 
 ## 环境与安全
@@ -27,6 +29,8 @@
 /opt/miniconda3/envs/punkrecord/bin/python -m pytest -q --disable-warnings tests/test_mcp_todo_tools.py tests/test_feedback_regressions.py tests/test_beli_migration.py tests/test_meeting_transcript_import.py
 ```
 
+考勤触发和工资权限更新还需运行 `tests/test_summary_attendance.py` 与 `tests/test_beli_workflow.py`。前者用内存LLM模拟成功、失败和并发，不调用真实模型；验证总结、考勤和余额的事务一致性。
+
 在 `frontend/` 执行 `npm run build`。构建产物用于验证，不提交 `dist/`。
 
 MySQL 行锁并发验证：在本地开发 MySQL、账号具有临时建库权限时，执行：
@@ -49,6 +53,7 @@ PUNKRECORD_MYSQL_TESTS=1 /opt/miniconda3/envs/punkrecord/bin/python -m pytest -q
 8. `test_result/` 是被忽略的本地反馈，不是测试依赖；用例中只能生成合成 DOCX/PDF，不得提交用户反馈原件或截图。
 9. 第三轮反馈执行 `node scripts/test-feedback-layout-ui.cjs`，同样使用全新临时服务；覆盖1440/1330/390px长文本、图片预览、阶段备注规范化/422恢复、Bug共享分页及URL历史。仅图片下载响应使用合成PNG，业务API仍走隔离SQLite；不向真实存储上传图片。截图为 `/tmp/punkrecord-ui/feedback3-*.png`。
 10. 待办详情执行 `node scripts/test-todo-details-ui.cjs`，全新临时服务，覆盖1440/390px描述与备注空态、单字段、旧Bug备注、显式清空、编辑保存刷新、Bug新建/编辑与团队待办同步。接口自动化为 `backend/tests/test_todo_details.py`，截图为 `/tmp/punkrecord-ui/todo-details-*.png`。
+11. 员工工资执行 `node scripts/test-employee-salary-ui.cjs`，使用本机临时服务，覆盖1440/390px管理员、非管理员L0和普通员工。L0测试角色只有 `iam.read`，验证只改工资不扩大资料权限；同时验证保存重开、普通员工不读取工资及公开响应无工资。截图为 `/tmp/punkrecord-ui/employee-salary-*.png`，独立 `l0_token` 不得用于真实业务环境。
 
 ## 每次更新的交付记录
 
@@ -63,9 +68,10 @@ PUNKRECORD_MYSQL_TESTS=1 /opt/miniconda3/envs/punkrecord/bin/python -m pytest -q
 
 - 对应 `RELEASE-02/03`：部署前核对本地/GitHub/生产提交、生产补丁与依赖差异；先备份数据库、配置、源码/补丁、PM2及前端，确认可用空间。敏感备份放私有目录，禁止提交。
 - 在停写窗口取得一致性SQL备份和历史记录摘要，再迁移；核对Alembic版本、期初余额、策略实际启用日及无追溯奖励/考勤，不能用测试数据写生产验证。
+- 2.1.1对应 `RELEASE-04`：迁移 `20261117_0001` 前后余额、工资、假期、流水、考勤和策略摘要不变；旧有效会议仅在已有考勤日期冻结名单，未结算日期不补快照；重启后台后再次核对无意外冲正。
 - PM2启动后先等待health就绪再验公网，不把重启窗口502当业务结论，也不忽略持续502；遇错先查启动日志。只操作本项目进程，不全局升级PM2或重启其他服务。
 - 验证公网12项认证只读接口、匿名401、MCP初始化及完整工具清单，校验新资源哈希和MIME；真实浏览器覆盖1440/390px登录和受保护深链接，截图只保留不含业务资料的登录页。
 - 使用现有Agent Token进行MCP实调时，仅选只读工具并注明last-used审计更新；无可用Token时不创建生产测试Token，明确“业务工具未实调”。JWT认证读取不得被描述为已测试真实密码登录。
 - 迁移通过不代表完成MySQL竞争测试；无隔离建库权限时仍记录跳过。外部ASR/LLM质量、真实存储写入及新余额/订单写入不能因只读冒烟通过而宣称已验证。
 
-*最后更新：2026-11-07*
+*最后更新：2026-11-17*

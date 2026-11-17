@@ -2,9 +2,10 @@
 Pydantic schemas for API requests and responses
 """
 from datetime import datetime, date
+from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from app.schemas.text import NonBlankText, PlainText
 
 
@@ -101,6 +102,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """User update schema"""
     display_name: NonBlankText = None
+    basic_salary: Optional[Decimal] = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     email: Optional[str] = None
     phone: Optional[str] = None
     is_shareholder: Optional[bool] = None

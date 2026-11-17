@@ -8,7 +8,7 @@ from app.core.exceptions import ForbiddenException, NotFoundException, Validatio
 from app.models.base import now_cn
 from app.models.iam import User, UserStatus
 from app.models.todo import TodoItem, TodoStatus, LeaveRequest, LeaveStatus
-from app.models.meeting import MeetingRecord, MeetingStatus
+from app.models.meeting import MeetingRecord
 from app.models.beli import (BeliAccount, BeliLedger, TaskReward, WorkdayOverride,
                             BeliPolicy, MorningAttendance, BeliOrder, BeliProduct)
 
@@ -218,14 +218,41 @@ def approve_reward(session, todo_id, actor, changes, comment=""):
     return reward
 
 
+def capture_attendance_snapshot(session, meeting):
+    """Freeze the identities used by this summary, not later transcript edits."""
+    if meeting.meeting_type != "morning" or not meeting.meeting_date:
+        return None
+    day = meeting.meeting_date
+    users = session.exec(select(User)).all()
+    rows = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)).all()
+    from app.services.meeting_participants import resolve_participants
+    present, unmatched = resolve_participants(session, [meeting],
+        [user for user in users if user.created_at.date() <= day],
+        {row.user_id: row.employee_name for row in rows if row.employee_name})
+    return {"day": day.isoformat(), "present_user_ids": sorted(str(uid) for uid in present),
+            "unmatched_names": unmatched}
+
+
+def lock_attendance_policy(session):
+    return session.exec(select(BeliPolicy).with_for_update().execution_options(populate_existing=True)).first()
+
+
+def attendance_meetings(session, day, *, lock=False):
+    query = select(MeetingRecord).where(MeetingRecord.meeting_date == day,
+        MeetingRecord.meeting_type == "morning", MeetingRecord.attendance_snapshot.is_not(None))
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return session.exec(query).all()
+
+
 def reconcile_attendance(session, day):
-    policy = session.exec(select(BeliPolicy).with_for_update()).first()
+    policy = lock_attendance_policy(session)
     if not policy or day < policy.starts_on or day > now_cn().date():
         return
-    meetings = session.exec(select(MeetingRecord).where(MeetingRecord.meeting_date == day,
-        MeetingRecord.meeting_type == "morning", MeetingRecord.status.in_([
-            MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED]))).all()
-    existing = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)).all()
+    # Current reads avoid reverting a newer summary under MySQL REPEATABLE READ.
+    meetings = attendance_meetings(session, day, lock=True)
+    existing = session.exec(select(MorningAttendance).where(MorningAttendance.day == day)
+                            .with_for_update().execution_options(populate_existing=True)).all()
     if not meetings and not existing:
         return
     all_users = session.exec(select(User)).all()
@@ -233,21 +260,24 @@ def reconcile_attendance(session, day):
     # Historical eligibility and names must survive later employee profile changes.
     roster_names = {user.id: (rows[user.id].employee_name or user.display_name).strip()
                     if user.id in rows else user.display_name.strip() for user in all_users}
-    from app.services.meeting_participants import resolve_participants
-    present_ids, _ = resolve_participants(session, meetings,
-        [user for user in all_users if user.created_at.date() <= day], roster_names)
+    present_ids = {uid for meeting in meetings
+                   for uid in (meeting.attendance_snapshot or {}).get("present_user_ids", [])}
     leaves = session.exec(select(LeaveRequest).where(LeaveRequest.status == LeaveStatus.APPROVED,
         LeaveRequest.start_at < datetime.combine(day, time(12)),
-        LeaveRequest.end_at > datetime.combine(day, time(10)))).all()
+        LeaveRequest.end_at > datetime.combine(day, time(10)))
+        .with_for_update().execution_options(populate_existing=True)).all()
     excused = {leave.applicant_user_id for leave in leaves}
+    override = session.exec(select(WorkdayOverride).where(WorkdayOverride.day == day)
+                            .with_for_update().execution_options(populate_existing=True)).first()
+    workday = override.is_workday if override else day.weekday() < 5
     for user in sorted(all_users, key=lambda item: str(item.id)):
         if user.id not in rows and (not user.manager_user_id or user.status != UserStatus.ACTIVE
                                    or user.created_at.date() > day):
             continue
         row = rows.get(user.id) or MorningAttendance(day=day, user_id=user.id)
         row.employee_name = roster_names[user.id]
-        present = user.id in present_ids
-        row.absent = bool(meetings and is_workday(session, day) and not present and user.id not in excused)
+        present = str(user.id) in present_ids
+        row.absent = bool(meetings and workday and not present and user.id not in excused)
         should_charge = row.absent and not row.waived
         if should_charge != row.charged:
             row.revision += 1
@@ -364,8 +394,8 @@ def _reconcile_recorded_days(engine):
             return
         days = set(session.exec(select(MeetingRecord.meeting_date).where(
             MeetingRecord.meeting_type == "morning", MeetingRecord.meeting_date >= policy.starts_on,
-            MeetingRecord.meeting_date <= now_cn().date(), MeetingRecord.status.in_([
-                MeetingStatus.TRANSCRIBED, MeetingStatus.SUMMARIZED, MeetingStatus.ARCHIVED]))).all())
+            MeetingRecord.meeting_date <= now_cn().date(),
+            MeetingRecord.attendance_snapshot.is_not(None))).all())
         days.update(session.exec(select(MorningAttendance.day).distinct()).all())
         for day in sorted(days):
             reconcile_attendance(session, day)

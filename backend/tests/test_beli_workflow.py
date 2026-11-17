@@ -21,7 +21,8 @@ from app.models.todo import TodoItem, TodoSourceType, TodoActionType, TodoStatus
 from app.models.meeting import MeetingRecord, MeetingStatus
 from app.models.beli import BeliPolicy, BeliAccount, BeliLedger, TaskReward, BeliProduct, BeliOrder, MorningAttendance, WorkdayOverride
 from app.services.beli import (account_for, post_entry, queue_reward, approve_reward, reverse_reward,
-    protect_reward_plan, reconcile_attendance, create_order, order_action, change_leave, is_workday)
+    protect_reward_plan, reconcile_attendance, capture_attendance_snapshot,
+    create_order, order_action, change_leave, is_workday)
 from app.api.beli import safe_reward
 from app.schemas.todo import TodoCreate
 
@@ -253,7 +254,18 @@ def meeting(session, boss, day=date(2026, 10, 15), attendees=None):
     row = MeetingRecord(title="Morning", meeting_type="morning", meeting_date=day,
                         created_by=boss.id, status=MeetingStatus.TRANSCRIBED, attendees=attendees or [])
     session.add(row); session.flush()
+    row.attendance_snapshot = capture_attendance_snapshot(session, row)
+    session.add(row); session.flush()
     return row
+
+
+def confirm_attendance(session, row):
+    """Service-level fixture for a newly successful summary."""
+    session.flush()
+    row.attendance_snapshot = capture_attendance_snapshot(session, row)
+    session.add(row); session.flush()
+    reconcile_attendance(session, row.meeting_date)
+    session.commit()
 
 
 def test_attendance_automatic_once_correction_and_waiver(db):
@@ -266,9 +278,9 @@ def test_attendance_automatic_once_correction_and_waiver(db):
     meeting(session, boss, day, [employee.display_name]); reconcile_attendance(session, day); session.commit()
     assert account_for(session, other.id)[1].balance == -500
     row.attendees = [employee.display_name, other.display_name]; session.add(row); session.flush()
-    reconcile_attendance(session, day); session.commit()
+    confirm_attendance(session, row)
     assert account_for(session, other.id)[1].balance == 0
-    row.attendees = []; session.add(row); session.flush(); reconcile_attendance(session, day); session.commit()
+    row.attendees = []; session.add(row); session.flush(); confirm_attendance(session, row)
     absence = session.exec(select(MorningAttendance).where(MorningAttendance.user_id == other.id)).first()
     absence.waived = True; absence.reason = "外出"; session.add(absence); session.flush()
     reconcile_attendance(session, day); session.commit()
@@ -449,6 +461,67 @@ def test_salary_admin_only_and_public_serialization(db):
     assert client.put(f'/api/v1/iam/users/{employee.id}/salary', json={'basic_salary':99999}).status_code == 403
 
 
+def test_l0_salary_inside_employee_edit_is_atomic_and_not_public(db, monkeypatch):
+    from app.models.iam import Permission, RolePermission, ScopeType
+    from app.models.shared import AuditLog
+    session, boss, employee, other, _, actor, client = db
+    role = Role(code='employee_editor', name='Employee editor')
+    session.add(role); session.flush()
+    for code in ['iam.read', 'iam.write']:
+        permission = Permission(code=code, name=code, module='iam')
+        session.add(permission); session.flush()
+        session.add(RolePermission(role_id=role.id, permission_id=permission.id))
+    for user in [boss, other]:
+        session.add(UserRole(user_id=user.id, role_id=role.id, scope_type=ScopeType.GLOBAL))
+    session.commit()
+    monkeypatch.setattr(settings, 'ENFORCE_RBAC', True)
+    assert client.get('/api/v1/iam/compensation-access').json()['data']['allowed'] is True
+    assert client.get(f'/api/v1/iam/users/{employee.id}/salary').status_code == 200
+    response = client.patch(f'/api/v1/iam/users/{employee.id}', json={
+        'display_name': 'Updated employee', 'basic_salary': '13500.50'})
+    assert response.status_code == 200, response.text
+    assert employee.display_name == 'Updated employee' and employee.basic_salary == Decimal('13500.50')
+    assert 'basic_salary' not in response.json()['data']
+    assert 'basic_salary' not in client.get('/api/v1/iam/users').text
+    audit = session.exec(select(AuditLog).where(AuditLog.object_type == 'employee_compensation')).one()
+    assert audit.changes == {'field': 'basic_salary'}
+    actor[0] = other
+    assert client.get('/api/v1/iam/compensation-access').json()['data']['allowed'] is False
+    assert client.get(f'/api/v1/iam/users/{employee.id}/salary').status_code == 403
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={
+        'display_name': 'Unauthorized change', 'basic_salary': 20000}).status_code == 403
+    assert employee.display_name == 'Updated employee' and employee.basic_salary == Decimal('13500.50')
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={'phone': '123'}).status_code == 200
+
+
+@pytest.mark.parametrize('amount', [0, -1, 'NaN', 'Infinity', '1.001', '10000000000'])
+def test_salary_edit_rejects_invalid_values_without_profile_changes(db, amount):
+    session, _, employee, *_, client = db
+    response = client.patch(f'/api/v1/iam/users/{employee.id}', json={
+        'display_name': 'Must not be saved', 'basic_salary': amount})
+    assert response.status_code == 422, response.text
+    assert employee.display_name == 'Employee' and employee.basic_salary == 12000
+
+
+def test_salary_edit_omission_preserves_value_and_null_cannot_clear(db):
+    session, _, employee, *_, client = db
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={'phone': '123'}).status_code == 200
+    assert employee.basic_salary == 12000
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={'basic_salary': None}).status_code == 400
+    assert employee.basic_salary == 12000
+
+
+def test_l0_salary_only_edit_does_not_grant_general_employee_write_permission(db, monkeypatch):
+    session, boss, employee, *_, client = db
+    monkeypatch.setattr(settings, 'ENFORCE_RBAC', True)
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={'basic_salary': 14000}).status_code == 200
+    assert employee.basic_salary == 14000
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={
+        'basic_salary': 15000, 'phone': '123'}).status_code == 403
+    assert employee.basic_salary == 14000 and employee.phone is None
+    assert client.patch(f'/api/v1/iam/users/{employee.id}', json={'phone': '123'}).status_code == 403
+
+
 def test_legacy_leave_hidden_and_mandatory_backfill(db):
     session, boss, employee, other, entity, actor, client = db
     legacy = task(db, source_type=TodoSourceType.APPROVAL_STEP, status=TodoStatus.PENDING_REVIEW,
@@ -605,7 +678,7 @@ def test_product_image_upload_download_permissions(db, monkeypatch):
 def test_reject_reward_keeps_task_done_and_salary_private(db):
     session, boss, employee, _, entity, actor, client = db
     todo = task(db)
-    assert client.get(f'/api/v1/iam/users/{employee.id}/salary').status_code == 403
+    assert client.get(f'/api/v1/iam/users/{employee.id}/salary').status_code == 200  # L0 access.
     response = client.post(f'/api/v1/beli/rewards/{todo.id}/review', json={'action': 'reject', 'comment': '请补充说明'})
     assert response.status_code == 200
     assert todo.status == TodoStatus.DONE

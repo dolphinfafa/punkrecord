@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, X, Crown, Search, KeyRound, FileText, Upload, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import iamApi from '@/api/iam';
 import client from '@/api/client';
 import ImagePasteUpload from '@/components/common/ImagePasteUpload';
@@ -7,7 +7,7 @@ import './IAMPage.css';
 
 const STATUS_LABELS = { active: '在职', inactive: '停用' };
 
-function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments, showNotification }) {
+function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, departments, showNotification, canManageSalary }) {
     const [form, setForm] = useState({
         display_name: '',
         username: '',
@@ -26,9 +26,38 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
         education_level: '',
     });
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [salary, setSalary] = useState('');
+    const [initialSalary, setInitialSalary] = useState('');
+    const [salaryLoading, setSalaryLoading] = useState(false);
+    const [salaryLoadError, setSalaryLoadError] = useState('');
+    const [salaryRetry, setSalaryRetry] = useState(0);
     const [idCardBlobUrl, setIdCardBlobUrl] = useState(null);
     const [resumeBlobUrl, setResumeBlobUrl] = useState(null);
     const isEdit = !!initialData;
+
+    useEffect(() => {
+        let cancelled = false;
+        setError('');
+        setSalary('');
+        setInitialSalary('');
+        setSalaryLoadError('');
+        setSalaryLoading(false);
+        if (isOpen && initialData?.id && canManageSalary) {
+            setSalaryLoading(true);
+            client.get(`/iam/users/${initialData.id}/salary`).then(res => {
+                if (cancelled) return;
+                const value = res.data.basic_salary == null ? '' : Number(res.data.basic_salary).toFixed(2);
+                setSalary(value);
+                setInitialSalary(value);
+            }).catch(err => {
+                if (!cancelled) setSalaryLoadError(err.response?.data?.message || '基本工资加载失败');
+            }).finally(() => {
+                if (!cancelled) setSalaryLoading(false);
+            });
+        }
+        return () => { cancelled = true; };
+    }, [isOpen, initialData?.id, canManageSalary, salaryRetry]);
 
     useEffect(() => {
         let cancelled = false;
@@ -103,6 +132,8 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (salaryLoading || salaryLoadError) return;
+        setError('');
         setLoading(true);
         try {
             const data = {
@@ -122,9 +153,24 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
             };
             if (!isEdit) data.password = form.password;
             if (isEdit) data.status = form.status;
+            if (isEdit) {
+                for (const key of Object.keys(data)) {
+                    const previous = initialData[key] === '' ? null : (initialData[key] ?? null);
+                    if (data[key] === previous) delete data[key];
+                }
+            }
+            if (isEdit && canManageSalary && salary !== initialSalary) {
+                data.basic_salary = salary === '' ? null : salary;
+            }
+            if (isEdit && Object.keys(data).length === 0) {
+                onClose();
+                return;
+            }
 
             await onSubmit(data);
             onClose();
+        } catch (err) {
+            setError(err.response?.data?.message || '员工保存失败，请重试');
         } finally {
             setLoading(false);
         }
@@ -144,7 +190,7 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
     if (!isOpen) return null;
     return (
         <div className="iam-modal-overlay" onClick={onClose}>
-            <div className="iam-modal iam-modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="iam-modal iam-modal-lg iam-employee-modal" onClick={e => e.stopPropagation()}>
                 <div className="iam-modal-header">
                     <h3>{isEdit ? '编辑员工' : '新建员工'}</h3>
                     <button onClick={onClose}><X size={18} /></button>
@@ -215,6 +261,23 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                             </div>
                         )}
                     </div>
+
+                    {isEdit && canManageSalary && (
+                        <div className="iam-form-group">
+                            <label htmlFor="employee-basic-salary">基本月工资（元）</label>
+                            <input id="employee-basic-salary" type="number" min="0.01" max="9999999999.99" step="0.01"
+                                value={salary} disabled={salaryLoading || !!salaryLoadError}
+                                required={initialSalary !== ''}
+                                onChange={e => setSalary(e.target.value)} />
+                            {salaryLoading && <span role="status">加载中...</span>}
+                            {salaryLoadError && <div role="alert">{salaryLoadError}
+                                <button type="button" className="btn-link" title="重新加载基本工资"
+                                    aria-label="重新加载基本工资" onClick={() => setSalaryRetry(n => n + 1)}>
+                                    <RotateCcw size={14} />
+                                </button>
+                            </div>}
+                        </div>
+                    )}
 
                     {isEdit && (
                         <>
@@ -322,9 +385,10 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
                         </label>
                     </div>
 
+                    {error && <p className="iam-form-error" role="alert">{error}</p>}
                     <div className="iam-modal-footer">
                         <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>取消</button>
-                        <button type="submit" className="btn-primary" disabled={loading}>{loading ? '保存中...' : '保存'}</button>
+                        <button type="submit" className="btn-primary" disabled={loading || salaryLoading || !!salaryLoadError}>{loading ? '保存中...' : '保存'}</button>
                     </div>
                 </form>
             </div>
@@ -334,16 +398,7 @@ function UserModal({ isOpen, onClose, onSubmit, initialData, users, jobTitles, d
 
 export default function UserListPage() {
     const [canManageSalary, setCanManageSalary] = useState(false);
-    const [salaryTarget, setSalaryTarget] = useState(null);
-    const [salary, setSalary] = useState('');
-    const [salaryBusy, setSalaryBusy] = useState(false);
-    const [salaryError, setSalaryError] = useState('');
     useEffect(() => { client.get('/iam/compensation-access').then(res => setCanManageSalary(res.data.allowed)).catch(() => {}); }, []);
-    const openSalary = async employee => {
-        setSalaryError('');
-        try { const res = await client.get(`/iam/users/${employee.id}/salary`); setSalary(res.data.basic_salary ?? ''); setSalaryTarget(employee); }
-        catch (err) { showNotification(err.response?.data?.message || err.message, 'error'); }
-    };
     const [users, setUsers] = useState([]);
     const [jobTitles, setJobTitles] = useState([]);
     const [departments, setDepartments] = useState([]);
@@ -418,12 +473,6 @@ export default function UserListPage() {
 
     return (
         <div className="iam-page">
-            {salaryTarget && <div className="iam-modal-overlay" onClick={() => { if (!salaryBusy) setSalaryTarget(null); }}><form className="iam-modal" style={{ padding: 24, maxWidth: 420 }} onClick={e => e.stopPropagation()} onSubmit={async e => {
-                e.preventDefault(); setSalaryBusy(true); setSalaryError('');
-                try { await client.put(`/iam/users/${salaryTarget.id}/salary`, { basic_salary: salary }); setSalaryTarget(null); showNotification('基本工资已保存'); }
-                catch (err) { setSalaryError(err.response?.data?.message || err.message); }
-                finally { setSalaryBusy(false); }
-            }}><h3>{salaryTarget.display_name} · 基本工资</h3><label className="iam-form-group">基本月工资（元） *<input type="number" min="0.01" step="0.01" required value={salary} onChange={e => setSalary(e.target.value)} /></label>{salaryError && <p role="alert">{salaryError}</p>}<div className="iam-modal-footer"><button type="button" disabled={salaryBusy} onClick={() => setSalaryTarget(null)}>取消</button><button type="submit" disabled={salaryBusy}>保存</button></div></form></div>}
             {notification && (
                 <div className={`iam-notification ${notification.type}`}>{notification.msg}</div>
             )}
@@ -486,7 +535,6 @@ export default function UserListPage() {
                                             <button className="btn-link" onClick={() => { setEditTarget(user); setModalOpen(true); }}>
                                                 <Edit2 size={14} /> 编辑
                                             </button>
-                                            {canManageSalary && user.status === 'active' && <button className="btn-link" onClick={() => openSalary(user)}><Edit2 size={14} />基本工资</button>}
                                             {currentUserLevel === 0 && (
                                                 <button className="btn-link" style={{ color: 'var(--warning-color)' }} onClick={() => handleResetPassword(user)}>
                                                     <KeyRound size={14} /> 重置密码
@@ -525,6 +573,7 @@ export default function UserListPage() {
                 jobTitles={jobTitles}
                 departments={departments}
                 showNotification={showNotification}
+                canManageSalary={canManageSalary}
             />
 
         </div>

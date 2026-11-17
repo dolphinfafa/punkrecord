@@ -207,6 +207,26 @@
     gap: 16px;
 }
 
+.iam-employee-modal .iam-form-group {
+    min-width: 0;
+}
+
+.iam-employee-modal .iam-form-error {
+    color: #b91c1c;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .iam-employee-modal {
+        width: calc(100% - 24px);
+    }
+
+    .iam-employee-modal .iam-form-row {
+        flex-direction: column;
+    }
+}
+
 .iam-hint {
     font-size: 12px;
     color: var(--text-secondary);

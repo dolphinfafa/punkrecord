@@ -37,15 +37,28 @@ def _is_admin(user, session):
                         .where(UserRole.user_id == user.id, Role.code == "admin")).first() is not None
 
 
+def _can_manage_salary(user, session):
+    return user.manager_user_id is None or _is_admin(user, session)
+
+
+def _set_salary(session, user, amount, actor):
+    from app.models.shared import AuditLog
+    user.basic_salary = amount
+    user.updated_at = now_cn()
+    session.add(user)
+    session.add(AuditLog(user_id=actor.id, object_type="employee_compensation", object_id=user.id,
+                         action="update", changes={"field": "basic_salary"}))
+
+
 @router.get("/compensation-access")
 def compensation_access(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    return success_response({"allowed": _is_admin(current_user, session)})
+    return success_response({"allowed": _can_manage_salary(current_user, session)})
 
 
 @router.get("/users/{user_id}/salary")
 def get_salary(user_id: UUID, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    if not _is_admin(current_user, session):
-        raise ForbiddenException("仅管理员可查看基本工资")
+    if not _can_manage_salary(current_user, session):
+        raise ForbiddenException("仅管理员或 L0 可查看基本工资")
     user = session.get(User, user_id)
     if not user:
         raise NotFoundException("未找到员工")
@@ -62,17 +75,12 @@ class SalaryUpdate(BaseModel):
 
 @router.put("/users/{user_id}/salary")
 def update_salary(user_id: UUID, data: SalaryUpdate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    if not _is_admin(current_user, session):
-        raise ForbiddenException("仅管理员可维护基本工资")
+    if not _can_manage_salary(current_user, session):
+        raise ForbiddenException("仅管理员或 L0 可维护基本工资")
     user = session.get(User, user_id)
     if not user:
         raise NotFoundException("未找到员工")
-    from app.models.shared import AuditLog
-    user.basic_salary = data.basic_salary
-    user.updated_at = now_cn()
-    session.add(user)
-    session.add(AuditLog(user_id=current_user.id, object_type="employee_compensation", object_id=user.id,
-                         action="update", changes={"field": "basic_salary"}))
+    _set_salary(session, user, data.basic_salary, current_user)
     session.commit()
     return success_response(message="基本工资已保存")
 _BELI_RULE_TYPES = {item.value for item in BeliRuleType}
@@ -679,9 +687,17 @@ async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_permission("iam.write"))
+    current_user: User = Depends(get_current_user)
 ):
     """Update user"""
+    salary_changed = "basic_salary" in user_data.model_fields_set
+    if salary_changed:
+        if not _can_manage_salary(current_user, session):
+            raise ForbiddenException("仅管理员或 L0 可维护基本工资")
+        if user_data.basic_salary is None:
+            raise ValidationException("基本工资必须大于零，不能清空")
+    if not salary_changed or user_data.model_fields_set - {"basic_salary"}:
+        await require_permission("iam.write")(current_user=current_user, session=session)
     user = session.get(User, user_id)
     if not user:
         raise NotFoundException("未找到用户")
@@ -715,6 +731,9 @@ async def update_user(
 
     if any(getattr(user_data, field) is not None for field in ("leave_annual_remaining", "leave_maternity_remaining", "leave_marriage_remaining", "leave_personal_remaining", "leave_sick_remaining", "beili_adjust_action", "beili_adjust_amount")):
         raise ValidationException("请在独立贝利页面调整贝利和假期")
+
+    if salary_changed:
+        _set_salary(session, user, user_data.basic_salary, current_user)
     
     session.add(user)
     session.commit()

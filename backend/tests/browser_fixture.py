@@ -61,17 +61,23 @@ with Session(engine) as session:
     employee = User(display_name="测试员工", username="fixture_employee", manager_user_id=boss.id,
         basic_salary=Decimal("12000"), beili_balance=2500, profile_completed=True, must_change_password=False,
         created_at=datetime(2020, 1, 1))
+    l0 = User(display_name="测试非管理员L0", username="fixture_l0", profile_completed=True,
+              must_change_password=False, created_at=datetime(2020, 1, 1))
     admin = Role(code="admin", name="Admin")
     staff = Role(code="fixture_staff", name="Employee")
+    salary_l0 = Role(code="fixture_salary_l0", name="L0 with read-only IAM")
     entity = OurEntity(name="测试主体", type=OurEntityType.COMPANY, status=OurEntityStatus.ACTIVE)
-    session.add_all([employee, admin, staff, entity]); session.flush()
+    session.add_all([employee, l0, admin, staff, salary_l0, entity]); session.flush()
     session.add_all([UserRole(user_id=boss.id, role_id=admin.id, scope_type=ScopeType.GLOBAL),
-                     UserRole(user_id=employee.id, role_id=staff.id, scope_type=ScopeType.GLOBAL)])
+                     UserRole(user_id=employee.id, role_id=staff.id, scope_type=ScopeType.GLOBAL),
+                     UserRole(user_id=l0.id, role_id=salary_l0.id, scope_type=ScopeType.GLOBAL)])
     for module in ("todo", "project", "iam", "meeting", "finance", "contract", "kb"):
         for action in ("read", "write"):
             permission = Permission(code=f"{module}.{action}", name=f"{module}.{action}", module=module)
             session.add(permission); session.flush()
             session.add(RolePermission(role_id=staff.id, permission_id=permission.id))
+            if module == "iam" and action == "read":
+                session.add(RolePermission(role_id=salary_l0.id, permission_id=permission.id))
     p = Project(our_entity_id=entity.id, project_no="FIXTURE", name="测试项目", project_type=ProjectType.B2B,
                 pm_user_id=boss.id, owner_user_id=boss.id, current_stage_code="development")
     session.add(p); session.flush()
@@ -89,6 +95,7 @@ with Session(engine) as session:
     session.add(completed); session.flush(); queue_reward(session, completed); session.commit()
     account_for(session, employee.id); session.commit()
     fixtures = {"project_id":str(p.id), "employee_id":str(employee.id),
+        "l0_token":create_access_token({"sub":str(l0.id)}),
         "boss_token":create_access_token({"sub":str(boss.id)}), "employee_token":create_access_token({"sub":str(employee.id)})}
 
 

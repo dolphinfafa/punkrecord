@@ -1,6 +1,7 @@
 """Migration replay against a disposable legacy schema, never the app DB."""
 import importlib.util
 from pathlib import Path
+from datetime import date, datetime
 from uuid import uuid4
 
 import pytest
@@ -103,4 +104,58 @@ def test_meeting_employee_binding_upgrade_preserves_legacy_records():
         connection.execute(upgraded.update().values(speaker_user_mapping={'speaker_1': str(uuid4())}))
         with Operations.context(MigrationContext.configure(connection)): migration.upgrade()
         assert connection.execute(sa.select(upgraded.c.speaker_user_mapping)).scalar_one()['speaker_1']
+    engine.dispose()
+
+
+def test_summary_attendance_migration_freezes_only_settled_days_without_money_changes():
+    path = Path(__file__).resolve().parents[1] / 'db_migrations/versions/20261117_0001_summary_attendance.py'
+    spec = importlib.util.spec_from_file_location('summary_attendance_upgrade', path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = sa.create_engine('sqlite://')
+    metadata = sa.MetaData()
+    users = sa.Table('users', metadata, sa.Column('id', sa.Uuid(), primary_key=True),
+        sa.Column('username', sa.String()), sa.Column('display_name', sa.String()),
+        sa.Column('created_at', sa.DateTime()), sa.Column('beili_balance', sa.Float()))
+    meetings = sa.Table('meeting_record', metadata, sa.Column('id', sa.Integer(), primary_key=True),
+        sa.Column('meeting_type', sa.String()), sa.Column('meeting_date', sa.Date()),
+        sa.Column('status', sa.String()), sa.Column('speaker_mapping', sa.JSON()),
+        sa.Column('speaker_user_mapping', sa.JSON()), sa.Column('attendees', sa.JSON()))
+    segments = sa.Table('meeting_transcript_segment', metadata,
+        sa.Column('meeting_id', sa.Integer()), sa.Column('speaker_id', sa.String()))
+    attendance = sa.Table('morning_attendance', metadata, sa.Column('day', sa.Date()),
+        sa.Column('user_id', sa.Uuid()), sa.Column('employee_name', sa.String()))
+    ledger = sa.Table('beli_ledger', metadata, sa.Column('amount', sa.Numeric(16, 2)))
+    metadata.create_all(engine)
+    first, second = uuid4(), uuid4()
+    day = date(2026, 11, 16)
+    with engine.begin() as connection:
+        connection.execute(users.insert(), [dict(id=first, username='first', display_name='Duplicate',
+            created_at=datetime(2020, 1, 1), beili_balance=1500), dict(id=second, username='second',
+            display_name='Duplicate', created_at=datetime(2020, 1, 1), beili_balance=-500)])
+        connection.execute(attendance.insert(), [dict(day=day, user_id=first, employee_name='Duplicate'),
+            dict(day=day, user_id=second, employee_name='Duplicate')])
+        connection.execute(ledger.insert(), [dict(amount=-500)])
+        connection.execute(meetings.insert(), [dict(id=1, meeting_type='morning', meeting_date=day,
+            status='TRANSCRIBED', speaker_mapping={'s1': 'Duplicate', 's2': 'second'},
+            speaker_user_mapping={'s1': str(first), 's2': None}, attendees=['Duplicate']),
+            dict(id=2, meeting_type='morning', meeting_date=date(2026, 11, 17), status='TRANSCRIBED',
+            speaker_mapping={}, speaker_user_mapping={}, attendees=[])])
+        connection.execute(segments.insert(), [dict(meeting_id=1, speaker_id='s1'), dict(meeting_id=1, speaker_id='s2')])
+        before_balances = connection.execute(sa.select(users.c.beili_balance).order_by(users.c.username)).all()
+        with Operations.context(MigrationContext.configure(connection)):
+            migration.upgrade()
+        upgraded = sa.Table('meeting_record', sa.MetaData(), autoload_with=connection)
+        snapshots = dict(connection.execute(sa.select(upgraded.c.id, upgraded.c.attendance_snapshot)).all())
+        assert snapshots[1]['present_user_ids'] == [str(first)] and snapshots[1]['legacy'] is True
+        assert snapshots[2] is None
+        connection.execute(upgraded.insert().values(id=3, meeting_type='morning', meeting_date=day,
+            status='TRANSCRIBED', speaker_mapping={}, speaker_user_mapping={}, attendees=[]))
+        with Operations.context(MigrationContext.configure(connection)):
+            migration.upgrade()
+        assert connection.execute(sa.select(upgraded.c.attendance_snapshot).where(upgraded.c.id == 3)).scalar_one() is None
+        assert connection.execute(sa.select(users.c.beili_balance).order_by(users.c.username)).all() == before_balances
+        assert connection.execute(sa.select(ledger.c.amount)).scalars().all() == [-500]
+    with pytest.raises(RuntimeError):
+        migration.downgrade()
     engine.dispose()

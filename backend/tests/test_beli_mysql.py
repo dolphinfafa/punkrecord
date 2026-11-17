@@ -17,9 +17,10 @@ from app.core.exceptions import ValidationException
 from app.models.base import now_cn
 from app.models.iam import User, OurEntity, OurEntityType, OurEntityStatus
 from app.models.todo import TodoItem
-from app.models.beli import BeliProduct, BeliAccount, BeliLedger
+from app.models.meeting import MeetingRecord, MeetingStatus
+from app.models.beli import BeliProduct, BeliAccount, BeliLedger, BeliPolicy, WorkdayOverride
 from app.services.beli import (account_for, create_order, queue_reward, approve_reward,
-                               lock_todo, protect_reward_plan)
+                               lock_todo, protect_reward_plan, reconcile_attendance)
 
 pytestmark = pytest.mark.skipif(os.environ.get('PUNKRECORD_MYSQL_TESTS') != '1', reason='Opt-in local scratch MySQL only')
 
@@ -140,3 +141,26 @@ def test_concurrent_zero_hours_and_reward_review_are_serialized(mysql_db):
         entries = session.exec(select(BeliLedger).where(BeliLedger.kind == 'task_reward')).all()
         assert (todo.estimated_hours == 0 and not entries) or (todo.estimated_hours == 2 and len(entries) == 1)
         assert account_for(session, employee_id)[1].balance == (1000 if not entries else 1060)
+
+
+def test_old_read_view_cannot_revert_new_summary_attendance(mysql_db):
+    engine, (boss_id, employee_id, _) = mysql_db
+    day = now_cn().date()
+    with Session(engine) as session:
+        session.add(BeliPolicy(starts_on=day))
+        session.add(WorkdayOverride(day=day, is_workday=True, reason='Synthetic workday'))
+        meeting = MeetingRecord(title='Synthetic morning', meeting_type='morning', meeting_date=day,
+            created_by=boss_id, status=MeetingStatus.SUMMARIZED,
+            attendance_snapshot={'day': str(day), 'present_user_ids': [], 'unmatched_names': []})
+        session.add(meeting); session.commit(); meeting_id = meeting.id
+    with Session(engine) as stale:
+        stale.exec(select(MeetingRecord)).all()  # Establish the old consistent read view.
+        with Session(engine) as writer:
+            meeting = writer.get(MeetingRecord, meeting_id)
+            meeting.attendance_snapshot = {'day': str(day), 'present_user_ids': [str(employee_id)], 'unmatched_names': []}
+            writer.add(meeting); writer.commit()
+        reconcile_attendance(stale, day)
+        stale.commit()
+    with Session(engine) as session:
+        assert account_for(session, employee_id)[1].balance == 1000
+        assert not session.exec(select(BeliLedger).where(BeliLedger.kind == 'attendance')).all()
