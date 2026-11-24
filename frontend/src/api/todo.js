@@ -1,4 +1,5 @@
 import client from './client';
+import { API_BASE_URL } from '@/utils/appPaths';
 import axios from 'axios';
 
 export const todoApi = {
@@ -29,7 +30,7 @@ export const todoApi = {
     downloadImage: (id, imageId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/todo/${id}/images/${imageId}/download`, {
+        return axios.get(`${API_BASE_URL}/todo/${id}/images/${imageId}/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,

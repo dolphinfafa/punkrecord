@@ -1,4 +1,5 @@
 import client from './client';
+import { API_BASE_URL } from '@/utils/appPaths';
 import axios from 'axios';
 
 export const projectApi = {
@@ -29,7 +30,7 @@ export const projectApi = {
     downloadProjectAttachment: async (projectId, attachmentId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/project/projects/${projectId}/attachments/${attachmentId}/download`, {
+        return axios.get(`${API_BASE_URL}/project/projects/${projectId}/attachments/${attachmentId}/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,
@@ -113,7 +114,7 @@ export const projectApi = {
     downloadAcceptanceReport: async (projectId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/project/projects/${projectId}/acceptance-report/download`, {
+        return axios.get(`${API_BASE_URL}/project/projects/${projectId}/acceptance-report/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,

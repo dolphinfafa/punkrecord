@@ -25,15 +25,18 @@ from app.core.response import success_response
 from app.core.config import settings
 from app.core.storage import save_file, get_file, delete_file, get_download_url
 from app.models.iam import User, UserStatus
+from app.models.beli import BeliPolicy, DailyAttendanceRoster
 from app.schemas.text import nonblank_text
 from app.models.meeting import MeetingRecord, MeetingTranscriptSegment, MeetingStatus, MeetingType
 from app.models.kb import KBDocument, KBDocumentStatus
 from app.schemas.meeting import (
     MeetingCreateResponse, MeetingResponse, MeetingListResponse,
     MeetingStatusResponse, TranscriptSegmentResponse,
-    TranscriptBatchUpdate, SpeakerMappingUpdate, SummarizeRequest,
+    TranscriptBatchUpdate, SpeakerMappingUpdate, SummarizeRequest, AttendanceRosterUpdate,
 )
 from app.services.asr_service import submit_asr_task
+from app.services.beli import (active_attendance_people, capture_attendance_snapshot, daily_attendance_roster,
+    expected_attendance_people, lock_attendance_policy, reconcile_attendance, uses_daily_attendance_roster)
 from app.services.document_parser import extract_text
 
 logger = logging.getLogger(__name__)
@@ -88,6 +91,30 @@ def _enrich_meeting(meeting: MeetingRecord, session: Session) -> MeetingResponse
     data = MeetingResponse.model_validate(meeting)
     data.creator_name = creator.display_name if creator else None
     return data
+
+
+def _lock_meeting(session, meeting_id):
+    return session.exec(select(MeetingRecord).where(MeetingRecord.id == meeting_id)
+                        .with_for_update().execution_options(populate_existing=True)).first()
+
+
+def _uses_daily_roster(meeting, policy):
+    return meeting.meeting_type == MeetingType.MORNING and uses_daily_attendance_roster(policy, meeting.meeting_date)
+
+
+def _roster_response(session, meeting, roster, people):
+    suggested = set(capture_attendance_snapshot(session, meeting)["present_user_ids"])
+    return success_response({
+        "enabled": True,
+        "day": meeting.meeting_date,
+        "version": roster.version if roster else 0,
+        "settled_version": roster.settled_version if roster else None,
+        "needs_confirmation": roster is None or roster.people.keys() != people.keys(),
+        "people": [
+            {"user_id": uid, **person, "suggested_present": uid in suggested}
+            for uid, person in sorted(people.items(), key=lambda item: (item[1]["name"], item[0]))
+        ],
+    })
 
 
 def _build_meeting_summary_user_message(
@@ -782,10 +809,8 @@ async def delete_meeting(
     current_user: User = Depends(require_permission("meeting.write")),
 ):
     """Delete meeting record, its transcript segments, and audio file."""
-    from app.services.beli import lock_attendance_policy
-    lock_attendance_policy(session)
-    meeting = session.exec(select(MeetingRecord).where(MeetingRecord.id == meeting_id)
-                           .with_for_update().execution_options(populate_existing=True)).first()
+    policy = lock_attendance_policy(session)
+    meeting = _lock_meeting(session, meeting_id)
     if not meeting:
         raise NotFoundException("未找到会议记录")
 
@@ -806,8 +831,7 @@ async def delete_meeting(
     day = meeting.meeting_date
     session.delete(meeting)
     session.flush()
-    if day:
-        from app.services.beli import reconcile_attendance
+    if day and policy and not policy.roster_starts_on:
         reconcile_attendance(session, day)
     session.commit()
     return success_response({"message": "会议记录已删除"})
@@ -939,6 +963,62 @@ async def update_speakers(
 
 # ─── 9. AI summarize (SSE) ───────────────────────────────────────────────────
 
+@router.get("/records/{meeting_id}/attendance-roster", response_model=dict)
+def get_daily_attendance_roster(
+    meeting_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    meeting = session.get(MeetingRecord, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+    policy = session.exec(select(BeliPolicy)).first()
+    if not _uses_daily_roster(meeting, policy):
+        return success_response({"enabled": False})
+    roster = daily_attendance_roster(session, meeting.meeting_date)
+    people = active_attendance_people(session, roster.people) if roster else expected_attendance_people(session, meeting.meeting_date)
+    return _roster_response(session, meeting, roster, people)
+
+
+@router.put("/records/{meeting_id}/attendance-roster", response_model=dict)
+def save_daily_attendance_roster(
+    meeting_id: UUID,
+    body: AttendanceRosterUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_permission("meeting.write")),
+):
+    policy = lock_attendance_policy(session)
+    meeting = _lock_meeting(session, meeting_id)
+    if not meeting:
+        raise NotFoundException("未找到会议记录")
+    if not _uses_daily_roster(meeting, policy):
+        raise ValidationException("此会议日期未启用出勤名单结算")
+    day = meeting.meeting_date
+    roster = daily_attendance_roster(session, day, lock=True)
+    if body.version != (roster.version if roster else 0):
+        raise AtlasException("出勤名单已更新，请重新加载后再编辑", code=409)
+    if roster:
+        expected = active_attendance_people(session, roster.people, lock=True)
+    else:
+        expected = expected_attendance_people(session, day, lock=True)
+    submitted = {str(person.user_id): person.status for person in body.people}
+    if len(submitted) != len(body.people) or submitted.keys() != expected.keys():
+        raise ValidationException("请核对应到名单，并确认每名员工的出勤状态")
+    if submitted and all(status == "absent" for status in submitted.values()) and not body.confirm_all_absent:
+        raise ValidationException("请再次确认全员缺席")
+    people = {uid: {**expected[uid], "status": status} for uid, status in submitted.items()}
+    if roster is None:
+        roster = DailyAttendanceRoster(day=day, people=people)
+    elif roster.people != people:
+        roster.version += 1
+        roster.people = people
+        roster.updated_at = now_cn()
+    session.add(roster)
+    result = _roster_response(session, meeting, roster, people)
+    session.commit()
+    return result
+
+
 @router.post("/records/{meeting_id}/summarize", response_model=None)
 async def summarize_meeting(
     meeting_id: UUID,
@@ -947,10 +1027,20 @@ async def summarize_meeting(
     current_user: User = Depends(require_permission("meeting.write")),
 ):
     """Generate AI meeting summary via SSE streaming."""
-    meeting = session.exec(select(MeetingRecord).where(MeetingRecord.id == meeting_id)
-                           .with_for_update().execution_options(populate_existing=True)).first()
+    policy = lock_attendance_policy(session)
+    meeting = _lock_meeting(session, meeting_id)
     if not meeting:
         raise NotFoundException("未找到会议记录")
+    roster_version = None
+    roster = None
+    roster_day = meeting.meeting_date
+    if _uses_daily_roster(meeting, policy):
+        roster = daily_attendance_roster(session, roster_day, lock=True)
+        if not roster or not body or body.attendance_roster_version != roster.version:
+            raise AtlasException("请确认并保存最新的当日早会考勤名单后，再生成总结", code=409)
+        if active_attendance_people(session, roster.people, lock=True) != roster.people:
+            raise AtlasException("在职人员已变更，请重新确认并保存考勤名单", code=409)
+        roster_version = roster.version
 
     # Build full transcript text
     segments = session.exec(
@@ -978,6 +1068,8 @@ async def summarize_meeting(
             attendees_list = [name for name in speaker_mapping.values() if name and name.strip()]
     else:
         transcript_text = ""
+    if roster is not None:
+        attendees_list = [person["name"] for person in roster.people.values() if person["status"] == "present"]
 
     # Store meeting_id for the generator closure
     m_id = meeting.id
@@ -1004,11 +1096,13 @@ async def summarize_meeting(
         attendees_list,
         previous_summary,
     )
-    from app.services.beli import capture_attendance_snapshot, reconcile_attendance, lock_attendance_policy
-    attendance_snapshot = capture_attendance_snapshot(session, meeting)
+    attendance_snapshot = capture_attendance_snapshot(session, meeting) if policy and not policy.roster_starts_on else None
     generation_id = uuid4()
     meeting.summary_generation_id = generation_id
     session.add(meeting)
+    if roster is not None:
+        roster.generation_id = generation_id
+        session.add(roster)
     # Release the meeting lock before waiting on the external streaming service.
     session.commit()
 
@@ -1059,22 +1153,33 @@ async def summarize_meeting(
         if completed and full_text.strip():
             try:
                 with Session(engine) as db:
-                    if attendance_snapshot is not None:
+                    if attendance_snapshot is not None or roster_version is not None:
                         lock_attendance_policy(db)
-                    m = db.exec(select(MeetingRecord).where(MeetingRecord.id == m_id)
-                                .with_for_update().execution_options(populate_existing=True)).first()
-                    if m and m.summary_generation_id == generation_id:
+                    m = _lock_meeting(db, m_id)
+                    current = daily_attendance_roster(db, roster_day, lock=True) if roster_version is not None else None
+                    roster_unchanged = roster_version is None or (
+                        current and current.version == roster_version and current.generation_id == generation_id
+                        and active_attendance_people(db, current.people, lock=True) == current.people
+                    )
+                    saved = m and m.summary_generation_id == generation_id and roster_unchanged
+                    if saved:
                         m.summary = full_text
-                        m.status = MeetingStatus.SUMMARIZED
-                        m.attendance_snapshot = attendance_snapshot
+                        if m.status != MeetingStatus.ARCHIVED:
+                            m.status = MeetingStatus.SUMMARIZED
+                        if attendance_snapshot is not None:
+                            m.attendance_snapshot = attendance_snapshot
                         m.updated_at = now_cn()
                         db.add(m)
+                        if current:
+                            current.settled_version = roster_version
+                            current.settled_people = current.people.copy()
+                            db.add(current)
                         db.flush()
-                        if attendance_snapshot is not None:
-                            reconcile_attendance(db, m.meeting_date)
+                        if current or attendance_snapshot is not None:
+                            reconcile_attendance(db, roster_day)
                         db.commit()
-                    else:
-                        yield f"data: {json.dumps({'error': '已有更新的总结请求或会议已删除，本次结果未保存'}, ensure_ascii=False)}\n\n"
+                if not saved:
+                    yield f"data: {json.dumps({'error': '考勤名单、总结请求或会议已变更，本次结果未保存'}, ensure_ascii=False)}\n\n"
             except Exception as e:
                 logger.error("Failed to save summary: %s", e)
                 yield f"data: {json.dumps({'error': '会议纪要保存失败，请重试'}, ensure_ascii=False)}\n\n"

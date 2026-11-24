@@ -1,3 +1,68 @@
+.attendance-roster-toolbar,
+.attendance-roster-actions,
+.attendance-roster-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.attendance-roster-toolbar,
+.attendance-roster-status,
+.attendance-roster-evidence {
+    color: #475569;
+    font-size: 0.875rem;
+}
+
+.attendance-roster-list {
+    margin: 0.75rem 0;
+    padding: 0;
+    list-style: none;
+    border-block: 1px solid #e2e8f0;
+}
+
+.attendance-roster-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6rem;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding-block: 0.25rem;
+}
+
+.attendance-roster-list li + li {
+    border-top: 1px solid #e2e8f0;
+}
+
+.attendance-roster-list label {
+    overflow-wrap: anywhere;
+}
+
+.attendance-roster-evidence {
+    display: inline-block;
+    margin-inline-start: 0.5rem;
+}
+
+.attendance-roster-list select {
+    width: 100%;
+    padding: 0.375rem;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    background: #fff;
+    color: #1e293b;
+    font: inherit;
+}
+
+.attendance-roster-actions {
+    justify-content: flex-end;
+}
+
+.attendance-roster-error {
+    color: #9f1239;
+    margin-block: 0.75rem;
+}
+
 .meeting-detail-container {
     padding: 2rem;
     max-width: 1200px;

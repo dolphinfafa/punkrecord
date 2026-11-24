@@ -23,7 +23,7 @@ from app.models.beli import (BeliLedger, TaskReward, WorkdayOverride, MorningAtt
                             BeliProduct, BeliOrder)
 from app.services.beli import (LEAVE_FIELDS, require_l0, account_for, post_entry, change_leave,
     approve_reward, reconcile_attendance, order_action, create_order, money, lock_todo, reward_for,
-    validate_plan)
+    validate_plan, apply_attendance_charge, lock_attendance_policy)
 
 router = APIRouter(prefix="/beli", tags=["Beli"])
 
@@ -187,7 +187,10 @@ def calendar_update(day: date, data: CalendarEntry, session: Session = Depends(g
 
 @router.get("/attendance")
 def attendance(day: Optional[date] = None, page: int = Query(1, ge=1), session: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    query = select(MorningAttendance)
+    # Current statistics exclude inactive staff without hiding settled historical records.
+    query = select(MorningAttendance).join(User, User.id == MorningAttendance.user_id).where(
+        (MorningAttendance.day < now_cn().date()) | (User.status == UserStatus.ACTIVE),
+    )
     if user.manager_user_id:
         query = query.where(MorningAttendance.user_id == user.id)
     if day:
@@ -214,15 +217,19 @@ class Waiver(BaseModel):
 def void_attendance(attendance_id: UUID, data: Waiver, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     require_l0(user)
     # Same policy lock order as automatic reconciliation.
-    from app.models.beli import BeliPolicy
-    session.exec(select(BeliPolicy).with_for_update()).first()
-    row = session.get(MorningAttendance, attendance_id)
+    policy = lock_attendance_policy(session)
+    row = session.exec(select(MorningAttendance).where(MorningAttendance.id == attendance_id)
+                       .with_for_update().execution_options(populate_existing=True)).first()
     if not row or not data.reason.strip():
         raise ValidationException("考勤记录不存在或未填写作废原因")
     row.waived, row.reason = True, data.reason
     session.add(row)
     session.flush()
-    reconcile_attendance(session, row.day)
+    if policy and policy.roster_starts_on:
+        # Explicit waivers can correct a settled row, even after the employee is disabled.
+        apply_attendance_charge(session, row, False, actor_id=user.id)
+    else:
+        reconcile_attendance(session, row.day)
     session.commit()
     return success_response(row)
 

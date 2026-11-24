@@ -56,6 +56,17 @@ class BeliPolicy(BaseDBModel, table=True):
     code: str = Field(default="default", unique=True)
     starts_on: date
     hours_rule_starts_at: Optional[datetime] = None
+    roster_starts_on: Optional[date] = None
+
+
+class DailyAttendanceRoster(BaseDBModel, table=True):
+    __tablename__ = "daily_attendance_roster"
+    day: date = Field(unique=True)
+    version: int = 1
+    people: dict = Field(sa_column=Column(JSON, nullable=False))
+    generation_id: Optional[UUID] = None
+    settled_version: Optional[int] = None
+    settled_people: Optional[dict] = Field(default=None, sa_column=Column(JSON(none_as_null=True)))
 
 
 class MorningAttendance(BaseDBModel, table=True):

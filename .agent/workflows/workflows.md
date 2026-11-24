@@ -6,6 +6,14 @@
 
 ## 1. 核心业务流程
 
+### 2.1.2 当日早会考勤（2026-11-24）
+
+- 会议详情确认并保存当日共享名单后生成总结。默认待确认；转录只提示，不代填出勤或缺席。只有确认缺席的应到员工扣500贝利；正常出勤不写流水或改余额。
+- 应到名单仅含在职员工（沿用非L0范围）。已保存名单中的员工停用后，不再显示在编辑名单或当日统计中，重新确认后方可生成总结；已结算历史和现有流水不因停用而改写。
+- 名单保存不等于结算。重新生成成功才按差额结算，更正出勤只退已扣的款；同日多个会议共用结果，删除单场会议不重算。AI失败、名单变更或过时请求不覆盖上次结算。
+- 保留新规则日期内的请假、工作日历和L0作废规则。开发迁移从当日启用；生产迁移从次日启用，既有流水和快照不回算。
+- 生产发布前检查实际生效的 Caddy 路由和旧8086业务调用，按本次授权停止并禁用旧 `punkrecord.service`，只保留PM2的9086；验收官网、API、MCP，至少观察一轮5分钟周期并确认旧进程不再连库。
+
 ### 2.1.1 总结考勤与工资编辑（2026-11-17）
 
 - 早会考勤以最近一次成功生成并保存的总结为准。请求开始时捕获参会员工ID，成功后与总结、考勤差额流水在同一事务保存；失败、空内容或中断不改变旧总结和扣款。并发时只允许最新发起的请求保存，较早请求不能覆盖它。
@@ -299,9 +307,9 @@ conda activate punkrecord
 
 ### Dev 环境（开发服务器）
 - **后端**：端口 15085（Uvicorn，Conda `punkrecord`，Python 3.10.0）
-- **前端**：端口 15173（Vite dev server）
+- **前端**：开发域名的 `/punkrecord/` 由本机 Nginx 提供 `frontend/.dev-preview/dist/`，直连 15173 由 PM2 下的 Vite Preview 提供同一构建；不对公网提供 Vite 源码转换。Nginx 的 `/punkrecord/api/` 和直连预览代理均指向 15085。
 - **数据库**：`punkrecord_local`（本地 MySQL 3306）
-- **启停**：`./dev.sh start|stop|restart|status`；PM2 后端必须以 `/opt/miniconda3/envs/punkrecord/bin/python -m uvicorn ...` 启动。`dev.sh` 前端显式设置 `VITE_BASE=/punkrecord/`，且 `App.jsx` 会在访问 `/punkrecord/` 时自动使用 `/punkrecord` basename，避免子路径白屏
+- **启停**：服务器用 PM2 管理，后端使用 Conda `punkrecord`；更新开发网页时在 `frontend/` 运行 `VITE_BASE=/punkrecord/ VITE_API_BASE_URL=/punkrecord/api/v1 npm run build -- --outDir .dev-preview/dist`。本地热更新仍可启动 Vite，避免占用已预览的 15173。正式根路径构建和 API 默认值不变。
 
 **PM2 管理与停服恢复（2026-10-15）**：
 
@@ -310,13 +318,13 @@ conda activate punkrecord
 - 调整 PM2 进程配置后执行 `pm2 save`；保存配置本身不会自动配置开机启动。
 - 页面无法访问时，先检查 `systemctl status pm2-zheyang.service`、`pm2 list` 和两个端口是否监听，再检查认证逻辑。
 - systemd 服务停止时执行 `sudo systemctl start pm2-zheyang.service`；重启该单元会短暂停止当前用户的两个项目进程。
-- 验证应覆盖后端 `/health`、前端 `/punkrecord/`、经 Vite 代理登录及 `/auth/me`。
+- 验证应覆盖后端 `/health`、开发域名和15173的 `/punkrecord/`、登录及深链接、JS/CSS MIME，以及 `/punkrecord/api/v1/auth/me`；匿名返回401，失效会话只跳回项目子路径内的登录页。
 
 ### Deploy 环境（生产服务器）
 - **后端**：端口 9086，Conda `punkrecord`，解释器 `/root/miniconda3/envs/punkrecord/bin/python`；PM2 `punkrecord-api` 使用该环境的uvicorn。运行Python前核实前缀，不调用旧venv或系统Python。
-- **前端**：Nginx serve `frontend/dist/`
+- **前端**：Caddy 提供 `frontend/dist/`，`punkrecord.yios.cn` 的 API 转发到9086；发布应核对实时路由，不应把旧Nginx配置当作生效状态。
 - **数据库**：`punkrecord_deploy`
-- **配置**：生产`.env`明确设置 `APP_ENV=production`、`DEBUG=False`、`APP_VERSION=2.1.1`；RBAC保持开启，自动建表与启动自动迁移关闭。凭证与连接信息只从环境读取，不提交配置备份。
+- **配置**：生产`.env`明确设置 `APP_ENV=production`、`DEBUG=False`，发布时更新 `APP_VERSION`；RBAC保持开启，自动建表与启动自动迁移关闭。凭证与连接信息只从环境读取，不提交配置备份。
 - **2.1.1已发布（2026-11-17）**：应用提交 `8e9b06b`，数据库从 `20261021_0001` 升至 `20261117_0001`，7场旧会议仅冻结原名单。迁移、重启及只读验收后，13类业务表摘要一致；余额、流水、考勤与策略启用日不变。备份 `/srv/punkrecord-backups/20261117-205516-2.1.1/`，health为healthy/2.1.1，15项认证业务读取、三类工资读取权限、MCP及桌面/手机登录渲染通过，详见当日测试报告。
 - **已部署（2026-11-07）**：应用代码 `71b31d2`，数据库从 `20260818_0001` 升级到 `20261021_0001`。早会策略启用日为实际迁移日2026-11-07；保留历史贝利余额，不补扣之前会议或追溯奖励。
 - **流程**：先核对GitHub、生产分支和未提交补丁；在私有目录备份SQL、`.env`、旧源码/补丁、PM2配置及旧前端。预先构建和校验新前端，短暂停止本项目后端，完成一致性备份、基线快照、`git pull --ff-only`与Alembic迁移，再发布前端、重启并保存PM2。不得使用开发专用迁移脚本操作生产。

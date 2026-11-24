@@ -9,6 +9,7 @@ import tempfile
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -21,16 +22,30 @@ from app.core.config import settings
 from app.core.database import get_session
 from app.core.exceptions import AtlasException
 from app.core.security import create_access_token
-from app.models.iam import User, Role, UserRole, ScopeType, Permission, RolePermission, OurEntity, OurEntityType, OurEntityStatus
+from app.models.iam import User, UserStatus, Role, UserRole, ScopeType, Permission, RolePermission, OurEntity, OurEntityType, OurEntityStatus
 from app.models.project import Project, ProjectType, ProjectMember
 from app.models.todo import TodoItem, TodoStatus
 from app.models.beli import BeliPolicy, BeliProduct
+from app.models.meeting import MeetingRecord, MeetingStatus, MeetingTranscriptSegment
 from app.models.base import now_cn
 from app.services.beli import queue_reward, account_for
 
 temporary = tempfile.TemporaryDirectory(prefix="punkrecord-browser-")
 engine = create_engine(f"sqlite:///{temporary.name}/fixture.sqlite", connect_args={"check_same_thread": False, "timeout": 30}, hide_parameters=True)
 SQLModel.metadata.create_all(engine)
+attendance_fixture = os.environ.get("BROWSER_ATTENDANCE_FIXTURE") == "1"
+if attendance_fixture:
+    import httpx
+
+    def llm_response(request):
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=(
+            'data: {"choices":[{"delta":{"content":"Synthetic attendance summary"}}]}\n\n'
+            'data: [DONE]\n\n'
+        ))
+
+    meeting.engine = engine
+    meeting.httpx = SimpleNamespace(AsyncClient=lambda **kwargs: httpx.AsyncClient(
+        transport=httpx.MockTransport(llm_response), **kwargs))
 settings.WECHAT_MSG_SERVICE_URL = None
 settings.ENFORCE_RBAC = True
 app = FastAPI()
@@ -82,7 +97,8 @@ with Session(engine) as session:
                 pm_user_id=boss.id, owner_user_id=boss.id, current_stage_code="development")
     session.add(p); session.flush()
     session.add(ProjectMember(project_id=p.id, user_id=employee.id, role_in_project="开发"))
-    session.add(BeliPolicy(starts_on=date(2026, 10, 16), hours_rule_starts_at=now_cn()))
+    session.add(BeliPolicy(starts_on=date(2026, 10, 16), hours_rule_starts_at=now_cn(),
+                           roster_starts_on=date(2026, 10, 16) if attendance_fixture else None))
     session.add(BeliProduct(name="半天年假", description="测试商品", kind="leave", price=300, stock=5, image_name='fixture.png',
                             leave_type="annual", leave_days=Decimal(".5")))
     for title in ("[BUG] 共享登录问题 - 前端", "[BUG] 共享登录问题 - 后端", "[BUG] 图片问题"):
@@ -97,6 +113,28 @@ with Session(engine) as session:
     fixtures = {"project_id":str(p.id), "employee_id":str(employee.id),
         "l0_token":create_access_token({"sub":str(l0.id)}),
         "boss_token":create_access_token({"sub":str(boss.id)}), "employee_token":create_access_token({"sub":str(employee.id)})}
+    if attendance_fixture:
+        silent = User(display_name="测试未发言员工", username="fixture_silent", manager_user_id=boss.id,
+                      created_at=datetime(2020, 1, 1))
+        inactive = User(display_name="测试停用员工", username="fixture_inactive", manager_user_id=boss.id,
+                        status=UserStatus.INACTIVE, created_at=datetime(2020, 1, 1))
+        session.add_all([silent, inactive])
+        session.flush()
+        fixtures["attendance_silent_id"] = str(silent.id)
+        fixtures["attendance_meetings"] = []
+        for day in [date(2026, 10, 19), date(2026, 10, 20)]:
+            groups = []
+            for title in ["考勤验证早会", "同日早会"]:
+                record = MeetingRecord(title=title, meeting_date=day, meeting_type="morning",
+                                       status=MeetingStatus.TRANSCRIBED, created_by=boss.id,
+                                       speaker_mapping={"s1": employee.display_name},
+                                       speaker_user_mapping={"s1": str(employee.id)})
+                session.add(record)
+                session.flush()
+                session.add(MeetingTranscriptSegment(meeting_id=record.id, speaker_id="s1", content="Synthetic notes"))
+                groups.append(str(record.id))
+            fixtures["attendance_meetings"].append(groups)
+        session.commit()
 
 
 @app.get("/__fixtures")

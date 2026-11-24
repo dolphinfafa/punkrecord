@@ -1,4 +1,5 @@
 import client from './client';
+import { API_BASE_URL } from '@/utils/appPaths';
 
 export const meetingApi = {
     createMeeting: (title, meetingType = 'morning', meetingDate = null, file = null, transcriptFile = null) => {
@@ -23,6 +24,8 @@ export const meetingApi = {
         client.patch(`/meeting/records/${meetingId}/attendees`, { attendees }),
     getMeetings: (params) => client.get('/meeting/records', { params }),
     getMeeting: (id) => client.get(`/meeting/records/${id}`),
+    getAttendanceRoster: (id) => client.get(`/meeting/records/${id}/attendance-roster`),
+    saveAttendanceRoster: (id, data) => client.put(`/meeting/records/${id}/attendance-roster`, data),
     deleteMeeting: (id) => client.delete(`/meeting/records/${id}`),
     getStatus: (id) => client.get(`/meeting/records/${id}/status`),
     getTranscript: (id) => client.get(`/meeting/records/${id}/transcript`),
@@ -39,5 +42,5 @@ export const meetingApi = {
     getTranscriptTemplate: () => client.get('/meeting/transcript-template', { responseType: 'blob' }),
     retranscribe: (id) => client.post(`/meeting/records/${id}/retranscribe`),
     archiveToKB: (id) => client.post(`/meeting/records/${id}/archive`),
-    getAudioUrl: (id) => `/api/v1/meeting/records/${id}/audio`,
+    getAudioUrl: (id) => `${API_BASE_URL}/meeting/records/${id}/audio`,
 };

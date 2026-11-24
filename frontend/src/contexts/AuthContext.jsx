@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import client from '@/api/client';
+import { loginPath } from '@/utils/appPaths';
 
 const AuthContext = createContext(null);
 
@@ -18,13 +19,16 @@ export const AuthProvider = ({ children }) => {
             }
 
             // Immediately restore from cache so UI is fast
-            if (cachedUser) {
-                setUser(JSON.parse(cachedUser));
-            }
-
             try {
+                if (cachedUser) {
+                    try {
+                        setUser(JSON.parse(cachedUser));
+                    } catch {
+                        localStorage.removeItem('user');
+                    }
+                }
                 // Re-validate token against backend
-                const resp = await client.get('/auth/me');
+                const resp = await client.get('/auth/me', { timeout: 10000 });
                 // Axios interceptor returns response.data, so resp is {code, data, message}
                 const profile = resp.data || resp;
                 if (profile && profile.id) {
@@ -39,12 +43,14 @@ export const AuthProvider = ({ children }) => {
                     localStorage.setItem('user', JSON.stringify(userData));
                 }
             } catch (error) {
-                console.log('Token validation failed, clearing auth state');
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+                if (error.response?.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
                 setUser(null);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         initAuth();
@@ -83,7 +89,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
-        window.location.href = '/login';
+        window.location.href = loginPath;
     };
 
     const hasPermission = useCallback((code) => {
@@ -98,7 +104,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{ user, login, logout, loading, hasPermission, hasAnyPermission }}>
-            {!loading && children}
+            {loading ? <div className="loading-screen" role="status">正在加载会话…</div> : children}
         </AuthContext.Provider>
     );
 };

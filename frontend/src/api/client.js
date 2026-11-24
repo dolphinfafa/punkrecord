@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL, loginPath } from '@/utils/appPaths';
 
 const client = axios.create({
-    baseURL: '/api/v1',
+    baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -34,7 +35,7 @@ client.interceptors.response.use(
             localStorage.removeItem('user');
             // Don't redirect if already on the login page (avoid reload loop on login failure)
             if (!window.location.pathname.endsWith('/login')) {
-                window.location.href = '/login';
+                window.location.href = loginPath;
             }
         }
         return Promise.reject(error);

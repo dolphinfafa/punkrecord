@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { meetingApi } from '@/api/meeting';
+import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE_URL, APP_BASENAME } from '@/utils/appPaths';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
@@ -11,6 +13,7 @@ import {
 } from 'lucide-react';
 import './MeetingDetailPage.css';
 import SpeakerEmployeeSelect from './components/SpeakerEmployeeSelect';
+import MeetingAttendanceRoster from './components/MeetingAttendanceRoster';
 
 const STATUS_MAP = {
     uploading: { label: '上传中', className: 'status-uploading' },
@@ -82,6 +85,8 @@ export default function MeetingDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const audioRef = useRef(null);
+    const { hasPermission } = useAuth();
+    const canWriteMeeting = hasPermission('meeting.write');
 
     const [meeting, setMeeting] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -117,6 +122,15 @@ export default function MeetingDetailPage() {
     const [selectedPresetPrompt, setSelectedPresetPrompt] = useState('');
     const [previousMeetingId, setPreviousMeetingId] = useState('');
     const [summarizedMeetings, setSummarizedMeetings] = useState([]);
+    const [rosterState, setRosterState] = useState({ id: null, data: null, people: [], error: '', busy: false });
+    const rosterRequest = useRef(0);
+    const needsRosterLookup = canWriteMeeting && meeting?.meeting_type === 'morning' && !!meeting.meeting_date;
+    const roster = rosterState.id === id ? rosterState.data : null;
+    const rosterPeople = rosterState.id === id ? rosterState.people : [];
+    const rosterDirty = !!roster?.enabled && rosterPeople.some((person, index) => person.status !== roster.people[index].status);
+    const rosterBlocksSummary = needsRosterLookup && (
+        !roster || (roster.enabled && (!roster.version || roster.needs_confirmation || rosterDirty || rosterState.busy || !!rosterState.error))
+    );
 
     // Archive
     const [archiving, setArchiving] = useState(false);
@@ -218,11 +232,58 @@ export default function MeetingDetailPage() {
         }
     }, [id]);
 
+    const loadRoster = useCallback(async () => {
+        const request = ++rosterRequest.current;
+        setRosterState({ id, data: null, people: [], error: '', busy: true });
+        try {
+            const { data } = await meetingApi.getAttendanceRoster(id);
+            if (request === rosterRequest.current) {
+                setRosterState({ id, data, people: data.people || [], error: '', busy: false });
+            }
+        } catch (err) {
+            if (request === rosterRequest.current) {
+                setRosterState({ id, data: null, people: [], error: getApiErrorMessage(err, '考勤名单加载失败'), busy: false });
+            }
+        }
+    }, [id]);
+
+    useEffect(() => {
+        if (needsRosterLookup) loadRoster();
+        return () => { rosterRequest.current += 1; };
+    }, [needsRosterLookup, loadRoster]);
+
+    const editRoster = (edit) => setRosterState(prev => ({
+        ...prev,
+        people: prev.people.map(edit),
+    }));
+
+    const saveRoster = async () => {
+        if (!roster?.enabled || rosterState.busy || rosterPeople.some(person => person.status === 'pending')) return;
+        const allAbsent = rosterPeople.length > 0 && rosterPeople.every(person => person.status === 'absent');
+        if (allAbsent && !window.confirm('确认当日所有应到员工均缺席？成功生成总结后将按规则扣款。')) return;
+        const request = ++rosterRequest.current;
+        setRosterState(prev => ({ ...prev, busy: true, error: '' }));
+        try {
+            const { data } = await meetingApi.saveAttendanceRoster(id, {
+                version: roster.version,
+                people: rosterPeople.map(({ user_id, status }) => ({ user_id, status })),
+                confirm_all_absent: allAbsent,
+            });
+            if (request === rosterRequest.current) {
+                setRosterState({ id, data, people: data.people, error: '', busy: false });
+            }
+        } catch (err) {
+            if (request === rosterRequest.current) {
+                setRosterState(prev => ({ ...prev, error: getApiErrorMessage(err, '考勤名单保存失败'), busy: false }));
+            }
+        }
+    };
+
     const loadAudio = useCallback(async () => {
         try {
             setAudioLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/v1/meeting/records/${id}/audio`, {
+            const response = await fetch(meetingApi.getAudioUrl(id), {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Failed to load audio');
@@ -485,6 +546,8 @@ export default function MeetingDetailPage() {
     };
 
     const handleGenerateSummary = async () => {
+        if (rosterBlocksSummary || summaryStreaming) return;
+        const previousSummary = meeting.summary || '';
         try {
             setSummaryStreaming(true);
             setSummary('');
@@ -493,7 +556,8 @@ export default function MeetingDetailPage() {
             const promptText = summaryPrompt || selectedPresetPrompt;
             if (promptText) body.prompt = promptText;
             if (previousMeetingId) body.previous_meeting_id = previousMeetingId;
-            const response = await fetch(`/api/v1/meeting/records/${id}/summarize`, {
+            if (roster?.enabled) body.attendance_roster_version = roster.version;
+            const response = await fetch(`${API_BASE_URL}/meeting/records/${id}/summarize`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -504,25 +568,30 @@ export default function MeetingDetailPage() {
             });
 
             if (!response.ok) {
-                throw new Error('生成会议纪要失败');
+                const detail = await response.json().catch(() => ({}));
+                if (response.status === 409 && roster?.enabled) await loadRoster();
+                throw new Error(detail.message || '生成会议纪要失败');
             }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let accumulated = '';
             let streamError = '';
+            let pending = '';
+            let complete = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                pending += decoder.decode(value, { stream: true });
+                const lines = pending.split('\n');
+                pending = lines.pop();
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') continue;
+                        const data = line.slice(6).trimEnd();
+                        if (data === '[DONE]') { complete = true; continue; }
                         try {
                             const parsed = JSON.parse(data);
                             if (parsed.error) {
@@ -532,21 +601,18 @@ export default function MeetingDetailPage() {
                                 setSummary(accumulated);
                             }
                         } catch {
-                            accumulated += data;
-                            setSummary(accumulated);
+                            streamError ||= '会议纪要响应不完整，请重试';
                         }
                     }
                 }
             }
 
-            if (streamError) {
-                setSummary('');
-                alert(streamError);
-                return;
-            }
+            if (streamError || !complete) throw new Error(streamError || '会议纪要生成中断，请重试');
 
             await loadMeeting();
+            if (roster?.enabled) await loadRoster();
         } catch (err) {
+            setSummary(previousSummary);
             alert(err.message || '生成会议纪要失败');
         } finally {
             setSummaryStreaming(false);
@@ -702,6 +768,25 @@ export default function MeetingDetailPage() {
                     </div>
                 )}
             </div>
+
+            {roster?.enabled && (
+                <MeetingAttendanceRoster roster={roster} people={rosterPeople} dirty={rosterDirty}
+                    busy={rosterState.busy || summaryStreaming} error={rosterState.error}
+                    onChange={(uid, status) => editRoster(person => person.user_id === uid ? { ...person, status } : person)}
+                    onMarkAllPresent={() => editRoster(person => ({ ...person, status: 'present' }))}
+                    onSave={saveRoster} onReload={loadRoster} />
+            )}
+            {needsRosterLookup && !roster && (
+                <div className="detail-section attendance-roster">
+                    <h2 className="section-title">当日早会考勤</h2>
+                    {rosterState.id === id && rosterState.error ? (
+                        <div className="attendance-roster-error" role="alert">
+                            {rosterState.error}
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={loadRoster}>重试</button>
+                        </div>
+                    ) : <div role="status">加载中…</div>}
+                </div>
+            )}
 
             {/* Processing indicator */}
             {isProcessing && (
@@ -998,11 +1083,12 @@ export default function MeetingDetailPage() {
                     <div className="section-header">
                         <h2 className="section-title">AI 会议纪要</h2>
                         <div className="section-actions">
-                            {!isArchived && (hasTranscript || !hasAudio) && (
+                            {canWriteMeeting && (!isArchived || roster?.enabled) && (hasTranscript || !hasAudio) && (
                                 <button
                                     className="btn btn-primary btn-sm"
                                     onClick={handleGenerateSummary}
-                                    disabled={summaryStreaming}
+                                    disabled={summaryStreaming || rosterBlocksSummary}
+                                    title={rosterBlocksSummary ? '请先确认并保存当日考勤名单' : undefined}
                                 >
                                     {summaryStreaming ? <Loader2 size={16} className="spin" /> : <Brain size={16} />}
                                     {summary ? '重新生成' : '生成会议纪要'}
@@ -1022,7 +1108,7 @@ export default function MeetingDetailPage() {
                     </div>
 
                     {/* Prompt & Previous Meeting options */}
-                    {!isArchived && (hasTranscript || !hasAudio) && (
+                    {canWriteMeeting && (!isArchived || roster?.enabled) && (hasTranscript || !hasAudio) && (
                         <div className="summary-options">
                             <div className="summary-option-row">
                                 <label className="summary-option-label">提示词预设</label>
@@ -1142,7 +1228,7 @@ export default function MeetingDetailPage() {
                             已归档到企业大脑
                             {archiveResult?.doc_id && (
                                 <a
-                                    href={`/kb/doc/${archiveResult.doc_id}`}
+                                    href={`${APP_BASENAME}/kb/doc/${archiveResult.doc_id}`}
                                     className="archive-link"
                                     target="_blank"
                                     rel="noopener noreferrer"

@@ -2,9 +2,9 @@
 Meeting record schemas
 """
 from datetime import date, datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Literal
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MeetingCreateResponse(BaseModel):
@@ -92,3 +92,15 @@ class MeetingStatusResponse(BaseModel):
 class SummarizeRequest(BaseModel):
     prompt: Optional[str] = None
     previous_meeting_id: Optional[UUID] = None
+    attendance_roster_version: Optional[int] = Field(default=None, ge=1)
+
+
+class AttendanceRosterEntry(BaseModel):
+    user_id: UUID
+    status: Literal["present", "absent"]
+
+
+class AttendanceRosterUpdate(BaseModel):
+    version: int = Field(ge=0)
+    people: list[AttendanceRosterEntry]
+    confirm_all_absent: bool = False

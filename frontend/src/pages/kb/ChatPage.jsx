@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { kbApi } from '@/api/kb';
+import { API_BASE_URL } from '@/utils/appPaths';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Send, Trash2, MessageSquare, FileText, Loader2, Bot, User
@@ -139,7 +140,7 @@ export default function ChatPage() {
             const controller = new AbortController();
             abortControllerRef.current = controller;
 
-            const response = await fetch('/api/v1/kb/chat', {
+            const response = await fetch(`${API_BASE_URL}/kb/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

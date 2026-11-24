@@ -1,4 +1,5 @@
 import client from './client';
+import { API_BASE_URL } from '@/utils/appPaths';
 import axios from 'axios';
 
 export const contractApi = {
@@ -48,13 +49,13 @@ export const contractApi = {
     },
 
     viewAttachmentUrl: (contractId, attachmentId) => {
-        return `/api/v1/contract/contracts/${contractId}/attachments/${attachmentId}/view`;
+        return `${API_BASE_URL}/contract/contracts/${contractId}/attachments/${attachmentId}/view`;
     },
 
     downloadAttachment: async (contractId, attachmentId) => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        return axios.get(`/api/v1/contract/contracts/${contractId}/attachments/${attachmentId}/download`, {
+        return axios.get(`${API_BASE_URL}/contract/contracts/${contractId}/attachments/${attachmentId}/download`, {
             responseType: 'blob',
             withCredentials: true,
             headers,

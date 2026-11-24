@@ -1,13 +1,38 @@
 """Migration replay against a disposable legacy schema, never the app DB."""
 import importlib.util
 from pathlib import Path
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+
+
+def test_daily_roster_migration_activates_next_day_without_backfill(monkeypatch):
+    from app.models.base import now_cn
+
+    path = Path(__file__).resolve().parents[1] / 'db_migrations/versions/20261124_0001_daily_attendance_roster.py'
+    spec = importlib.util.spec_from_file_location('daily_roster_upgrade', path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    monkeypatch.setattr(migration.settings, 'APP_ENV', 'production')
+    effective = now_cn().date() + timedelta(days=1)
+    engine = sa.create_engine('sqlite://')
+    with engine.begin() as connection:
+        connection.execute(sa.text('CREATE TABLE beli_policy (starts_on DATE NOT NULL)'))
+        connection.execute(sa.text("INSERT INTO beli_policy VALUES ('2026-11-07')"))
+        connection.execute(sa.text('CREATE TABLE beli_ledger (amount INTEGER NOT NULL)'))
+        connection.execute(sa.text('INSERT INTO beli_ledger VALUES (-500)'))
+        for _ in range(2):
+            with Operations.context(MigrationContext.configure(connection)):
+                migration.upgrade()
+        assert connection.execute(sa.text('SELECT starts_on, roster_starts_on FROM beli_policy')).one() == (
+            '2026-11-07', effective.isoformat())
+        assert connection.execute(sa.text('SELECT count(*) FROM daily_attendance_roster')).scalar_one() == 0
+        assert connection.execute(sa.text('SELECT amount FROM beli_ledger')).scalar_one() == -500
+    engine.dispose()
 
 
 def test_upgrade_preserves_balances_and_is_replayable():

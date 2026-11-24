@@ -1,5 +1,12 @@
 # 后端架构与 API 接口
 
+## 2.1.2 当日早会考勤
+
+- `GET /meeting/records/{id}/attendance-roster`：需要 `meeting.write`；启用时返回 `day/version/settled_version/people/needs_confirmation`。只列在职应到员工，保存后有人停用时返回 `needs_confirmation:true`，须重新保存；转录命中仅作为 `suggested_present` 提示。未启用返回 `enabled:false`。
+- 同路径 `PUT` 提交当前 `version` 和完整 `people:[{user_id,status}]`，状态仅接受 `present/absent`。非应到、漏人、重复项拒绝；全员缺席附 `confirm_all_absent:true`；版本冲突返回409。不产生贝利流水。
+- 已启用早会的 `POST .../summarize` 必须携带 `attendance_roster_version`；保存总结前再次核对名单及同日最新请求。成功时事务提交考勤差额和总结；旧日期和非早会不要求名单，旧日期不重算。MCP仍为43个工具。
+- `GET /beli/attendance` 的当日统计不列停用员工；历史结算记录保留。后台不为停用员工产生新扣款或自动冲正，L0仍可显式作废历史扣款。
+
 ## 2.1.1 总结考勤与工资编辑
 
 - `POST /meeting/records/{id}/summarize`：请求时捕获参会员工ID，完整非空SSE总结成功后，将总结、考勤快照与差额流水原子保存；失败保留旧结果。只允许最新发起的请求保存。创建、ASR、文稿/说话人编辑和归档不结算；后台仅使用已确认快照。

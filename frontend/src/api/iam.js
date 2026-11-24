@@ -1,4 +1,5 @@
 import client from './client';
+import { API_BASE_URL } from '@/utils/appPaths';
 
 export const iamApi = {
     // Users
@@ -116,7 +117,7 @@ export const iamApi = {
     },
 
     getUserFileUrl: (userId, filename) => {
-        return `/api/v1/iam/users/${userId}/files/${filename}`;
+        return `${API_BASE_URL}/iam/users/${userId}/files/${filename}`;
     },
 
     downloadUserFile: async (userId, filename) => {
